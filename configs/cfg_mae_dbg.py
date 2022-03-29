@@ -30,7 +30,6 @@
 import ml_collections
 
 import configs.vit as vit
-import configs.mae as mae
 import configs.cfg_mae_common as cfg_mae_common
 
 
@@ -58,7 +57,6 @@ def get_config():
   config.model.decoder.transformer.attention_dropout_rate = 0.0
   config.model.decoder.transformer.dropout_rate = 0.0
   config.model.decoder.transformer.droppath_rate = 0.0
-  config.model.decoder.classifier = 'token'
 
   # opt config
   config.opt_mu_dtype = 'float32'

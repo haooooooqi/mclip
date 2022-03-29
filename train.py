@@ -499,26 +499,28 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         train_metrics_last_t = time.time()
 
     if (step + 1) % steps_per_epoch == 0:
-      raise NotImplementedError
-      epoch = step // steps_per_epoch
-      eval_metrics = []
-
-      # sync batch statistics across replicas
-      state = sync_batch_stats(state)
-      for _ in range(steps_per_eval):
-        eval_batch = next(eval_iter)
-        metrics = p_eval_step(state, eval_batch)
-        eval_metrics.append(metrics)
-      eval_metrics = common_utils.get_metrics(eval_metrics)
-      summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
-      values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
-      logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
-
-      # to make it consistent with PyTorch log
-      summary['step_tensorboard'] = epoch  # step for tensorboard (no need to minus 1)
-
-      writer.write_scalars(step + 1, summary)
       writer.flush()
+
+    # if (step + 1) % steps_per_epoch == 0:
+    #   epoch = step // steps_per_epoch
+    #   eval_metrics = []
+
+    #   # sync batch statistics across replicas
+    #   state = sync_batch_stats(state)
+    #   for _ in range(steps_per_eval):
+    #     eval_batch = next(eval_iter)
+    #     metrics = p_eval_step(state, eval_batch)
+    #     eval_metrics.append(metrics)
+    #   eval_metrics = common_utils.get_metrics(eval_metrics)
+    #   summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
+    #   values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
+    #   logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
+
+    #   # to make it consistent with PyTorch log
+    #   summary['step_tensorboard'] = epoch  # step for tensorboard (no need to minus 1)
+
+    #   writer.write_scalars(step + 1, summary)
+    #   writer.flush()
 
     if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
       state = sync_batch_stats(state)

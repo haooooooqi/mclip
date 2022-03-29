@@ -37,10 +37,26 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = cfg_mae_common.get_config()
 
-  # model config
-  config.model = vit.get_b16_config()  # ViT-B/16
+  # mae config
+  config.model.mask_ratio = 0.75
+  config.norm_pix_loss = True
+
+  config.model.update(vit.get_b16_config())
+  # config.model.hidden_size = 768
+  # config.model.transformer.mlp_dim = config.model.hidden_size * 4
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.0
+  # config.model.transformer.num_layers = 12
+
+  config.model.decoder = ml_collections.ConfigDict()
+  config.model.decoder.hidden_size = 512
+  config.model.decoder.transformer = ml_collections.ConfigDict()
+  config.model.decoder.transformer.mlp_dim = config.model.decoder.hidden_size * 4
+  config.model.decoder.transformer.num_heads = 16
+  config.model.decoder.transformer.num_layers = 8
+  config.model.decoder.transformer.attention_dropout_rate = 0.0
+  config.model.decoder.transformer.dropout_rate = 0.0
+  config.model.decoder.transformer.droppath_rate = 0.0
 
   # opt config
   config.opt_mu_dtype = 'float32'

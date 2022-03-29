@@ -107,7 +107,7 @@ def get_config():
   config.rescale_init = False  # rescale initialized weights by layer id
 
   # memory
-  config.profile_memory = False
+  config.profile_memory = True
   config.donate = False
   config.init_backend = 'tpu'
 

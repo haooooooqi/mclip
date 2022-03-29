@@ -6,15 +6,15 @@ rm -rf tmp
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 python3 main.py \
     --workdir=./tmp \
-    --config=configs/cfg_mae_dbg.py \
+    --config=configs/cfg_mae_base.py \
     --config.batch_size=128 \
     --config.log_every_steps=10 \
     --config.num_epochs=0.1 \
     --config.profile_memory=True \
-    --config.model.patches.size=\(16,16\) \
     --config.donate=False
 
     # --config.model.transformer.num_layers=2 \
+    # --config.model.patches.size=\(16,16\) \
 
 
 # python3 test_profile.py
