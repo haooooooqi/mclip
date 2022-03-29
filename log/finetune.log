@@ -1,0 +1,121 @@
+[0329 17:01:53.004 INFO:main.py:51] JAX process: 0 / 32
+[0329 17:01:53.005 INFO:main.py:52] JAX local devices: [TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0), TpuDevice(id=1, process_index=0, coords=(0,0,0), core_on_chip=1), TpuDevice(id=2, process_index=0, coords=(1,0,0), core_on_chip=0), TpuDevice(id=3, process_index=0, coords=(1,0,0), core_on_chip=1), TpuDevice(id=16, process_index=0, coords=(0,1,0), core_on_chip=0), TpuDevice(id=17, process_index=0, coords=(0,1,0), core_on_chip=1), TpuDevice(id=18, process_index=0, coords=(1,1,0), core_on_chip=0), TpuDevice(id=19, process_index=0, coords=(1,1,0), core_on_chip=1)]
+[0329 17:01:53.005 INFO:local.py:45] Setting task status: process_index: 0, process_count: 32
+[0329 17:01:53.005 INFO:local.py:50] Created artifact workdir of type ArtifactType.DIRECTORY and value gs://kmh-gcp/checkpoints/flax/20220329_170138_kmh-tpuvm-v3-256-4_cfg_vit_large_200ep_pytorch_recipe_batch4096.
+[0329 17:01:53.005 INFO:main.py:61] aug:
+  area_range: !!python/tuple
+  - 0.08
+  - 1
+  aspect_ratio_range: !!python/tuple
+  - 0.75
+  - 1.3333333333333333
+  autoaug: autoaug
+  color_jit: null
+  crop_ver: v4
+  label_smoothing: 0.1
+  mix:
+    cutmix: true
+    cutmix_alpha: 1.0
+    mixup: true
+    mixup_alpha: 0.8
+    switch_elementwise: false
+  torchvision: false
+batch_size: 4096
+cache: true
+dataset: imagenet2012:5.*.*
+donate: true
+ema: true
+ema_decay: 0.9999
+ema_eval: true
+exclude_wd: true
+half_precision: false
+init_backend: tpu
+learning_rate: 0.0001
+log_every_steps: 1
+min_abs_lr: 1.0e-06
+model:
+  classifier: token
+  hidden_size: 1024
+  name: ViT-L_16
+  patches:
+    size: !!python/tuple
+    - 16
+    - 16
+  representation_size: null
+  transformer:
+    attention_dropout_rate: 0.0
+    dropout_rate: 0.0
+    droppath_rate: 0.2
+    mlp_dim: 4096
+    num_heads: 16
+    num_layers: 24
+num_epochs: 200.0
+num_train_steps: -1
+opt:
+  b1: 0.9
+  b2: 0.95
+  weight_decay: 0.3
+opt_mu_dtype: bfloat16
+opt_type: adamw
+profile_memory: false
+rescale_init: true
+save_every_epochs: 10
+steps_per_eval: -1
+warmup_epochs: 20.0
+
+[0329 17:01:54.097 INFO:dataset_info.py:439] Load dataset info from gs://kmh-gcp/tensorflow_datasets/imagenet2012/5.1.0
+[0329 17:01:54.486 INFO:logging_logger.py:44] Constructing tf.data.Dataset imagenet2012 for split train[0:40036], from gs://kmh-gcp/tensorflow_datasets/imagenet2012/5.1.0
+[0329 17:01:54.561 WARNING:options.py:556] options.experimental_threading is deprecated. Use options.threading instead.
+[0329 17:02:02.307 INFO:logging_logger.py:44] Constructing tf.data.Dataset imagenet2012 for split validation[0:1562], from gs://kmh-gcp/tensorflow_datasets/imagenet2012/5.1.0
+[0329 17:02:02.377 WARNING:options.py:556] options.experimental_threading is deprecated. Use options.threading instead.
+[0329 17:02:47.972 INFO:checkpoints.py:249] Found no checkpoint files in gs://kmh-gcp/checkpoints/flax/20220329_170138_kmh-tpuvm-v3-256-4_cfg_vit_large_200ep_pytorch_recipe_batch4096
+[0329 17:02:48.571 INFO:train.py:465] Initial compilation, this might take some minutes...
+[0329 17:03:57.330 INFO:train.py:472] Initial compilation completed.
+2022-03-29 17:04:34.481912: E external/org_tensorflow/tensorflow/stream_executor/stream.cc:4548] INTERNAL: Program or fatal error occurred; computation may be invalid: FAILED_PRECONDITION: Can't read TensorCore tag value when not Open.
+=== Source Location Trace: ===
+platforms/asic_sw/driver/2a886c8/jxc/common/internal/tensor_node.cc:1109
+learning/45eac/tpu/runtime/hal/internal/jxc/tpu_core_debug_interface_jxc_driver_impl.cc:47
+learning/45eac/tpu/runtime/hal/internal/tpu_program_termination_validation.cc:35
+
+2022-03-29 17:04:34.481995: F external/org_tensorflow/tensorflow/compiler/xla/pjrt/local_device_state.cc:167] Check failed: stream->ok() INTERNAL: Program or fatal error occurred; computation may be invalid: FAILED_PRECONDITION: Can't read TensorCore tag value when not Open.
+=== Source Location Trace: ===
+platforms/asic_sw/driver/2a886c8/jxc/common/internal/tensor_node.cc:1109
+learning/45eac/tpu/runtime/hal/internal/jxc/tpu_core_debug_interface_jxc_driver_impl.cc:47
+learning/45eac/tpu/runtime/hal/internal/tpu_program_termination_validation.cc:35
+
+Fatal Python error: Aborted
+
+Thread 0x00007f3eb245ac40 (most recent call first):
+  File "/home/kaiminghe/flax_dev/train.py", line 483 in train_and_evaluate
+  File "main.py", line 66 in main
+  File "/usr/local/lib/python3.8/dist-packages/absl/app.py", line 258 in _run_main
+  File "/usr/local/lib/python3.8/dist-packages/absl/app.py", line 312 in run
+  File "main.py", line 74 in <module>
+https://symbolize.stripped_domain/r/?trace=7f3eb28ad03b,7f3eb28ad0bf,7f3eacfd6351,7f3eac17ee32,7f3eaf83ed6b,7f3eaf252c98,7f3ea25d7e4f,7f3ea825095a,7f3ea825ae00,7f3ea4e7acee,7f3ea8261d74,7f3ea8cb9ec6,7f3ea8cbf28a,7f3ea8cbbe64,7f3ea8f2341f,7f3eb284f608&map=991d3a3f1e3316bc5256e1e99f124438:7f3ea9c78000-7f3eb0b7b429,52a3e5736151c7837be510ff417da4d4:7f3e98f01000-7f3ea938e7d0 
+*** SIGABRT received by PID 568777 (TID 570205) on cpu 5 from PID 568777; stack trace: ***
+PC: @     0x7f3eb28ad03b  (unknown)  raise
+    @     0x7f3ea901603a        992  (unknown)
+    @     0x7f3eb28ad0c0  (unknown)  (unknown)
+    @     0x7f3eacfd6352        464  xla::LocalDeviceState::ReturnStreamToPool()
+    @     0x7f3eac17ee33         48  std::_Function_handler<>::_M_invoke()
+    @     0x7f3eaf83ed6c         32  std::_Function_handler<>::_M_invoke()
+    @     0x7f3eaf252c99         96  tensorflow::tpu::HostCallbackTrampoline()
+    @     0x7f3ea25d7e50         32  (unknown)
+    @     0x7f3ea825095b         48  (unknown)
+    @     0x7f3ea825ae01        288  (unknown)
+    @     0x7f3ea4e7acef         32  (unknown)
+    @     0x7f3ea8261d75        272  (unknown)
+    @     0x7f3ea8cb9ec7         64  (unknown)
+    @     0x7f3ea8cbf28b         96  (unknown)
+    @     0x7f3ea8cbbe65         32  (unknown)
+    @     0x7f3ea8f23420        240  (unknown)
+    @     0x7f3eb284f609  (unknown)  start_thread
+https://symbolize.stripped_domain/r/?trace=7f3eb28ad03b,7f3ea9016039,7f3eb28ad0bf,7f3eacfd6351,7f3eac17ee32,7f3eaf83ed6b,7f3eaf252c98,7f3ea25d7e4f,7f3ea825095a,7f3ea825ae00,7f3ea4e7acee,7f3ea8261d74,7f3ea8cb9ec6,7f3ea8cbf28a,7f3ea8cbbe64,7f3ea8f2341f,7f3eb284f608&map=991d3a3f1e3316bc5256e1e99f124438:7f3ea9c78000-7f3eb0b7b429,52a3e5736151c7837be510ff417da4d4:7f3e98f01000-7f3ea938e7d0 
+E0329 17:04:34.516705  570205 coredump_hook.cc:365] RAW: Remote crash data gathering hook invoked.
+E0329 17:04:34.516713  570205 coredump_hook.cc:411] RAW: Skipping coredump since rlimit was 0 at process start.
+E0329 17:04:34.516726  570205 client.cc:222] RAW: Coroner client retries enabled (b/136286901), will retry for up to 30 sec.
+E0329 17:04:34.516732  570205 coredump_hook.cc:473] RAW: Sending fingerprint to remote end.
+E0329 17:04:34.516740  570205 coredump_socket.cc:124] RAW: Stat failed errno=2 on socket /var/google/services/logmanagerd/remote_coredump.socket
+E0329 17:04:34.516752  570205 coredump_hook.cc:477] RAW: Cannot send fingerprint to Coroner: [NOT_FOUND] Missing crash reporting socket. Is the listener running?
+E0329 17:04:34.516755  570205 coredump_hook.cc:550] RAW: Discarding core.
+E0329 17:04:34.852506  570205 process_state.cc:766] RAW: Raising signal 6 with default behavior
