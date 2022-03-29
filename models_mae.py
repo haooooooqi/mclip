@@ -347,16 +347,18 @@ class VisionTransformer(nn.Module):
     x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
 
     # ---------------------------------------------------------------
-    x = nn.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
-      dtype=self.dtype,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      name='pred')(x)
+    # x = nn.Dense(
+    #   features=self.patches.size[0] * self.patches.size[1] * 3,
+    #   dtype=self.dtype,
+    #   kernel_init=mlp_kernel_init,
+    #   bias_init=mlp_bias_init,
+    #   name='pred')(x)
 
-    pred = x[:, 1:, :]
-    mask = jnp.ones([1,])
-    loss = self.compute_loss(inputs, pred, mask)
+    pred = x
+    loss = jnp.sum(pred)
+    # pred = x[:, 1:, :]
+    # mask = jnp.ones([1,])
+    # loss = self.compute_loss(inputs, pred, mask)
     # ---------------------------------------------------------------
 
     # apply the encoder-decoder bottleneck
