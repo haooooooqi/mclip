@@ -1,6 +1,6 @@
 VM_NAME=kmh-tpuvm-v3-256-4
 echo $VM_NAME
-REPO=https://71d519550fe3430ecbf39b70467e9210aed5da69:@github.com/KaimingHe/flax_dev.git
+REPO=https://$GIT_ID@github.com/KaimingHe/flax_dev.git
 BRANCH=main
 
 # kaiming: this is the setting that produced the crash (v3-256 only)
@@ -15,7 +15,7 @@ log_every_steps=1
 JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_pytorch_recipe_batch${batch}
 
 
-DATADIR='gs://kmh-gcp/tensorflow_datasets'
+TFDS_DATA_DIR='gs://kmh-gcp/tensorflow_datasets'
 WORKDIR='gs://kmh-gcp/checkpoints/'${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
 mkdir -p ${LOGDIR}
@@ -32,7 +32,7 @@ git rev-parse --short HEAD
 # pip3 list | grep 'jax\|flax\|tensorflow '
 
 cd ~/flax_dev
-export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
+export TFDS_DATA_DIR=$TFDS_DATA_DIR
 python3 main.py \
     --workdir=$WORKDIR \
     --config=configs/$CONFIG.py \
