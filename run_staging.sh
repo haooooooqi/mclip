@@ -1,6 +1,6 @@
 VM_NAME=kmh-tpuvm-v3-256-4
 echo $VM_NAME
-REPO=https://$GIT_ID@github.com/KaimingHe/flax_dev.git
+REPO=https://${GITHUB_ID}@github.com/KaimingHe/flax_dev.git
 BRANCH=main
 
 # kaiming: this is the setting that produced the crash (v3-256 only)
