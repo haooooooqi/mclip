@@ -27,5 +27,7 @@ donate=True
 ```
 It does not happen in other settings.
 
+1. The log when crashing is in log/finetune.log
+
 
 
