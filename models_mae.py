@@ -15,11 +15,12 @@
 from inspect import trace
 from typing import Any, Callable, Optional, Tuple
 
-import flax.linen as nn
+import jax
 import jax.numpy as jnp
+import jax.random as random
 
-# from vit_jax import models_mixer
-# from vit_jax import models_resnet
+import flax.linen as nn
+
 
 Array = Any
 PRNGKey = Any
@@ -233,7 +234,7 @@ class Encoder(nn.Module):
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1),
+          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
           name='encoderblock_{:02d}'.format(lyr),
           num_heads=self.num_heads,
           layer_id=lyr)(
@@ -247,19 +248,44 @@ class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
   num_classes: int
+  mask_ratio: float
   patches: Any
   transformer: Any
   hidden_size: int
-  resnet: Optional[Any] = None
   representation_size: Optional[int] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
+  decoder: Any = None
+
+  def random_mask(self, x, train):
+    if train:
+      rng = self.make_rng('dropout')
+    else:
+      rng = random.PRNGKey(0)
+    
+    N, L, D = x.shape  # batch, length, dim
+    len_keep = int(L * (1 - self.mask_ratio))
+
+    noise = random.normal(rng, shape=(N, L))
+    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
+    ids_restore = jnp.argsort(ids_shuffle, axis=1)
+
+    # keep the first subset
+    ids_keep = ids_shuffle[:, :len_keep]    
+    ids_keep = jnp.expand_dims(ids_keep, -1)
+    x_masked = jnp.take_along_axis(x, ids_keep, axis=1)
+
+    # generate the binary mask: 0 is keep, 1 is remove
+    mask = jnp.ones([N, L])
+    mask = mask.at[:, :len_keep].set(0)
+    # unshuffle to get the binary mask
+    mask = jnp.take_along_axis(mask, ids_restore, axis=1)
+
+    return x_masked, mask, ids_restore
 
   @nn.compact
   def __call__(self, inputs, *, train):
     x = inputs
-    # (Possibly partial) ResNet root.
-    assert self.resnet == None
 
     n, h, w, c = x.shape
     # We can merge s2d+emb into a single conv; it's the same.
@@ -278,6 +304,9 @@ class VisionTransformer(nn.Module):
     # Transformer.
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
+
+    # masking: length -> length * mask_ratio
+    x, mask, ids_restore = self.random_mask(x, train)
 
     # If we want to add a class token, add it here.
     if self.classifier == 'token':
@@ -299,16 +328,6 @@ class VisionTransformer(nn.Module):
       x = nn.tanh(x)
     else:
       x = IdentityLayer(name='pre_logits')(x)
-    
-    # ------------------------------------------------
-    # debugging BN or state
-    # x = nn.BatchNorm(
-    #   use_running_average=not train,
-    #   momentum=0.9,
-    #   epsilon=1e-5,
-    #   name='bn_debug'
-    # )(x)
-    # ------------------------------------------------
 
     if self.num_classes:
       x = nn.Dense(

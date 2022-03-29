@@ -44,7 +44,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 import input_pipeline
-import models_vit
+import models_mae
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import opt_util
@@ -74,7 +74,7 @@ def create_model(*, model_cls, half_precision, **kwargs):
 
 
 def initialized(key, image_size, model, init_backend='tpu'):
-  input_shape = (1, image_size, image_size, 3)
+  input_shape = (2, image_size, image_size, 3)
   def init(*args):
     return model.init(*args, train=False)
   init = jax.jit(init, backend=init_backend)
@@ -416,7 +416,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
   # model_cls = getattr(models, config.model)
-  model_cls = models_vit.VisionTransformer
+  model_cls = models_mae.VisionTransformer
   model = create_model(
       model_cls=model_cls, half_precision=config.half_precision, **config.model)
 
@@ -430,17 +430,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   # --------------------------------------------------------------------------------
   # up til now, state.params are for one device
-  # image = jnp.ones([2, 224, 224, 3])
-  # label = jnp.ones([2,], dtype=jnp.int32)
-  # mutable_keys = [k for k in state.variables]
-  # outcome = state.apply_fn(
-  #     {'params': state.params,
-  #      **state.variables,
-  #     },
-  #     rngs=dict(dropout=state.rng),
-  #     inputs=image,
-  #     mutable=mutable_keys,
-  #     train=True)
+  image = jnp.ones([2, 224, 224, 3])
+  label = jnp.ones([2,], dtype=jnp.int32)
+  mutable_keys = [k for k in state.variables]
+  outcome = state.apply_fn(
+      {'params': state.params,
+       **state.variables,
+      },
+      rngs=dict(dropout=state.rng),
+      inputs=image,
+      mutable=mutable_keys,
+      train=True)
   # logits, new_variables = outcome
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.opt_state[0].nu)])
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.params)])
