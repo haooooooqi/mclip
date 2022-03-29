@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from inspect import trace
+import functools
 from typing import Any, Callable, Optional, Tuple
 
 import jax
@@ -244,7 +244,7 @@ class Encoder(nn.Module):
 
 def gather(x, ids):
   return x[ids]
-batch_gather = jax.vmap(gather, in_axes=(0, 0), out_axes=0)
+vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
 
 
 class VisionTransformer(nn.Module):
@@ -267,28 +267,19 @@ class VisionTransformer(nn.Module):
     N, L, _ = x.shape  # batch, length, dim
     len_keep = int(L * (1 - self.mask_ratio))
 
-    # noise = random.normal(rng, shape=(N, L))
-    # ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
-    # ids_restore = jnp.argsort(ids_shuffle, axis=1)
+    noise = random.normal(rng, shape=(N, L))
+    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
+    ids_restore = jnp.argsort(ids_shuffle, axis=1)
 
-    ids_shuffle = jnp.arange(0, L)
-    ids_shuffle = jnp.expand_dims(ids_shuffle, 0)
-    ids_shuffle = jnp.tile(ids_shuffle, (N, 1))
-
-    ids_restore = None
-    ids_keep = ids_shuffle[:, :len_keep]
-
-    # # keep the first subset
-    # ids_keep = ids_shuffle[:, :len_keep]    
-    # ids_keep = jnp.expand_dims(ids_keep, -1)
-    # x_masked = jnp.take_along_axis(x, ids_keep, axis=1)
-    x_masked = batch_gather(x, ids_keep)
+    # keep the first subset
+    ids_keep = ids_shuffle[:, :len_keep]    
+    x_masked = vmapped_gather(x, ids_keep)
 
     # generate the binary mask: 0 is keep, 1 is remove
     mask = jnp.ones([N, L])
     mask = mask.at[:, :len_keep].set(0)
     # unshuffle to get the binary mask
-    # mask = jnp.take_along_axis(mask, ids_restore, axis=1)
+    mask = vmapped_gather(mask, ids_restore)
 
     return x_masked, mask, ids_restore
 
