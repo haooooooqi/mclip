@@ -133,10 +133,8 @@ def train_step(state, batch, learning_rate_fn, config):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    logits, new_variables = outcome
-
-    loss = cross_entropy_loss(logits, batch['label_one_hot'])
-    return loss, (new_variables, logits)
+    (loss, pred), new_variables = outcome
+    return loss, (new_variables, loss)
 
   step = state.step
   dynamic_scale = state.dynamic_scale
@@ -152,9 +150,10 @@ def train_step(state, batch, learning_rate_fn, config):
     aux, grads = grad_fn(state.params)
     # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
     grads = lax.pmean(grads, axis_name='batch')
-  new_variables, logits = aux[1]
-  metrics = compute_metrics(logits, batch['label'], batch['label_one_hot'])
-  metrics['learning_rate'] = lr
+
+  new_variables, loss = aux[1]
+  # metrics = compute_metrics(logits, batch['label'], batch['label_one_hot'])
+  metrics = {'loss': loss, 'learning_rate': lr,}
 
   # ----------------------------------------------------------------------------
   # original
@@ -441,7 +440,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   #     inputs=image,
   #     mutable=mutable_keys,
   #     train=True)
-  # logits, new_variables = outcome
+  # (loss, pred), new_variables = outcome
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.opt_state[0].nu)])
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.params)])
   # num_params_mem = num_params * 4 / 1024 / 1024
@@ -453,9 +452,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       axis_name='batch',
       donate_argnums=(0,) if config.donate else ()
       )
-  p_eval_step = jax.pmap(
-      functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
-      axis_name='batch')
+  # p_eval_step = jax.pmap(
+  #     functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
+  #     axis_name='batch')
 
   train_metrics = []
   hooks = []
@@ -492,7 +491,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         # to make it consistent with PyTorch log
         summary['loss'] = summary['train_loss']  # add extra name
         summary['lr'] = summary.pop('train_learning_rate')  # rename
-        summary['class_acc'] = summary.pop('train_accuracy')  # this is [0, 1]
+        # summary['class_acc'] = summary.pop('train_accuracy')  # this is [0, 1]
         summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
 
         writer.write_scalars(step + 1, summary)
@@ -500,6 +499,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         train_metrics_last_t = time.time()
 
     if (step + 1) % steps_per_epoch == 0:
+      raise NotImplementedError
       epoch = step // steps_per_epoch
       eval_metrics = []
 

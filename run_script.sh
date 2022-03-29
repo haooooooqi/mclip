@@ -12,7 +12,7 @@ python3 main.py \
     --config.num_epochs=0.1 \
     --config.profile_memory=True \
     --config.model.patches.size=\(16,16\) \
-    --config.donate=True
+    --config.donate=False
 
     # --config.model.transformer.num_layers=2 \
 

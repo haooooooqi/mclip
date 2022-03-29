@@ -247,6 +247,7 @@ class VisionTransformer(nn.Module):
 
   num_classes: int
   mask_ratio: float
+  norm_pix_loss: bool
   patches: Any
   transformer: Any
   hidden_size: int
@@ -297,9 +298,15 @@ class VisionTransformer(nn.Module):
     pred: [N, L, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
     target = self.patchify(imgs)
+    if self.norm_pix_loss:
+        target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
+
+    loss = jnp.square(pred - target)
+    loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
+
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -369,12 +376,9 @@ class VisionTransformer(nn.Module):
       name='pred')(x)
 
     # remove cls token
-    x = x[:, num_clstokens:, :]
+    pred = x[:, num_clstokens:, :]
   
     # compute loss
-    self.compute_loss(inputs, x, mask)
+    loss = self.compute_loss(inputs, pred, mask)
 
-    # ------------------------------------------------
-    # WIP
-
-    return x
+    return loss, pred

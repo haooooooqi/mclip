@@ -42,6 +42,7 @@ def get_config():
   config.transformer.droppath_rate = 0.0
 
   config.mask_ratio = 0.75
+  config.norm_pix_loss = True
 
   config.decoder = vit.get_testing_config()
   config.decoder.transformer.dropout_rate = 0.0
