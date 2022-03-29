@@ -278,6 +278,29 @@ class VisionTransformer(nn.Module):
 
     return x_masked, mask, ids_restore
 
+  def patchify(self, imgs):
+      """
+      imgs: (N, H, W, 3)
+      x: (N, L, patch_size**2 *3)
+      """
+      p, q = self.patches.size
+      h, w = imgs.shape[1] // p, imgs.shape[2] // q 
+
+      x = jnp.reshape(imgs, (imgs.shape[0], h, p, w, q, 3))
+      x = jnp.einsum('nhpwqc->nhwpqc', x)
+      x = jnp.reshape(x, (imgs.shape[0], h * w, p * q * 3))
+      return x
+
+  def compute_loss(self, imgs, pred, mask):
+    """
+    imgs: [N, H, W, 3]
+    pred: [N, L, p*p*3]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+    target = self.patchify(imgs)
+
   @nn.compact
   def __call__(self, inputs, *, train):
     use_cls_token=(self.classifier == 'token')
@@ -285,7 +308,6 @@ class VisionTransformer(nn.Module):
 
     x = inputs
 
-    n, h, w, c = x.shape
     # We can merge s2d+emb into a single conv; it's the same.
     x = nn.Conv(
         features=self.hidden_size,
@@ -303,10 +325,7 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    x = AddPositionEmbs(
-      posemb_init=posemb_init,  # from BERT.
-      name='posembed_encoder',
-    )(x)
+    x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x, train)
@@ -335,27 +354,27 @@ class VisionTransformer(nn.Module):
     x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
+    # add decoder posembed
+    x = AddPositionEmbs(posemb_init=posemb_init,  name='posembed_decoder')(x)
+
+    # apply the decoder
+    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+    
+    # apply the encoder-decoder bottleneck
+    x = nn.Dense(
+      features=self.patches.size[0] * self.patches.size[1] * 3,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='pred')(x)
+
+    # remove cls token
+    x = x[:, num_clstokens:, :]
+  
+    # compute loss
+    self.compute_loss(inputs, x, mask)
 
     # ------------------------------------------------
     # WIP
 
-    if self.classifier == 'token':
-      x = x[:, 0]
-    elif self.classifier == 'gap':
-      x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-    else:
-      raise ValueError(f'Invalid classifier={self.classifier}')
-
-    if self.representation_size is not None:
-      x = nn.Dense(features=self.representation_size, name='pre_logits')(x)
-      x = nn.tanh(x)
-    else:
-      x = IdentityLayer(name='pre_logits')(x)
-
-    if self.num_classes:
-      x = nn.Dense(
-        features=self.num_classes,
-        name='head',
-        kernel_init=head_kernel_init
-      )(x)
     return x

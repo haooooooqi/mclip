@@ -56,6 +56,7 @@ def get_config():
   config.model.decoder.transformer.num_layers = 3
   config.model.decoder.transformer.attention_dropout_rate = 0.0
   config.model.decoder.transformer.dropout_rate = 0.0
+  config.model.decoder.transformer.droppath_rate = 0.0
   config.model.decoder.classifier = 'token'
 
   # opt config
