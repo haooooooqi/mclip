@@ -77,7 +77,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
   input_shape = (2, image_size, image_size, 3)
   def init(*args):
     return model.init(*args, train=False)
-  init = jax.jit(init, backend=init_backend)
+  # init = jax.jit(init, backend=init_backend)
   variables = init({'params': key}, jnp.ones(input_shape, model.dtype))
   return variables
 
@@ -430,17 +430,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   # --------------------------------------------------------------------------------
   # up til now, state.params are for one device
-  image = jnp.ones([2, 224, 224, 3])
-  label = jnp.ones([2,], dtype=jnp.int32)
-  mutable_keys = [k for k in state.variables]
-  outcome = state.apply_fn(
-      {'params': state.params,
-       **state.variables,
-      },
-      rngs=dict(dropout=state.rng),
-      inputs=image,
-      mutable=mutable_keys,
-      train=True)
+  # image = jnp.ones([3, 224, 224, 3])
+  # label = jnp.ones([3,], dtype=jnp.int32)
+  # mutable_keys = [k for k in state.variables]
+  # outcome = state.apply_fn(
+  #     {'params': state.params,
+  #      **state.variables,
+  #     },
+  #     rngs=dict(dropout=state.rng),
+  #     inputs=image,
+  #     mutable=mutable_keys,
+  #     train=True)
   # logits, new_variables = outcome
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.opt_state[0].nu)])
   # num_params = np.sum([np.prod(p.shape) for p in jax.tree_leaves(state.params)])

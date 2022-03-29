@@ -34,6 +34,7 @@ INIT_VER = 'v2'
 fixed_gaussian_init = nn.initializers.normal(stddev=0.02)
 if INIT_VER == 'v1':
   clstoken_init = nn.initializers.zeros
+  masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init
   patch_kernel_init = nn.initializers.lecun_uniform()
   patch_bias_init = nn.initializers.zeros
@@ -43,6 +44,7 @@ if INIT_VER == 'v1':
   head_kernel_init=nn.initializers.zeros
 elif INIT_VER == 'v2':
   clstoken_init = fixed_gaussian_init
+  masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init
   patch_kernel_init = fixed_gaussian_init
   patch_bias_init = fixed_gaussian_init  # bug from PyTorch code?
@@ -208,6 +210,7 @@ class Encoder(nn.Module):
   dropout_rate: float = 0.1
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
+  prefix: str = 'encoder'
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -222,12 +225,7 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
-    x = AddPositionEmbs(
-        posemb_init=posemb_init,  # from BERT.
-        name='posembed_input')(
-            inputs)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
-
+    x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
       x = Encoder1DBlock(
@@ -235,11 +233,11 @@ class Encoder(nn.Module):
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
           droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name='encoderblock_{:02d}'.format(lyr),
+          name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
           num_heads=self.num_heads,
           layer_id=lyr)(
               x, deterministic=not train)
-    encoded = nn.LayerNorm(name='encoder_norm')(x)
+    encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
 
     return encoded
 
@@ -258,12 +256,9 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
 
   def random_mask(self, x, train):
-    if train:
-      rng = self.make_rng('dropout')
-    else:
-      rng = random.PRNGKey(0)
+    rng = self.make_rng('dropout') if train else random.PRNGKey(0)
     
-    N, L, D = x.shape  # batch, length, dim
+    N, L, _ = x.shape  # batch, length, dim
     len_keep = int(L * (1 - self.mask_ratio))
 
     noise = random.normal(rng, shape=(N, L))
@@ -285,6 +280,9 @@ class VisionTransformer(nn.Module):
 
   @nn.compact
   def __call__(self, inputs, *, train):
+    use_cls_token=(self.classifier == 'token')
+    assert use_cls_token  # kaiming: TODO: support both?
+
     x = inputs
 
     n, h, w, c = x.shape
@@ -305,16 +303,41 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
+    x = AddPositionEmbs(
+      posemb_init=posemb_init,  # from BERT.
+      name='posembed_encoder',
+    )(x)
+
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x, train)
 
     # If we want to add a class token, add it here.
-    if self.classifier == 'token':
+    if use_cls_token:
       cls = self.param('cls', clstoken_init, (1, 1, c))
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
 
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train)
+    # apply the encoder
+    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+
+    # apply the encoder-decoder bottleneck
+    x = nn.Dense(
+      features=self.decoder.hidden_size,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='bottleneck')(x)
+    
+    # append mask token
+    num_clstokens = 1 if use_cls_token else 0
+    mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
+    mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
+    x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
+    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
+
+
+    # ------------------------------------------------
+    # WIP
 
     if self.classifier == 'token':
       x = x[:, 0]
