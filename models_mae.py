@@ -350,54 +350,40 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
 
-    # ---------------------------------------------------------------
-    # x = nn.Dense(
-    #   features=self.patches.size[0] * self.patches.size[1] * 3,
-    #   dtype=self.dtype,
-    #   kernel_init=mlp_kernel_init,
-    #   bias_init=mlp_bias_init,
-    #   name='pred')(x)
-
-    pred = x
-    loss = jnp.sum(pred)
-    # pred = x[:, 1:, :]
-    # mask = jnp.ones([1,])
-    # loss = self.compute_loss(inputs, pred, mask)
-    # ---------------------------------------------------------------
-
     # apply the encoder-decoder bottleneck
-    # x = nn.Dense(
-    #   features=self.decoder.hidden_size,
-    #   dtype=self.dtype,
-    #   kernel_init=mlp_kernel_init,
-    #   bias_init=mlp_bias_init,
-    #   name='bottleneck')(x)
-    
+    x = nn.Dense(
+      features=self.decoder.hidden_size,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='bottleneck')(x)
+
     # append mask token
-    # num_clstokens = 1 if use_cls_token else 0
-    # mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
-    # mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
-    # x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
-    # x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
+    num_clstokens = 1 if use_cls_token else 0
+    mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
+    mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
+    x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
+    x_ = vmapped_gather(x_, ids_restore)
+    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # add decoder posembed
-    # x = AddPositionEmbs(posemb_init=posemb_init,  name='posembed_decoder')(x)
+    x = AddPositionEmbs(posemb_init=posemb_init,  name='posembed_decoder')(x)
 
     # apply the decoder
-    # x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
-    
+    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+
     # apply the predictor
-    # x = nn.Dense(
-    #   features=self.patches.size[0] * self.patches.size[1] * 3,
-    #   dtype=self.dtype,
-    #   kernel_init=mlp_kernel_init,
-    #   bias_init=mlp_bias_init,
-    #   name='pred')(x)
+    x = nn.Dense(
+      features=self.patches.size[0] * self.patches.size[1] * 3,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='pred')(x)
 
     # remove cls token
-    # pred = x[:, num_clstokens:, :]
+    pred = x[:, num_clstokens:, :]
   
     # compute loss
-    # loss = self.compute_loss(inputs, pred, mask)
+    loss = self.compute_loss(inputs, pred, mask)
 
     return loss, pred
