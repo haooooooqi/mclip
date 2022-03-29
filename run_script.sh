@@ -2,14 +2,14 @@
 
 rm -rf tmp
 
-# 4096 / 256 tpus = 128 / 8 tpus  
+# 4096 / 128 tpus = 256 / 8 tpus  
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 python3 main.py \
     --workdir=./tmp \
-    --config=configs/cfg_mae_dbg.py \
-    --config.batch_size=128 \
-    --config.log_every_steps=10 \
-    --config.num_epochs=0.1 \
+    --config=configs/cfg_mae_base.py \
+    --config.batch_size=256 \
+    --config.log_every_steps=100 \
+    --config.num_epochs=10 \
     --config.profile_memory=True \
     --config.donate=False
 
