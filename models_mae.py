@@ -335,7 +335,7 @@ class VisionTransformer(nn.Module):
     x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
-    # x, mask, ids_restore = self.random_mask(x, train)
+    x, mask, ids_restore = self.random_mask(x, train)
 
     # If we want to add a class token, add it here.
     if use_cls_token:
