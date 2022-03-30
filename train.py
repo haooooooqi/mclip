@@ -482,8 +482,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
     if config.get('log_every_steps'):
       train_metrics.append(metrics)
-      if (step + 1) % config.log_every_steps == 0:
-
+      if (step + 1) % config.log_every_steps == 0:        
         # if (step + 1) == config.log_every_steps and config.profile_memory:
         #   profile_memory(workdir)
         # Wait until computations are done before exiting

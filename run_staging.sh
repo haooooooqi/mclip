@@ -6,13 +6,13 @@ BRANCH=main
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c8`
 
-ep=800
+ep=100
 batch=4096
 
 
-CONFIG=cfg_mae_large
+CONFIG=cfg_mae_base
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_vis
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_posemb_sincos
 
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -49,6 +49,7 @@ python3 main.py \
     --config.num_epochs=${ep} \
     --config.save_every_epochs=10 \
     --config.model.norm_pix_loss=True \
+    --config.model.sincos=True \
 
 " 2>&1 | tee $LOGDIR/finetune.log
 

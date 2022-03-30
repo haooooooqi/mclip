@@ -22,6 +22,9 @@ import jax.random as random
 import flax.linen as nn
 
 
+from utils import posembed_util
+from utils import initializers_util
+
 Array = Any
 PRNGKey = Any
 Shape = Tuple[int]
@@ -73,6 +76,7 @@ class AddPositionEmbs(nn.Module):
   sincos: bool
   use_cls_token: bool
   img_shape: Shape  # [h, w, c]
+  dtype: Any = jnp.float32
 
   def setup(self):
     h, w, c = self.img_shape
@@ -80,7 +84,13 @@ class AddPositionEmbs(nn.Module):
     num_clstokens = 1 if self.use_cls_token else 0
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
-    self.pe = self.param('pos_embedding', posemb_init, pos_emb_shape)
+    if not self.sincos:
+      self.pe = self.param('pos_embedding', posemb_init, pos_emb_shape)
+    else:
+      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
+
+      sincos_init = initializers_util.constant(value=pe_array, dtype=self.dtype)
+      self.pe = self.param('pos_embedding', sincos_init, pos_emb_shape)
 
     # kaiming: in MAE, we should always set posembed for cls_token as zero.
     # when loading for finetuning, this zero posembed can be tuned.
@@ -99,11 +109,13 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
+    
+    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
 
     if self.use_cls_token:
-      output = inputs + self.pe[:, 1:, :]
+      output = inputs + pe[:, 1:, :]
     else:
-      output = inputs + self.pe
+      output = inputs + pe
 
     return output
 
