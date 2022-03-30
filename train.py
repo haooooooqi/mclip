@@ -78,7 +78,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
   input_shape = (2, image_size, image_size, 3)
   def init(*args):
     return model.init(*args, train=False)
-  # init = jax.jit(init, backend=init_backend)
+  init = jax.jit(init, backend=init_backend)
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
     jnp.ones(input_shape, model.dtype))
@@ -419,6 +419,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     steps_per_eval = config.steps_per_eval
 
   steps_per_checkpoint = int(steps_per_epoch * config.save_every_epochs)
+  steps_per_visualize = int(steps_per_epoch * config.vis_every_epochs)
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
@@ -510,7 +511,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       writer.flush()
 
     # visualize
-    if ((step + 1) % steps_per_epoch == 0 or step == step_offset + 1) and config.model.visualize:
+    if ((step + 1) % steps_per_visualize == 0 or step == step_offset) and config.model.visualize:
       epoch = step // steps_per_epoch
       eval_batch = next(eval_iter)
       metrics = p_eval_step(state, eval_batch)

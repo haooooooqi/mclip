@@ -113,5 +113,6 @@ def get_config():
 
   # utils
   config.resume_dir = ''
+  config.vis_every_epochs = 20.
 
   return config
