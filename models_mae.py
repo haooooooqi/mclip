@@ -260,9 +260,10 @@ class VisionTransformer(nn.Module):
   classifier: str = 'token'
   dtype: Any = jnp.float32
   decoder: Any = None
+  visualize: bool = False
 
-  def random_mask(self, x, train):
-    rng = self.make_rng('dropout') if train else random.PRNGKey(0)
+  def random_mask(self, x):
+    rng = self.make_rng('dropout')
     
     N, L, _ = x.shape  # batch, length, dim
     len_keep = int(L * (1 - self.mask_ratio))
@@ -296,6 +297,19 @@ class VisionTransformer(nn.Module):
       x = jnp.reshape(x, (imgs.shape[0], h * w, p * q * 3))
       return x
 
+  def unpatchify(self, x):
+      """
+      x: (N, L, patch_size**2 *3)
+      imgs: (N, H, W, 3)
+      """
+      p, q = self.patches.size
+      h = w = int(x.shape[1]**.5)
+
+      x = jnp.reshape(x, (x.shape[0], h, w, p, q, 3))
+      x = jnp.einsum('nhwpqc->nhpwqc', x)
+      imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
+      return imgs
+
   def compute_loss(self, imgs, pred, mask):
     """
     imgs: [N, H, W, 3]
@@ -311,6 +325,26 @@ class VisionTransformer(nn.Module):
 
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
+
+  def visualization(self, imgs, pred, mask):
+    """
+    imgs: [N, H, W, 3]
+    pred: [N, L, p*p*3]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    imgs_pred = self.unpatchify(pred)
+
+    mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
+    mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
+    imgs_mask = imgs * (1 - mask)
+
+    imgs_plus = imgs * (1 - mask) + imgs_pred * mask
+
+    imgs_vis = jnp.concatenate(
+    [jnp.concatenate([imgs, imgs_mask], axis=2),
+     jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
+    axis=1)
+    return imgs_vis
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -339,7 +373,7 @@ class VisionTransformer(nn.Module):
     x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x, train)
+    x, mask, ids_restore = self.random_mask(x)
 
     # If we want to add a class token, add it here.
     if use_cls_token:
@@ -386,4 +420,9 @@ class VisionTransformer(nn.Module):
     # compute loss
     loss = self.compute_loss(inputs, pred, mask)
 
-    return loss, pred
+    if self.visualize and not train:
+      outcome = self.visualization(inputs, pred, mask)
+    else:
+      outcome = pred  # not used
+
+    return loss, outcome

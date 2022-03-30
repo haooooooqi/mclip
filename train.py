@@ -49,6 +49,7 @@ import models_mae
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import opt_util
 from utils import mix_util
+from utils.transform_util import MEAN_RGB, STDDEV_RGB
 
 
 import jax.profiler
@@ -78,7 +79,9 @@ def initialized(key, image_size, model, init_backend='tpu'):
   def init(*args):
     return model.init(*args, train=False)
   # init = jax.jit(init, backend=init_backend)
-  variables = init({'params': key}, jnp.ones(input_shape, model.dtype))
+  variables = init(
+    {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
+    jnp.ones(input_shape, model.dtype))
   return variables
 
 
@@ -154,6 +157,7 @@ def train_step(state, batch, learning_rate_fn, config):
   new_variables, loss = aux[1]
   # metrics = compute_metrics(logits, batch['label'], batch['label_one_hot'])
   metrics = {'loss': loss, 'learning_rate': lr,}
+  metrics = lax.pmean(metrics, axis_name='batch')
 
   # ----------------------------------------------------------------------------
   # original
@@ -205,15 +209,19 @@ def train_step(state, batch, learning_rate_fn, config):
 
 def eval_step(state, batch, ema_eval=False):
   variables = {'params': state.params, **state.variables}
-  logits = state.apply_fn(variables, batch['image'], train=False, mutable=False)
-  metrics = compute_metrics(logits, batch['label'], batch['label_one_hot'])
-  metrics['test_acc1'] = metrics.pop('accuracy') * 100  # rename
-  metrics['test_loss'] = metrics.pop('loss')  # rename
 
-  if ema_eval:
-    logits = state.apply_fn(state.ema_state.ema, batch['image'], train=False, mutable=False)
-    metrics_ema = compute_metrics(logits, batch['label'], batch['label_one_hot'])
-    metrics['test_acc1_ema'] = metrics_ema.pop('accuracy') * 100  # rename
+  dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))  # kaiming: eval rng should not matter?
+  outcome = state.apply_fn(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=dropout_rng))
+  loss, imgs_vis = outcome
+
+  metrics = {'test_loss': loss}
+  metrics = lax.pmean(metrics, axis_name='batch')
+  metrics['imgs_vis'] = imgs_vis
+
+  # if ema_eval:
+  #   logits = state.apply_fn(state.ema_state.ema, batch['image'], train=False, mutable=False)
+  #   metrics_ema = compute_metrics(logits, batch['label'], batch['label_one_hot'])
+  #   metrics['test_acc1_ema'] = metrics_ema.pop('accuracy') * 100  # rename
 
   return metrics
 
@@ -233,10 +241,10 @@ def prepare_tf_data(xs):
 
 
 def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, aug=None):
+                      cache, aug=None, force_shuffle=None):
   ds = input_pipeline.create_split(
       dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, aug=aug)
+      train=train, cache=cache, aug=aug, force_shuffle=force_shuffle)
 
   if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
     apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
@@ -318,7 +326,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     rescales = opt_util.filter_parameters(params, opt_util.layer_rescale)
     params = jax.tree_util.tree_multimap(lambda x, y: x * y, rescales, params)
 
-  stds = jax.tree_util.tree_map(lambda x: np.array(x).std(), params)
+  # stds = jax.tree_util.tree_map(lambda x: np.array(x).std(), params)
   # logging.info('std: {}'.format(stds))
 
   # optional: exclude some wd
@@ -392,7 +400,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       cache=config.cache, aug=config.aug)
   eval_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-      cache=config.cache)
+      cache=config.cache, force_shuffle=True)
 
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
@@ -423,7 +431,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       config, abs_learning_rate, steps_per_epoch)
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
-  state = restore_checkpoint(state, workdir)
+  state = restore_checkpoint(state, workdir if config.resume_dir == '' else config.resume_dir)
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
 
@@ -452,9 +460,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       axis_name='batch',
       donate_argnums=(0,) if config.donate else ()
       )
-  # p_eval_step = jax.pmap(
-  #     functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
-  #     axis_name='batch')
+  p_eval_step = jax.pmap(
+      functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
+      axis_name='batch')
 
   train_metrics = []
   hooks = []
@@ -500,6 +508,21 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
     if (step + 1) % steps_per_epoch == 0:
       writer.flush()
+
+    # visualize
+    if ((step + 1) % steps_per_epoch == 0 or step == step_offset + 1) and config.model.visualize:
+      epoch = step // steps_per_epoch
+      eval_batch = next(eval_iter)
+      metrics = p_eval_step(state, eval_batch)
+
+      imgs_vis = metrics.pop('imgs_vis')[0]  # keep the master device
+      imgs_vis = imgs_vis * jnp.asarray(STDDEV_RGB) + jnp.asarray(MEAN_RGB)
+      imgs_vis = jnp.uint8(jnp.clip(imgs_vis, 0, 255.))
+      writer.write_images(step=epoch_1000x, images=dict(imgs_vis=imgs_vis))
+
+      summary = jax.tree_map(lambda x: x.mean(), metrics)
+      values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
+      logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
 
     # if (step + 1) % steps_per_epoch == 0:
     #   epoch = step // steps_per_epoch

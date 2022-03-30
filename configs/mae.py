@@ -48,5 +48,6 @@ def get_config():
   config.decoder.transformer.dropout_rate = 0.0
   config.decoder.transformer.droppath_rate = 0.0
 
+  config.visualize = False
 
   return config

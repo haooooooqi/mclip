@@ -130,7 +130,7 @@ def preprocess_for_eval(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
 
 
 def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
-                 image_size=IMAGE_SIZE, cache=False, aug=None):
+                 image_size=IMAGE_SIZE, cache=False, force_shuffle=None, aug=None):
   """Creates a split from the ImageNet dataset using TensorFlow Datasets.
 
   Args:
@@ -167,7 +167,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   if cache:
     ds = ds.cache()
 
-  if train:
+  if train or force_shuffle:
     ds = ds.repeat()
     ds = ds.shuffle(16 * batch_size, seed=0)
 

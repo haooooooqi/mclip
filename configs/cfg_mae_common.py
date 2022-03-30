@@ -111,4 +111,7 @@ def get_config():
   config.donate = False
   config.init_backend = 'tpu'
 
+  # utils
+  config.resume_dir = ''
+
   return config

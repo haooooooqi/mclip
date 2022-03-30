@@ -61,4 +61,7 @@ def get_config():
   # opt config
   config.opt_mu_dtype = 'float32'
 
+  # vis
+  config.model.visualize = True
+
   return config
