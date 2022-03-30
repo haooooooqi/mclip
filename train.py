@@ -31,9 +31,7 @@ from flax import optim
 from flax import struct
 from flax.training import checkpoints
 from flax.training import common_utils
-# from flax.training import train_state
-import utils.train_state as train_state
-import utils.adamw_util as adamw_util
+from flax.training import train_state
 import jax
 from jax import lax
 import jax.numpy as jnp
@@ -49,6 +47,7 @@ import models_mae
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import opt_util
 from utils import mix_util
+from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 
 
