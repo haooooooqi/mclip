@@ -70,10 +70,22 @@ class AddPositionEmbs(nn.Module):
   Attributes:
     posemb_init: positional embedding initializer.
   """
+  sincos: bool
+  use_cls_token: bool
+  img_shape: Shape  # [h, w, c]
 
-  posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+  def setup(self):
+    h, w, c = self.img_shape
 
-  @nn.compact
+    num_clstokens = 1 if self.use_cls_token else 0
+    pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
+
+    self.pe = self.param('pos_embedding', posemb_init, pos_emb_shape)
+
+    # kaiming: in MAE, we should always set posembed for cls_token as zero.
+    # when loading for finetuning, this zero posembed can be tuned.
+    # but this is not addressed here if sincos=False
+
   def __call__(self, inputs):
     """Applies AddPositionEmbs module.
 
@@ -87,12 +99,13 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    # inputs.shape is (batch_size, seq_len, emb_dim).
-    assert inputs.ndim == 3, ('Number of dimensions should be 3,'
-                              ' but it is: %d' % inputs.ndim)
-    pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
-    pe = self.param('pos_embedding', self.posemb_init, pos_emb_shape)
-    return inputs + pe
+
+    if self.use_cls_token:
+      output = inputs + self.pe[:, 1:, :]
+    else:
+      output = inputs + self.pe
+
+    return output
 
 
 class MlpBlock(nn.Module):
@@ -252,6 +265,7 @@ class VisionTransformer(nn.Module):
 
   num_classes: int
   mask_ratio: float
+  sincos: bool
   norm_pix_loss: bool
   patches: Any
   transformer: Any
@@ -370,7 +384,8 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    # x = AddPositionEmbs(posemb_init=posemb_init, sincos=self.sincos, name='posembed_encoder')(x)
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
@@ -398,10 +413,11 @@ class VisionTransformer(nn.Module):
     mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
     x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
     x_ = vmapped_gather(x_, ids_restore)
-    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
-    # add decoder posembed
-    x = AddPositionEmbs(posemb_init=posemb_init,  name='posembed_decoder')(x)
+    # add decoder posembed (before cls token)
+    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
+
+    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
     x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)

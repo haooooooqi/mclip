@@ -37,12 +37,14 @@ def get_config():
   config = ml_collections.ConfigDict()
 
 
-  config = vit.get_b16_config()
-  config.transformer.dropout_rate = 0.0
-  config.transformer.droppath_rate = 0.0
-
   config.mask_ratio = 0.75
   config.norm_pix_loss = True
+
+  config.sincos = True
+
+  config.update(vit.get_b16_config())
+  config.transformer.dropout_rate = 0.0
+  config.transformer.droppath_rate = 0.0
 
   config.decoder = vit.get_testing_config()
   config.decoder.transformer.dropout_rate = 0.0

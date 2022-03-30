@@ -77,7 +77,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
   input_shape = (2, image_size, image_size, 3)
   def init(*args):
     return model.init(*args, train=False)
-  init = jax.jit(init, backend=init_backend)
+  # init = jax.jit(init, backend=init_backend)
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
     jnp.ones(input_shape, model.dtype))
