@@ -1,12 +1,12 @@
 VM_NAME=kmh-tpuvm-v3-128-2
-# VM_NAME=kmh-tpuvm-v3-256-4
+# VM_NAME=kmh-tpuvm-v3-256-3
 echo $VM_NAME
 REPO=https://71d519550fe3430ecbf39b70467e9210aed5da69:@github.com/KaimingHe/flax_dev.git
 BRANCH=main
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c8`
 
-ep=100
+ep=800
 batch=4096
 
 

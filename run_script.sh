@@ -12,10 +12,11 @@ python3 main.py \
     --config.num_epochs=10 \
     --config.profile_memory=True \
     --config.donate=False \
-    --config.model.norm_pix_loss=False \
+    --config.model.norm_pix_loss=True \
+    --config.resume_dir='gs://kmh-gcp/checkpoints/flax/20220331_014514_kmh-tpuvm-v3-128-2_cfg_mae_base_100ep_maeDBG_batch4096_vmap_normpix_sincos_initmaev1/checkpoint_31200' \
+    --config.model.sincos=False
 
     # --config.model.visualize=True \
-    # --config.resume_dir='gs://kmh-gcp/checkpoints/flax/20220330_044150_kmh-tpuvm-v3-128-2_cfg_mae_base_100ep_maeDBG_batch4096_vmap_NOnormpix/checkpoint_31200'
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
