@@ -31,11 +31,10 @@ Shape = Tuple[int]
 Dtype = Any
 
 # init hacks
-# v1: JAX ViT; v2: PyTorch ViT; v3: v2 with fix
-INIT_VER = 'v2'
+INIT_VER = 'mae_jax_v1'
 
 fixed_gaussian_init = nn.initializers.normal(stddev=0.02)
-if INIT_VER == 'v1':
+if INIT_VER == 'vit_v1':  # JAX ViT
   clstoken_init = nn.initializers.zeros
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init
@@ -44,8 +43,7 @@ if INIT_VER == 'v1':
   msa_kernel_init = nn.initializers.xavier_uniform()
   mlp_kernel_init = nn.initializers.xavier_uniform()
   mlp_bias_init = nn.initializers.normal(stddev=1e-6)
-  head_kernel_init=nn.initializers.zeros
-elif INIT_VER == 'v2':
+elif INIT_VER == 'vit_v2':  # PyTorch ViT, used for debugging
   clstoken_init = fixed_gaussian_init
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init
@@ -54,7 +52,15 @@ elif INIT_VER == 'v2':
   msa_kernel_init = fixed_gaussian_init
   mlp_kernel_init = fixed_gaussian_init
   mlp_bias_init = nn.initializers.zeros
-  head_kernel_init = nn.initializers.normal(stddev=2e-5)
+elif INIT_VER == 'mae_jax_v1':  # like PyTorch/TF ViT, with some differences
+  clstoken_init = fixed_gaussian_init
+  masktoken_init = fixed_gaussian_init
+  posemb_init = fixed_gaussian_init  # not used if sincos
+  patch_kernel_init = nn.initializers.xavier_uniform()  # known to be different: were like nn.Linear in TF
+  patch_bias_init = nn.initializers.zeros
+  msa_kernel_init = nn.initializers.xavier_uniform()  # known to be different: q, k, v are separated kernels in JAX
+  mlp_kernel_init = nn.initializers.xavier_uniform()
+  mlp_bias_init = nn.initializers.zeros
 else:
   raise NotImplementedError
 
