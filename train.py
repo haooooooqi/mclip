@@ -325,8 +325,10 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     rescales = opt_util.filter_parameters(params, opt_util.layer_rescale)
     params = jax.tree_util.tree_multimap(lambda x, y: x * y, rescales, params)
 
-  # stds = jax.tree_util.tree_map(lambda x: (x.shape, np.array(x).std()), params)
-  # logging.info('std: {}'.format(stds))
+  from IPython import embed; embed();
+  if (0 == 0): raise NotImplementedError
+  stds = jax.tree_util.tree_map(lambda x: (x.shape, np.array(x).std()), params)
+  logging.info('std: {}'.format(stds))
 
   # optional: exclude some wd
   if config.exclude_wd:

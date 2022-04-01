@@ -20,10 +20,12 @@ import jax.numpy as jnp
 import jax.random as random
 
 import flax.linen as nn
+from uritemplate import partial
 
 
 from utils import posembed_util
 from utils import initializers_util
+from utils import attention_util
 
 Array = Any
 PRNGKey = Any
@@ -31,7 +33,7 @@ Shape = Tuple[int]
 Dtype = Any
 
 # init hacks
-INIT_VER = 'mae_jax_v1'
+INIT_VER = 'mae_jax_v2'
 
 fixed_gaussian_init = nn.initializers.normal(stddev=0.02)
 if INIT_VER == 'vit_v1':  # JAX ViT
@@ -52,13 +54,20 @@ elif INIT_VER == 'vit_v2':  # PyTorch ViT, used for debugging
   msa_kernel_init = fixed_gaussian_init
   mlp_kernel_init = fixed_gaussian_init
   mlp_bias_init = nn.initializers.zeros
-elif INIT_VER == 'mae_jax_v1':  # like PyTorch/TF ViT, with some differences
+elif INIT_VER == 'mae_jax_v2':  # like PyTorch/TF ViT, with some differences
   clstoken_init = fixed_gaussian_init
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init  # not used if sincos
   patch_kernel_init = nn.initializers.xavier_uniform()  # known to be different: were like nn.Linear in TF
   patch_bias_init = nn.initializers.zeros
-  msa_kernel_init = nn.initializers.xavier_uniform()  # known to be different: q, k, v are separated kernels in JAX
+
+  # msa_kernel_init = nn.initializers.xavier_uniform()  # known to be different: q, k, v are separated kernels in JAX
+
+  # TF/PyTorch: qkv is [D, 3*D], fan_in + fan_out = 4*D.
+  # JAX: q, k, v each is [D, D], fan_in + fan_out = 2*D. So we compensate by scale=0.5
+  qkv_kernel_init = functools.partial(nn.initializers.variance_scaling, 0.5, "fan_avg", "uniform")()
+  out_kernel_init = nn.initializers.xavier_uniform()
+
   mlp_kernel_init = nn.initializers.xavier_uniform()
   mlp_bias_init = nn.initializers.zeros
 else:
@@ -198,9 +207,17 @@ class Encoder1DBlock(nn.Module):
     # Attention block.
     assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
     x = nn.LayerNorm(dtype=self.dtype)(inputs)
-    x = nn.MultiHeadDotProductAttention(
+    # revised
+    MsaBlock = functools.partial(
+      attention_util.MultiHeadDotProductAttention,
+      qkv_kernel_init=qkv_kernel_init,
+      out_kernel_init=out_kernel_init)
+    # original
+    # MsaBlock = functools.partial(
+    #   nn.MultiHeadDotProductAttention,
+    #   kernel_init=msa_kernel_init,)
+    x = MsaBlock(
         dtype=self.dtype,
-        kernel_init=msa_kernel_init,
         broadcast_dropout=False,
         deterministic=deterministic,
         dropout_rate=self.attention_dropout_rate,
