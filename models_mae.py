@@ -300,7 +300,7 @@ class VisionTransformer(nn.Module):
     N, L, _ = x.shape  # batch, length, dim
     len_keep = int(L * (1 - self.mask_ratio))
 
-    noise = random.normal(rng, shape=(N, L))
+    noise = random.uniform(rng, shape=(N, L))
     ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
     ids_restore = jnp.argsort(ids_shuffle, axis=1)
 
@@ -350,7 +350,10 @@ class VisionTransformer(nn.Module):
     """
     target = self.patchify(imgs)
     if self.norm_pix_loss:
-        target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
+      # target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
+      mean = jnp.mean(target, axis=-1, keepdims=True)
+      var = jnp.var(target, axis=-1, keepdims=True)
+      target = (target - mean) / (var + 1.e-6)**.5
 
     loss = jnp.square(pred - target)
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch

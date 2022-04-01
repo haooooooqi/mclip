@@ -1,5 +1,5 @@
-VM_NAME=kmh-tpuvm-v3-128-2
-# VM_NAME=kmh-tpuvm-v3-256-3
+# VM_NAME=kmh-tpuvm-v3-128-2
+VM_NAME=kmh-tpuvm-v3-256-4
 echo $VM_NAME
 REPO=https://71d519550fe3430ecbf39b70467e9210aed5da69:@github.com/KaimingHe/flax_dev.git
 BRANCH=main
@@ -10,9 +10,9 @@ ep=800
 batch=4096
 
 
-CONFIG=cfg_mae_base
+CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev1
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev1_randuniform_normimpl
 
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}

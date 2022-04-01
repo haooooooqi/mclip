@@ -6,14 +6,13 @@ rm -rf tmp
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 python3 main.py \
     --workdir=./tmp \
-    --config=configs/cfg_mae_base.py \
+    --config=configs/cfg_mae_dbg.py \
     --config.batch_size=128 \
     --config.log_every_steps=100 \
     --config.num_epochs=10 \
     --config.profile_memory=True \
     --config.donate=False \
     --config.model.norm_pix_loss=True \
-    --config.resume_dir='gs://kmh-gcp/checkpoints/flax/20220331_014514_kmh-tpuvm-v3-128-2_cfg_mae_base_100ep_maeDBG_batch4096_vmap_normpix_sincos_initmaev1/checkpoint_31200' \
     --config.model.sincos=False
 
     # --config.model.visualize=True \
