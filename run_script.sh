@@ -6,14 +6,15 @@ rm -rf tmp
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 python3 main.py \
     --workdir=./tmp \
-    --config=configs/cfg_mae_large.py \
+    --config=configs/cfg_mae_dbg.py \
     --config.batch_size=128 \
     --config.log_every_steps=100 \
     --config.num_epochs=10 \
     --config.profile_memory=True \
     --config.donate=False \
     --config.model.norm_pix_loss=True \
-    --config.model.sincos=False
+    --config.model.sincos=False \
+    --config.aug.crop_ver=v2 \
 
     # --config.model.visualize=True \
 

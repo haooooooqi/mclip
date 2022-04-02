@@ -203,6 +203,39 @@ def _decode_and_random_crop(image_bytes, image_size,
   return image
 
 
+# crop v2: hand-written, following BYOL
+def _decode_and_random_crop_v2(image_bytes, image_size,
+    area_range=(0.08, 1.0), aspect_ratio_range=(3. / 4, 4. / 3.)):
+
+  img_size = tf.image.extract_jpeg_shape(image_bytes)
+  area = tf.cast(img_size[1] * img_size[0], tf.float32)
+  target_area = tf.random.uniform([], area_range[0], area_range[1], dtype=tf.float32) * area
+
+  log_ratio = (tf.math.log(aspect_ratio_range[0]), tf.math.log(aspect_ratio_range[1]))
+  aspect_ratio = tf.math.exp(
+      tf.random.uniform([], *log_ratio, dtype=tf.float32))
+
+  w = tf.cast(tf.round(tf.sqrt(target_area * aspect_ratio)), tf.int32)
+  h = tf.cast(tf.round(tf.sqrt(target_area / aspect_ratio)), tf.int32)
+
+  w = tf.minimum(w, img_size[1])
+  h = tf.minimum(h, img_size[0])
+
+  offset_w = tf.random.uniform((),
+                              minval=0,
+                              maxval=img_size[1] - w + 1,
+                              dtype=tf.int32)
+  offset_h = tf.random.uniform((),
+                              minval=0,
+                              maxval=img_size[0] - h + 1,
+                              dtype=tf.int32)
+
+  crop_window = tf.stack([offset_h, offset_w, h, w])
+  image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)
+  return image
+
+
 # crop v3: like SimCLR's original code, but: (i) max_attempts=100, and (ii) remove bad condition
 def _decode_and_random_crop_v3(image_bytes, image_size,
     area_range=(0.08, 1.0), aspect_ratio_range=(3. / 4, 4. / 3.)):
@@ -295,6 +328,7 @@ def _get_center_crop_window(img_shape, image_size=224):
 
 decode_and_random_crop ={
     'v1': _decode_and_random_crop,
+    'v2': _decode_and_random_crop_v2,
     'v3': _decode_and_random_crop_v3,
     'v4': _decode_and_random_crop_v4,
   }
