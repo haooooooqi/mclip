@@ -58,8 +58,8 @@ elif INIT_VER == 'mae_jax_v2':  # like PyTorch/TF ViT, with some differences
   clstoken_init = fixed_gaussian_init
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init  # not used if sincos
-  patch_kernel_init = nn.initializers.xavier_uniform()  # known to be different: were like nn.Linear in TF
-  # patch_kernel_init = initializers_util.patch_kernel()
+  # patch_kernel_init = nn.initializers.xavier_uniform()  # known to be different: were like nn.Linear in TF
+  patch_kernel_init = initializers_util.patch_kernel()
   patch_bias_init = nn.initializers.zeros  # different from PyTorch?
 
   # msa_kernel_init = nn.initializers.xavier_uniform()  # known to be different: q, k, v are separated kernels in JAX
