@@ -19,7 +19,7 @@ The data is loaded using tensorflow_datasets.
 """
 
 import functools
-import time
+import time, datetime
 from typing import Any
 
 from absl import logging
@@ -498,6 +498,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       h(step)
     if step == step_offset:
       logging.info('Initial compilation completed.')
+      start_time = time.time()  # log the time after compilation
 
     epoch_1000x = int(step * config.batch_size / 1281167 * 1000)  # normalize to IN1K epoch anyway
 
@@ -544,10 +545,22 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
       logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
 
+    # knn monitor
     if config.knn.on and ((step + 1) % steps_per_epoch == 0 or step == 0):
       epoch = step // steps_per_epoch
-      eval_batch = next(eval_iter)
-      metrics = p_encode_step(state, eval_batch)
+      
+      # scan the val set
+      tic = time.time()
+      from IPython import embed; embed();
+      if (0 == 0): raise NotImplementedError
+      for _ in range(steps_per_eval):
+        eval_batch = next(eval_iter)
+        features = p_encode_step(state, eval_batch)
+
+      toc = time.time() - tic
+      logging.info('kNN time: {}'.format(str(datetime.timedelta(seconds=int(toc)))))
+
+
     #   eval_metrics = []
 
     #   # sync batch statistics across replicas
@@ -573,6 +586,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+
+  total_time = time.time() - start_time
+  total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+  logging.info('Elapsed time: {}'.format(total_time_str))
 
   if config.profile_memory:
     profile_memory(workdir)

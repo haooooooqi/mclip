@@ -33,6 +33,7 @@ def patch_kernel(dtype: DType = jnp.float_):
   As patch_embed is implemented as Conv, we view its 4D params as 2D
   """
   def init(key, shape, dtype=dtype):
+    dtype = dtypes.canonicalize_dtype(dtype)
     h, w, c, n = shape
     fan_in = h * w * c
     fan_out = n
