@@ -309,7 +309,7 @@ class VisionTransformer(nn.Module):
   representation_size: Optional[int] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
-  decoder: Any = None
+  decoder: Any = None  # decoder config
   visualize: bool = False
 
   def random_mask(self, x):
@@ -399,7 +399,7 @@ class VisionTransformer(nn.Module):
     axis=1)
     return imgs_vis
 
-  def apply_encoder(self, inputs, train):
+  def apply_encoder(self, inputs, train, apply_mask=True):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
@@ -424,9 +424,12 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+    if apply_mask:
+      # masking: length -> length * mask_ratio
+      x, mask, ids_restore = self.random_mask(x)
+      ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+    else:
+      mask, ids_restore = None, None
 
     # If we want to add a class token, add it here.
     if use_cls_token:
@@ -481,10 +484,12 @@ class VisionTransformer(nn.Module):
     return pred
 
   @nn.compact
-  def __call__(self, inputs, *, train):
-
+  def __call__(self, inputs, *, train, encode_only=False):
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(inputs, train=train)
+    x, mask, ids_restore = self.apply_encoder(inputs, train=train, apply_mask=(not encode_only))
+
+    if encode_only:
+      return x
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)

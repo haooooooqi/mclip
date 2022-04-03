@@ -225,6 +225,24 @@ def eval_step(state, batch, ema_eval=False):
   return metrics
 
 
+def encode_step(state, batch, config):
+  """ encode train/val images for knn"""
+  variables = {'params': state.params, **state.variables}
+
+  dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))  # kaiming: eval rng should not matter?
+  features = state.apply_fn(variables, batch['image'], train=False, encode_only=True, mutable=False, rngs=dict(dropout=dropout_rng))
+
+  if config.knn.postprocess == 'tgap':
+    features = jnp.sum(features, axis=1)
+  else:
+    raise NotImplementedError
+
+  if config.knn.layernorm:
+    features = jax.nn.normalize(features, axis=-1, epsilon=1.e-6)
+
+  return features
+
+
 def prepare_tf_data(xs):
   """Convert a input batch from tf Tensors to numpy arrays."""
   local_device_count = jax.local_device_count()
@@ -250,8 +268,7 @@ def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
     ds = map(apply_mix, ds)
 
   # ------------------------------------------------
-  # from IPython import embed; embed();
-  # if (0 == 0): raise NotImplementedError
+  # for debugging
   # x = next(iter(ds))
   # ------------------------------------------------
 
@@ -464,6 +481,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
       axis_name='batch')
 
+  p_encode_step = jax.pmap(
+      functools.partial(encode_step, config=config),
+      axis_name='batch')
+
   train_metrics = []
   hooks = []
   # if jax.process_index() == 0:
@@ -523,8 +544,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
       logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
 
-    # if (step + 1) % steps_per_epoch == 0:
-    #   epoch = step // steps_per_epoch
+    if config.knn.on and ((step + 1) % steps_per_epoch == 0 or step == 0):
+      epoch = step // steps_per_epoch
+      eval_batch = next(eval_iter)
+      metrics = p_encode_step(state, eval_batch)
     #   eval_metrics = []
 
     #   # sync batch statistics across replicas

@@ -13,8 +13,7 @@ python3 main.py \
     --config.profile_memory=True \
     --config.donate=False \
     --config.model.norm_pix_loss=True \
-    --config.model.sincos=False \
-    --config.aug.crop_ver=v2 \
+    --config.model.sincos=True \
 
     # --config.model.visualize=True \
 
