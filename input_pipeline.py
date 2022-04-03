@@ -168,8 +168,9 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
     ds = ds.cache()
 
   if train or force_shuffle:
+    seed = aug.seed + jax.process_index() if aug.seed_per_host else aug.seed
     ds = ds.repeat()
-    ds = ds.shuffle(16 * batch_size, seed=0)
+    ds = ds.shuffle(16 * batch_size, seed=seed)
 
   use_torchvision = (aug is not None and aug.torchvision)
   if use_torchvision:

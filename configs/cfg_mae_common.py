@@ -80,6 +80,8 @@ def get_config():
 
   # aug config
   config.aug = ml_collections.ConfigDict()
+  config.aug.seed = 0
+  config.aug.seed_per_host = True
 
   config.aug.torchvision = False
 
