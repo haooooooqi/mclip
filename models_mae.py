@@ -399,8 +399,7 @@ class VisionTransformer(nn.Module):
     axis=1)
     return imgs_vis
 
-  @nn.compact
-  def __call__(self, inputs, *, train):
+  def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
@@ -423,11 +422,11 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    # x = AddPositionEmbs(posemb_init=posemb_init, sincos=self.sincos, name='posembed_encoder')(x)
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
+    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
 
     # If we want to add a class token, add it here.
     if use_cls_token:
@@ -438,13 +437,21 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
 
+    return x, mask, ids_restore
+
+  def apply_decoder(self, x, ids_restore, train):
+    use_cls_token=(self.classifier == 'token')
+
+    n, h, w = ids_restore.shape
+    ids_restore = jnp.reshape(ids_restore, [n, h * w])
+
     # apply the encoder-decoder bottleneck
     x = nn.Dense(
       features=self.decoder.hidden_size,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='bottleneck')(x)
+      name='bottleneck')(x)    
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
@@ -471,7 +478,17 @@ class VisionTransformer(nn.Module):
 
     # remove cls token
     pred = x[:, num_clstokens:, :]
-  
+    return pred
+
+  @nn.compact
+  def __call__(self, inputs, *, train):
+
+    # apply encoder
+    x, mask, ids_restore = self.apply_encoder(inputs, train=train)
+
+    # apply decoder
+    pred = self.apply_decoder(x, ids_restore, train=train)
+
     # compute loss
     loss = self.compute_loss(inputs, pred, mask)
 

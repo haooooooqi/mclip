@@ -115,4 +115,9 @@ def get_config():
   config.resume_dir = ''
   config.vis_every_epochs = 20.
 
+  # knn config
+  config.knn = ml_collections.ConfigDict()
+  config.knn.on = True
+
+
   return config
