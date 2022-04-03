@@ -80,8 +80,6 @@ def get_config():
 
   # aug config
   config.aug = ml_collections.ConfigDict()
-  config.aug.seed = 0
-  config.aug.seed_per_host = True
 
   config.aug.torchvision = False
 
@@ -116,6 +114,8 @@ def get_config():
   # utils
   config.resume_dir = ''
   config.vis_every_epochs = 20.
+
+  config.seed_per_host = True
 
   # knn config
   config.knn = ml_collections.ConfigDict()

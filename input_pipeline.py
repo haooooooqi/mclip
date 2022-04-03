@@ -130,7 +130,7 @@ def preprocess_for_eval(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
 
 
 def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
-                 image_size=IMAGE_SIZE, cache=False, force_shuffle=None, aug=None):
+                 image_size=IMAGE_SIZE, cache=False, force_shuffle=None, seed_per_host=False, aug=None):
   """Creates a split from the ImageNet dataset using TensorFlow Datasets.
 
   Args:
@@ -168,7 +168,8 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
     ds = ds.cache()
 
   if train or force_shuffle:
-    seed = aug.seed + jax.process_index() if aug.seed_per_host else aug.seed
+    seed = 0
+    seed += jax.process_index() if seed_per_host else 0
     ds = ds.repeat()
     ds = ds.shuffle(16 * batch_size, seed=seed)
 

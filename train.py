@@ -240,10 +240,10 @@ def prepare_tf_data(xs):
 
 
 def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, aug=None, force_shuffle=None):
+                      cache, force_shuffle=None, seed_per_host=False, aug=None,):
   ds = input_pipeline.create_split(
       dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, aug=aug, force_shuffle=force_shuffle)
+      train=train, cache=cache, force_shuffle=force_shuffle, seed_per_host=seed_per_host, aug=aug,)
 
   if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
     apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
@@ -396,10 +396,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   dataset_builder = tfds.builder(config.dataset)
   train_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-      cache=config.cache, aug=config.aug)
+      cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
   eval_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-      cache=config.cache, force_shuffle=True)
+      cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)
 
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
