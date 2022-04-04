@@ -48,6 +48,8 @@ from utils import summary_util as summary_util  # must be after 'from clu import
 from utils import opt_util
 from utils import mix_util
 from utils import adamw_util
+from utils import knn_util
+
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 
 
@@ -240,7 +242,10 @@ def encode_step(state, batch, config):
   if config.knn.layernorm:
     features = jax.nn.normalize(features, axis=-1, epsilon=1.e-6)
 
-  return features
+  features_all = lax.all_gather(features, axis_name='batch')
+  labels_all = lax.all_gather(batch['label'], axis_name='batch')
+
+  return features_all, labels_all
 
 
 def prepare_tf_data(xs):
@@ -550,15 +555,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       epoch = step // steps_per_epoch
       
       # scan the val set
-      tic = time.time()
-      from IPython import embed; embed();
-      if (0 == 0): raise NotImplementedError
-      for _ in range(steps_per_eval):
-        eval_batch = next(eval_iter)
-        features = p_encode_step(state, eval_batch)
-
-      toc = time.time() - tic
-      logging.info('kNN time: {}'.format(str(datetime.timedelta(seconds=int(toc)))))
+      knn_util.apply_knn(state, p_encode_step, eval_iter, dataset_builder, config)
 
 
     #   eval_metrics = []
