@@ -14,6 +14,8 @@ python3 main.py \
     --config.donate=False \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
+    --config.model.visualize=False \
+
 
     # --config.model.visualize=True \
 
