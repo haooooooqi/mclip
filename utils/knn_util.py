@@ -49,7 +49,6 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
   sim_labels_cached = jnp.zeros((N, k_knns), dtype=val_labels.dtype)  # [N, k]
 
   # extract train features
-  steps_per_train = 30
   for i in range(steps_per_train):
     train_batch = next(knn_train_iter)
 
@@ -59,7 +58,7 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
 
     sim_matrix_cached, sim_labels_cached = update_knn(
         val_features, train_features, train_labels, sim_matrix_cached, sim_labels_cached)
-    if ((i + 1) % 100 == 0):
+    if ((i + 1) % 5 == 0):
         logging.info('Updating train kNN: {}/{} steps.'.format(i + 1, steps_per_train))
 
   logging.info('Update train kNN done.')
