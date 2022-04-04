@@ -64,4 +64,7 @@ def get_config():
   # vis
   config.model.visualize = True
 
+  # memory
+  config.donate = True
+
   return config

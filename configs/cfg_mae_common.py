@@ -119,7 +119,7 @@ def get_config():
   config.knn = ml_collections.ConfigDict()
   config.knn.on = True
 
-  config.knn.every_epochs = 50
+  config.knn.every_epochs = 20
 
   config.knn.log_every_steps = 20
 
