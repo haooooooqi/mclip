@@ -65,7 +65,8 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
 
   # finalize scores
   num_classes = dataset_builder.info.features['label'].num_classes
-  knn_accuracy = compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes)
+  sim_weight_cached = jnp.exp(sim_matrix_cached / config.knn.temperature)
+  knn_accuracy = compute_accuracy(sim_weight_cached, sim_labels_cached, val_labels, num_classes)
 
   metrics = {'knn_accuracy': knn_accuracy}
   # log time
@@ -74,19 +75,19 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
   return metrics
 
 
-def compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes):
+def compute_accuracy(sim_weight_cached, sim_labels_cached, val_labels, num_classes):
   """ Finalize kNN metrics. To reduce memory, we process it by batching
   """
   N = val_labels.shape[0]  # N: # val samples (queries)
-  k_knns = sim_matrix_cached.shape[1]
+  k_knns = sim_weight_cached.shape[1]
 
   split_batch_size = 256
-  sim_matrix_cached = jnp.reshape(sim_matrix_cached, [N // split_batch_size, split_batch_size, k_knns])
+  sim_weight_cached = jnp.reshape(sim_weight_cached, [N // split_batch_size, split_batch_size, k_knns])
   sim_labels_cached = jnp.reshape(sim_labels_cached, [N // split_batch_size, split_batch_size, k_knns])
 
   pred_labels = []
-  for i in range(sim_matrix_cached.shape[0]):
-    sim_weight = sim_matrix_cached[i]  # [B, k]
+  for i in range(sim_weight_cached.shape[0]):
+    sim_weight = sim_weight_cached[i]  # [B, k]
     sim_labels = sim_labels_cached[i]  # [B, k]
 
     pred_labels_this = compute_predictions(sim_weight, sim_labels, num_classes)
