@@ -180,7 +180,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   def decode_example(example):
     label = example['label']
     label_one_hot = tf.one_hot(label, depth=num_classes, dtype=dtype)
-    if train:
+    if train and aug is not None:
       if use_torchvision:
         image = preprocess_for_train_torchvision(example['image'], dtype, image_size, transform_aug=transform_aug)
       else:

@@ -242,8 +242,15 @@ def encode_step(state, batch, config):
   if config.knn.layernorm:
     features = jax.nn.normalize(features, axis=-1, epsilon=1.e-6)
 
+  if config.knn.l2norm:
+    l2norm = jnp.sqrt(jnp.sum(features**2, axis=-1, keepdims=True) + 1.e-6)
+    features /= l2norm
+
+  # all gather
   features_all = lax.all_gather(features, axis_name='batch')
+  features_all = jnp.reshape(features_all, (-1, features_all.shape[-1]))
   labels_all = lax.all_gather(batch['label'], axis_name='batch')
+  labels_all = jnp.reshape(labels_all, (-1,))
 
   return features_all, labels_all
 
@@ -423,6 +430,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       dataset_builder, local_batch_size, image_size, input_dtype, train=False,
       cache=config.cache, force_shuffle=True)
 
+  if config.knn.on:
+    knn_train_iter = create_input_iter(
+        dataset_builder, local_batch_size, image_size, input_dtype, train=True,
+        cache=config.cache, aug=None)
+
+
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
   )
@@ -486,9 +499,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
       axis_name='batch')
 
-  p_encode_step = jax.pmap(
-      functools.partial(encode_step, config=config),
-      axis_name='batch')
+  if config.knn.on:
+    p_encode_step = jax.pmap(
+        functools.partial(encode_step, config=config),
+        axis_name='batch')
 
   train_metrics = []
   hooks = []
@@ -555,7 +569,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       epoch = step // steps_per_epoch
       
       # scan the val set
-      knn_util.apply_knn(state, p_encode_step, eval_iter, dataset_builder, config)
+      knn_util.apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, config)
 
 
     #   eval_metrics = []

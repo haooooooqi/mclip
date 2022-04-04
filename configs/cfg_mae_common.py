@@ -120,6 +120,9 @@ def get_config():
   config.knn.on = True
   config.knn.postprocess = 'tgap'  # token + global average pool
   config.knn.layernorm = True  # apply layer norm after postprocess
-
+  config.knn.l2norm = True  # apply l2-norm for kNN (after layernorm)
+  
+  config.knn.num_knns = 200
+  config.knn.temperature = 0.2
 
   return config
