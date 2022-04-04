@@ -566,7 +566,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
 
     # knn monitor
-    if config.knn.on and ((step + 1) % steps_per_knn == 0 or step == 0):
+    if ((step + 1) % steps_per_knn == 0 or step + 1 == num_steps) and config.knn.on:
       epoch = step // steps_per_epoch
       # scan the val set
       knn_metrics = knn_util.apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, config)
