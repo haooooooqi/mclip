@@ -48,7 +48,8 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
   sim_matrix_cached = -jnp.ones((N, k_knns), dtype=val_features.dtype)  # [N, k]
   sim_labels_cached = jnp.zeros((N, k_knns), dtype=val_labels.dtype)  # [N, k]
 
-  steps_per_train = 100
+  # extract train features
+  steps_per_train = 30
   for i in range(steps_per_train):
     train_batch = next(knn_train_iter)
 
@@ -56,44 +57,59 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
     train_features = train_features[0]  # [batch_size, dim,]
     train_labels = train_labels[0]  # [batch_size, dim,]
 
-    # Wait until computations are done before exiting
-    # jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
-
     sim_matrix_cached, sim_labels_cached = update_knn(
         val_features, train_features, train_labels, sim_matrix_cached, sim_labels_cached)
-    if (i % 10 == 0):
-        logging.info('Updating train kNN: {} steps.'.format(i))
+    if ((i + 1) % 10 == 0):
+        logging.info('Updating train kNN: {} steps.'.format(i + 1))
 
+  logging.info('Update train kNN done.')
+
+  # finalize scores
+  num_classes = dataset_builder.info.features['label'].num_classes
+  knn_accuracy = compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes)
+
+  # log time
   toc = time.time() - tic
   logging.info('kNN time: {}'.format(str(datetime.timedelta(seconds=int(toc)))))
-  from IPython import embed; embed();
-  if (0 == 0): raise NotImplementedError
-
-  # finalize kNN metrics
-  CLS = dataset_builder.info.features['label'].num_classes
+  return knn_accuracy
 
 
-  # To reduce memory, we process it by batching
+def compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes):
+  """ Finalize kNN metrics. To reduce memory, we process it by batching
+  """
+  N = val_labels.shape[0]  # N: # val samples (queries)
+  k_knns = sim_matrix_cached.shape[1]
+
   split_batch_size = 256
   sim_matrix_cached = jnp.reshape(sim_matrix_cached, [N // split_batch_size, split_batch_size, k_knns])
   sim_labels_cached = jnp.reshape(sim_labels_cached, [N // split_batch_size, split_batch_size, k_knns])
   val_labels = jnp.reshape(val_labels, [N // split_batch_size, split_batch_size,])
-  
-  total_accuracy = 0.
+
+  pred_labels = []
   for i in range(sim_matrix_cached.shape[0]):
     sim_weight = sim_matrix_cached[i]  # [B, k]
     sim_labels = sim_labels_cached[i]  # [B, k]
     gt_labels = val_labels[i]  # [B,]
 
-    sim_weight = jnp.exp(sim_weight / config.knn.temperature)  # [B, k]
-    one_hot_labels = jax.nn.one_hot(sim_labels, CLS, dtype=sim_weight.dtype, axis=-1)  # [B, k, CLS]
+    pred_labels_this = compute_predictions(sim_weight, sim_labels, gt_labels, num_classes)
+    pred_labels.append(pred_labels_this)
 
-    pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)  # [B, k, CLS]
-    pred_scores = jnp.sum(pred_scores, axis=1)  # [B, CLS]
+  pred_labels = jnp.concatenate(pred_labels, axis=0)
 
-    pred_labels = jnp.argmax(pred_scores, axis=-1)
-    accuracy = jnp.mean(pred_labels == gt_labels)
-    total_accuracy += accuracy
+  accuracy = jnp.mean(pred_labels == jnp.reshape(val_labels, -1))
+
+  return accuracy
+
+
+def compute_predictions(sim_weight, sim_labels, gt_labels, num_classes):
+  one_hot_labels = jax.nn.one_hot(sim_labels, num_classes, dtype=sim_weight.dtype, axis=-1)  # [B, k, CLS]
+
+  pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)  # [B, k, CLS]
+  pred_scores = jnp.sum(pred_scores, axis=1)  # [B, CLS]
+
+  pred_labels = jnp.argmax(pred_scores, axis=-1)
+  return pred_labels
+
 
 @jax.jit
 def update_knn(val_features, train_features, train_labels, sim_matrix_cached, sim_labels_cached):
