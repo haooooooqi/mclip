@@ -26,6 +26,7 @@ from uritemplate import partial
 from utils import posembed_util
 from utils import initializers_util
 from utils import attention_util
+from utils import onlineknn_util
 
 Array = Any
 PRNGKey = Any
@@ -311,6 +312,7 @@ class VisionTransformer(nn.Module):
   dtype: Any = jnp.float32
   decoder: Any = None
   visualize: bool = False
+  knn: Any = None
 
   def random_mask(self, x):
     rng = self.make_rng('dropout')
@@ -480,11 +482,38 @@ class VisionTransformer(nn.Module):
     pred = x[:, num_clstokens:, :]
     return pred
 
+  def apply_knn(self, x, train):
+    if not self.knn.on:
+      return
+    if not train:
+      return
+
+    if self.knn.postprocess == 'tgap':
+      x = jnp.sum(x, axis=1)
+    else:
+      raise NotImplementedError
+
+    if self.knn.postnorm == 'LayerNorm':
+      x = nn.LayerNorm(use_bias=False, use_scale=False, name='knn_postnorm')(x)
+      nn.BatchNorm
+    else:
+      raise NotImplementedError
+
+    if self.knn.l2norm:
+      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-6)
+      x /= l2norm
+
+    onlineknn_util.OnlineKNN(knn=self.config.knn)(x)
+
+
   @nn.compact
   def __call__(self, inputs, *, train):
 
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(inputs, train=train)
+
+    # optionally apply knn
+    self.apply_knn(x, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
