@@ -58,7 +58,7 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
 
     sim_matrix_cached, sim_labels_cached = update_knn(
         val_features, train_features, train_labels, sim_matrix_cached, sim_labels_cached)
-    if ((i + 1) % 5 == 0):
+    if ((i + 1) % config.knn.log_every_steps == 0):
         logging.info('Updating train kNN: {}/{} steps.'.format(i + 1, steps_per_train))
 
   logging.info('Update train kNN done.')
@@ -83,25 +83,23 @@ def compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_class
   split_batch_size = 256
   sim_matrix_cached = jnp.reshape(sim_matrix_cached, [N // split_batch_size, split_batch_size, k_knns])
   sim_labels_cached = jnp.reshape(sim_labels_cached, [N // split_batch_size, split_batch_size, k_knns])
-  val_labels = jnp.reshape(val_labels, [N // split_batch_size, split_batch_size,])
 
   pred_labels = []
   for i in range(sim_matrix_cached.shape[0]):
     sim_weight = sim_matrix_cached[i]  # [B, k]
     sim_labels = sim_labels_cached[i]  # [B, k]
-    gt_labels = val_labels[i]  # [B,]
 
-    pred_labels_this = compute_predictions(sim_weight, sim_labels, gt_labels, num_classes)
+    pred_labels_this = compute_predictions(sim_weight, sim_labels, num_classes)
     pred_labels.append(pred_labels_this)
 
   pred_labels = jnp.concatenate(pred_labels, axis=0)
 
-  accuracy = jnp.mean(pred_labels == jnp.reshape(val_labels, -1))
+  accuracy = jnp.mean(pred_labels == val_labels)
 
   return accuracy
 
 
-def compute_predictions(sim_weight, sim_labels, gt_labels, num_classes):
+def compute_predictions(sim_weight, sim_labels, num_classes):
   one_hot_labels = jax.nn.one_hot(sim_labels, num_classes, dtype=sim_weight.dtype, axis=-1)  # [B, k, CLS]
 
   pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)  # [B, k, CLS]
