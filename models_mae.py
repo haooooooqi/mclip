@@ -26,7 +26,8 @@ from uritemplate import partial
 from utils import posembed_util
 from utils import initializers_util
 from utils import attention_util
-from utils import onlineknn_util
+from utils.onlineknn_util import OnlineKNN
+
 
 Array = Any
 PRNGKey = Any
@@ -482,10 +483,8 @@ class VisionTransformer(nn.Module):
     pred = x[:, num_clstokens:, :]
     return pred
 
-  def apply_knn(self, x, train):
+  def apply_knn(self, x, labels, train):
     if not self.knn.on:
-      return
-    if not train:
       return
 
     if self.knn.postprocess == 'tgap':
@@ -503,26 +502,28 @@ class VisionTransformer(nn.Module):
       l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-6)
       x /= l2norm
 
-    onlineknn_util.OnlineKNN(knn=self.config.knn)(x)
+    OnlineKNN(knn=self.knn)(x, labels, train=train)
 
 
   @nn.compact
   def __call__(self, inputs, *, train):
+    imgs = inputs['image']
+    labels = inputs['label']
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(inputs, train=train)
+    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
-    self.apply_knn(x, train=train)
+    self.apply_knn(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss = self.compute_loss(inputs, pred, mask)
+    loss = self.compute_loss(imgs, pred, mask)
 
     if self.visualize and not train:
-      outcome = self.visualization(inputs, pred, mask)
+      outcome = self.visualization(imgs, pred, mask)
     else:
       outcome = pred  # not used
 

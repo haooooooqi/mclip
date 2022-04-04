@@ -74,13 +74,16 @@ def create_model(*, model_cls, half_precision, **kwargs):
 
 
 def initialized(key, image_size, model, init_backend='tpu'):
-  input_shape = (2, image_size, image_size, 3)
+  init_batch_size = 2
+  input_shape = (init_batch_size, image_size, image_size, 3)
+  init_batch = {'image': jnp.ones(input_shape, model.dtype),
+    'label': jnp.zeros((init_batch_size,), jnp.int32)}
   def init(*args):
     return model.init(*args, train=False)
   # init = jax.jit(init, backend=init_backend)
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
-    jnp.ones(input_shape, model.dtype))
+    init_batch)
   return variables
 
 
@@ -131,7 +134,7 @@ def train_step(state, batch, learning_rate_fn, config):
     mutable = [k for k in state.variables]
     outcome = state.apply_fn(
         {'params': params, **state.variables},
-        inputs=batch['image'],
+        inputs=batch,
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
@@ -210,17 +213,12 @@ def eval_step(state, batch, ema_eval=False):
   variables = {'params': state.params, **state.variables}
 
   dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))  # kaiming: eval rng should not matter?
-  outcome = state.apply_fn(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=dropout_rng))
+  outcome = state.apply_fn(variables, batch, train=False, mutable=False, rngs=dict(dropout=dropout_rng))
   loss, imgs_vis = outcome
 
   metrics = {'test_loss': loss}
   metrics = lax.pmean(metrics, axis_name='batch')
   metrics['imgs_vis'] = imgs_vis
-
-  # if ema_eval:
-  #   logits = state.apply_fn(state.ema_state.ema, batch['image'], train=False, mutable=False)
-  #   metrics_ema = compute_metrics(logits, batch['label'], batch['label_one_hot'])
-  #   metrics['test_acc1_ema'] = metrics_ema.pop('accuracy') * 100  # rename
 
   return metrics
 
@@ -445,7 +443,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   #      **state.variables,
   #     },
   #     rngs=dict(dropout=state.rng),
-  #     inputs=image,
+  #     inputs={'image': image, 'label': label},
   #     mutable=mutable_keys,
   #     train=True)
   # (loss, pred), new_variables = outcome

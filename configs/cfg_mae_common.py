@@ -121,14 +121,17 @@ def get_config():
   config.model.knn = ml_collections.ConfigDict()
   config.model.knn.on = True
 
-  config.knn.postprocess = 'tgap'  # token + global average pool
+  config.model.knn.postprocess = 'tgap'  # token + global average pool
   config.model.knn.postnorm = 'LayerNorm'  # apply norm after postprocess
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   
+  config.model.knn.num_classes = 1000  # specifiy here for simplicity
+
   config.model.knn.queue_size = 131072  # 128 * 1024
 
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
+
 
 
   return config

@@ -15,8 +15,7 @@ python3 main.py \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=False \
     --config.aug.crop_ver=v2 \
-
-    # --config.model.visualize=True \
+    --config.model.visualize=True \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
