@@ -576,7 +576,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       logging.info('knn_accuracy in [0, 1]')
 
       # to make it consistent with PyTorch log
-      summary['step_tensorboard'] = epoch  # step for tensorboard (no need to minus 1)
+      summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
       writer.write_scalars(step + 1, summary)
       writer.flush()
 
