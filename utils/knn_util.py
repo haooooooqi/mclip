@@ -60,7 +60,7 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
     sim_matrix_cached, sim_labels_cached = update_knn(
         val_features, train_features, train_labels, sim_matrix_cached, sim_labels_cached)
     if ((i + 1) % 10 == 0):
-        logging.info('Updating train kNN: {} steps.'.format(i + 1))
+        logging.info('Updating train kNN: {}/{} steps.'.format(i + 1, steps_per_train))
 
   logging.info('Update train kNN done.')
 
@@ -68,10 +68,11 @@ def apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, 
   num_classes = dataset_builder.info.features['label'].num_classes
   knn_accuracy = compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes)
 
+  metrics = {'knn_accuracy': knn_accuracy}
   # log time
   toc = time.time() - tic
   logging.info('kNN time: {}'.format(str(datetime.timedelta(seconds=int(toc)))))
-  return knn_accuracy
+  return metrics
 
 
 def compute_accuracy(sim_matrix_cached, sim_labels_cached, val_labels, num_classes):
