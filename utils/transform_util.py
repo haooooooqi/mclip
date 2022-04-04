@@ -331,6 +331,7 @@ decode_and_random_crop ={
     'v2': _decode_and_random_crop_v2,
     'v3': _decode_and_random_crop_v3,
     'v4': _decode_and_random_crop_v4,
+    'vc': _decode_and_center_crop,
   }
   
 
