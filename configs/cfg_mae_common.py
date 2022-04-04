@@ -115,7 +115,7 @@ def get_config():
   config.resume_dir = ''
   config.vis_every_epochs = 20.
 
-  config.seed_per_host = True
+  config.seed_per_host = False
 
   # knn config
   config.knn = ml_collections.ConfigDict()
