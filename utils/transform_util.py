@@ -323,16 +323,6 @@ def _get_center_crop_window(img_shape, image_size=224):
   crop_window = tf.stack([offset_height, offset_width,
                           padded_center_crop_size, padded_center_crop_size])
   return crop_window
-
-
-
-decode_and_random_crop ={
-    'v1': _decode_and_random_crop,
-    'v2': _decode_and_random_crop_v2,
-    'v3': _decode_and_random_crop_v3,
-    'v4': _decode_and_random_crop_v4,
-    'vc': _decode_and_center_crop,
-  }
   
 
 def _decode_and_center_crop(image_bytes, image_size):
@@ -354,6 +344,15 @@ def _decode_and_center_crop(image_bytes, image_size):
   image = _resize(image, image_size)
 
   return image
+
+
+decode_and_random_crop ={
+    'v1': _decode_and_random_crop,
+    'v2': _decode_and_random_crop_v2,
+    'v3': _decode_and_random_crop_v3,
+    'v4': _decode_and_random_crop_v4,
+    'vc': _decode_and_center_crop,
+  }
 
 
 def normalize_image(image):
