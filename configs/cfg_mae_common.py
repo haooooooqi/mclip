@@ -121,7 +121,7 @@ def get_config():
 
   config.knn.every_epochs = 5
 
-  config.knn.log_every_steps = 100
+  config.knn.log_every_steps = 20
 
   config.knn.postprocess = 'tgap'  # token + global average pool
   config.knn.layernorm = True  # apply layer norm after postprocess
