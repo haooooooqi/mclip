@@ -118,6 +118,9 @@ def get_config():
   # knn config
   config.knn = ml_collections.ConfigDict()
   config.knn.on = True
+
+  config.knn.every_epochs = 1
+
   config.knn.postprocess = 'tgap'  # token + global average pool
   config.knn.layernorm = True  # apply layer norm after postprocess
   config.knn.l2norm = True  # apply l2-norm for kNN (after layernorm)

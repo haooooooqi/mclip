@@ -454,6 +454,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   steps_per_checkpoint = int(steps_per_epoch * config.save_every_epochs)
   steps_per_visualize = int(steps_per_epoch * config.vis_every_epochs)
+  steps_per_knn = int(steps_per_epoch * config.knn.every_epochs)
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
@@ -565,7 +566,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
 
     # knn monitor
-    if config.knn.on and ((step + 1) % steps_per_epoch == 0 or step == 0):
+    if config.knn.on and ((step + 1) % steps_per_knn == 0 or step == 0):
       epoch = step // steps_per_epoch
       # scan the val set
       knn_metrics = knn_util.apply_knn(state, p_encode_step, eval_iter, knn_train_iter, dataset_builder, config)
