@@ -498,6 +498,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         # to make it consistent with PyTorch log
         summary['loss'] = summary['train_loss']  # add extra name
         summary['lr'] = summary.pop('train_learning_rate')  # rename
+        summary['knn_accuracy'] = summary.pop('train_knn_accuracy')  # rename
         # summary['class_acc'] = summary.pop('train_accuracy')  # this is [0, 1]
         summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
 
