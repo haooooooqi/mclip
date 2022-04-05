@@ -73,12 +73,15 @@ def create_model(*, model_cls, half_precision, **kwargs):
   return model_cls(num_classes=NUM_CLASSES, **kwargs)
 
 
-def initialized(key, image_size, model, init_backend='tpu'):
-  init_batch_size = 2
-  input_shape = (init_batch_size, image_size, image_size, 3)
-  # TODO{kaiming}: load a real batch
-  init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
-    'label': jnp.zeros((init_batch_size,), jnp.int32)}
+def initialized(key, image_size, model, init_backend='tpu', init_batch=None):
+  init_batch_size = 16
+  if init_batch is None:
+    input_shape = (init_batch_size, image_size, image_size, 3)
+    # TODO{kaiming}: load a real batch
+    init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
+      'label': jnp.zeros((init_batch_size,), jnp.int32)}
+  else:
+    init_batch = jax.tree_util.tree_map(lambda x: x[0, :init_batch_size], init_batch)
 
   def init(*args):
     return model.init(*args, train=False)
@@ -305,7 +308,7 @@ def sync_batch_stats(state):
 
 
 def create_train_state(rng, config: ml_collections.ConfigDict,
-                       model, image_size, learning_rate_fn):
+                       model, image_size, learning_rate_fn, init_batch=None):
   """Create initial training state."""
   dynamic_scale = None
   platform = jax.local_devices()[0].platform
@@ -317,7 +320,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   # split rng for init and for state
   rng_init, rng_state = jax.random.split(rng)
 
-  variables = initialized(rng_init, image_size, model, config.init_backend)
+  variables = initialized(rng_init, image_size, model, config.init_backend, init_batch)
   variables_states, params = variables.pop('params')
 
   # optional: rescale
@@ -430,7 +433,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   learning_rate_fn = create_learning_rate_fn(
       config, abs_learning_rate, steps_per_epoch)
 
-  state = create_train_state(rng, config, model, image_size, learning_rate_fn)
+  state = create_train_state(rng, config, model, image_size, learning_rate_fn, next(train_iter))
   state = restore_checkpoint(state, workdir if config.resume_dir == '' else config.resume_dir)
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)

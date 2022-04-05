@@ -6,9 +6,20 @@ import jax.numpy as jnp
 
 import flax.linen as nn
 
+from utils import dist_util
+
 
 # queue is not batched; ids is batched
 gather = jax.vmap(lambda queue, ids: queue[ids], in_axes=(None, 0), out_axes=0)
+
+
+# initialize queue
+def queue_features_init(shape):
+  x = jax.random.normal(jax.random.PRNGKey(0), shape)
+  l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
+  x /= l2norm
+  return x
+
 
 class OnlineKNN(nn.Module):
   """Online kNN Monitor during training.
@@ -21,7 +32,7 @@ class OnlineKNN(nn.Module):
     D = features.shape[-1]
 
     # create the queue
-    queue_features = self.variable('knn_vars', 'queue_features', lambda s: jnp.zeros(s, jnp.float32), (K, D))
+    queue_features = self.variable('knn_vars', 'queue_features', queue_features_init, (K, D))
     queue_labels = self.variable('knn_vars', 'queue_labels', lambda s: jnp.zeros(s, jnp.int32), (K,))
     queue_ptr = self.variable('knn_vars', 'queue_ptr', lambda s: jnp.zeros(s, jnp.int32), ())
 
@@ -60,16 +71,20 @@ class OnlineKNN(nn.Module):
     return accuracy
   
   def update_queue(self, features, labels, queue_features, queue_labels, queue_ptr):
-    features_all = jax.lax.all_gather(features, axis_name='batch')
-    labels_all = jax.lax.all_gather(labels, axis_name='batch')
+    features_all = dist_util.all_gather(features, axis_name='batch')
+    labels_all = dist_util.all_gather(labels, axis_name='batch')
+
+    # features_all = jax.lax.all_gather(features, axis_name='batch')
+    # labels_all = jax.lax.all_gather(labels, axis_name='batch')
 
     features_all = jnp.reshape(features_all, [-1, features_all.shape[-1]])  # [MN, C]
-    labels_all = jnp.reshape(labels_all, [-1])  # [MN,]
+    labels_all = jnp.reshape(labels_all, [-1,])  # [MN,]
 
     batch_size = features_all.shape[0]
+    assert self.knn.queue_size % batch_size == 0
     inds = jnp.arange(batch_size) + queue_ptr.value
 
     queue_features.value = queue_features.value.at[inds].set(features_all)
     queue_labels.value = queue_labels.value.at[inds].set(labels_all)
-    queue_ptr.value = queue_ptr.value + batch_size
+    queue_ptr.value = (queue_ptr.value + batch_size) % self.knn.queue_size
     return 

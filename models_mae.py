@@ -487,9 +487,8 @@ class VisionTransformer(nn.Module):
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
       return
-
     if self.knn.postprocess == 'tgap':
-      x = jnp.sum(x, axis=1)
+      x = jnp.mean(x, axis=1)
     else:
       raise NotImplementedError
 
@@ -501,7 +500,7 @@ class VisionTransformer(nn.Module):
       raise NotImplementedError
 
     if self.knn.l2norm:
-      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-6)
+      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
       x /= l2norm
 
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)

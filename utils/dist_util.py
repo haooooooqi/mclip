@@ -13,6 +13,16 @@ def pmean(x, axis_name='batch'):
   return x
 
 
+def all_gather(x, axis_name='batch'):
+  """ all_gather if pmap axis_name exist
+  """
+  frames = jax.core.thread_local_state.trace_state.axis_env
+  for frame in frames:
+    if frame.name == axis_name:
+      return jax.lax.all_gather(x, axis_name=axis_name)
+  return x
+
+
 def SyncBatchNorm(x, eps=1.e-6):
   """ without gamma/beta
   """
