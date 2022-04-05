@@ -26,7 +26,7 @@ class OnlineKNN(nn.Module):
     queue_ptr = self.variable('knn_vars', 'queue_ptr', lambda s: jnp.zeros(s, jnp.int32), ())
 
     if not train:  # we only monitor the training set.
-      return
+      return None
 
     # compute knn accuracy
     knn_accuracy = self.compute_knn_accuracy(features, labels, queue_features, queue_labels)

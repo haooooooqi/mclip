@@ -140,8 +140,8 @@ def train_step(state, batch, learning_rate_fn, config):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    (loss, pred), new_variables = outcome
-    return loss, (new_variables, loss)
+    (loss, pred, knn_accuracy), new_variables = outcome
+    return loss, (new_variables, loss, knn_accuracy)
 
   step = state.step
   dynamic_scale = state.dynamic_scale
@@ -158,9 +158,9 @@ def train_step(state, batch, learning_rate_fn, config):
     # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
     grads = lax.pmean(grads, axis_name='batch')
 
-  new_variables, loss = aux[1]
-  # metrics = compute_metrics(logits, batch['label'], batch['label_one_hot'])
-  metrics = {'loss': loss, 'learning_rate': lr,}
+  new_variables, loss, knn_accuracy = aux[1]
+
+  metrics = {'loss': loss, 'learning_rate': lr, 'knn_accuracy': knn_accuracy}
   metrics = lax.pmean(metrics, axis_name='batch')
 
   # ----------------------------------------------------------------------------
@@ -211,12 +211,12 @@ def train_step(state, batch, learning_rate_fn, config):
   return new_state, metrics
 
 
-def eval_step(state, batch, ema_eval=False):
+def eval_step(state, batch):
   variables = {'params': state.params, **state.variables}
 
   dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))  # kaiming: eval rng should not matter?
   outcome = state.apply_fn(variables, batch, train=False, mutable=False, rngs=dict(dropout=dropout_rng))
-  loss, imgs_vis = outcome
+  loss, imgs_vis, _ = outcome
 
   metrics = {'test_loss': loss}
   metrics = lax.pmean(metrics, axis_name='batch')
@@ -461,7 +461,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       donate_argnums=(0,) if config.donate else ()
       )
   p_eval_step = jax.pmap(
-      functools.partial(eval_step, ema_eval=(config.ema and config.ema_eval)),
+      eval_step,
       axis_name='batch')
 
   train_metrics = []

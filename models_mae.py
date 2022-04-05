@@ -502,7 +502,8 @@ class VisionTransformer(nn.Module):
       l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-6)
       x /= l2norm
 
-    OnlineKNN(knn=self.knn)(x, labels, train=train)
+    knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
+    return knn_accuracy
 
 
   @nn.compact
@@ -514,7 +515,7 @@ class VisionTransformer(nn.Module):
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
-    self.apply_knn(x, labels, train=train)
+    knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
@@ -527,4 +528,4 @@ class VisionTransformer(nn.Module):
     else:
       outcome = pred  # not used
 
-    return loss, outcome
+    return loss, outcome, knn_accuracy
