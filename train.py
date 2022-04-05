@@ -76,8 +76,10 @@ def create_model(*, model_cls, half_precision, **kwargs):
 def initialized(key, image_size, model, init_backend='tpu'):
   init_batch_size = 2
   input_shape = (init_batch_size, image_size, image_size, 3)
-  init_batch = {'image': jnp.ones(input_shape, model.dtype),
+  # TODO{kaiming}: load a real batch
+  init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
     'label': jnp.zeros((init_batch_size,), jnp.int32)}
+
   def init(*args):
     return model.init(*args, train=False)
   # init = jax.jit(init, backend=init_backend)
