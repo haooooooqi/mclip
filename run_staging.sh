@@ -1,5 +1,5 @@
-VM_NAME=kmh-tpuvm-v3-128-1
-# VM_NAME=kmh-tpuvm-v3-256-4
+# VM_NAME=kmh-tpuvm-v3-128-1
+VM_NAME=kmh-tpuvm-v3-256-3
 echo $VM_NAME
 REPO=https://71d519550fe3430ecbf39b70467e9210aed5da69:@github.com/KaimingHe/flax_dev.git
 BRANCH=main
@@ -12,7 +12,7 @@ batch=4096
 
 CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev2_cropvc
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev2_cropv2_donate_olkNN
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
@@ -49,7 +49,8 @@ python3 main.py \
     --config.save_every_epochs=10 \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
-    --config.aug.crop_ver=vc \
+    --config.aug.crop_ver=v2 \
+    --config.donate=True \
 
 " 2>&1 | tee $LOGDIR/pretrain.log
 
