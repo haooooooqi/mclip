@@ -25,10 +25,6 @@ class OnlineKNN(nn.Module):
     queue_labels = self.variable('knn_vars', 'queue_labels', lambda s: jnp.zeros(s, jnp.int32), (K,))
     queue_ptr = self.variable('knn_vars', 'queue_ptr', lambda s: jnp.zeros(s, jnp.int32), ())
 
-    queue_features = queue_features.value
-    queue_labels = queue_labels.value
-    queue_ptr = queue_ptr.value
-
     if not train:  # we only monitor the training set.
       return
 
@@ -38,11 +34,11 @@ class OnlineKNN(nn.Module):
     # update queue with the current batch
     self.update_queue(features, labels, queue_features, queue_labels, queue_ptr)
 
-    return
+    return knn_accuracy
 
   def compute_knn_accuracy(self, features, labels, queue_features, queue_labels):
     # [N, C] * [K, C] => [N, K]
-    sim_matrix = jnp.einsum('nc,kc->nk', features, queue_features)
+    sim_matrix = jnp.einsum('nc,kc->nk', features, queue_features.value)
 
     # => [N, k] for top-k
     sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
@@ -51,7 +47,7 @@ class OnlineKNN(nn.Module):
     sim_weight = jnp.exp(sim_weight / self.knn.temperature)
 
     # get labels: [N, k]
-    sim_labels = gather(queue_labels, sim_indices)
+    sim_labels = gather(queue_labels.value, sim_indices)
 
     # compute scores
     one_hot_labels = jax.nn.one_hot(sim_labels, self.knn.num_classes, dtype=sim_weight.dtype, axis=-1)  # [N, k, CLS]
@@ -70,9 +66,10 @@ class OnlineKNN(nn.Module):
     features_all = jnp.reshape(features_all, [-1, features_all.shape[-1]])  # [MN, C]
     labels_all = jnp.reshape(labels_all, [-1])  # [MN,]
 
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
-
     batch_size = features_all.shape[0]
-    new_queue_ptr = queue_ptr + batch_size
-    queue_features.at[queue_ptr:new_queue_ptr].set(features_all)
+    inds = jnp.arange(batch_size) + queue_ptr.value
+
+    queue_features.value = queue_features.value.at[inds].set(features_all)
+    queue_labels.value = queue_labels.value.at[inds].set(labels_all)
+    queue_ptr.value = queue_ptr.value + batch_size
+    return 
