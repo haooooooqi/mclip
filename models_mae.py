@@ -26,6 +26,7 @@ from uritemplate import partial
 from utils import posembed_util
 from utils import initializers_util
 from utils import attention_util
+from utils import dist_util
 from utils.onlineknn_util import OnlineKNN
 
 
@@ -494,7 +495,8 @@ class VisionTransformer(nn.Module):
 
     if self.knn.postnorm == 'LayerNorm':
       x = nn.LayerNorm(use_bias=False, use_scale=False, name='knn_postnorm')(x)
-      nn.BatchNorm
+    elif self.knn.postnorm == 'SyncBatchNorm':  # no gamma/beta
+      x = dist_util.SyncBatchNorm(x, eps=1.e-6)
     else:
       raise NotImplementedError
 
