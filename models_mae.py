@@ -324,7 +324,6 @@ class VisionTransformer(nn.Module):
     if noise is not None:
       pass
     else:
-      raise NotImplementedError
       rng = self.make_rng('dropout')
       noise = random.uniform(rng, shape=(N, L))
 

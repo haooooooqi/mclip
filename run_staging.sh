@@ -32,7 +32,7 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
 cd ~/flax_dev
 git pull
-git checkout mae
+git checkout mae.subtleties
 git pull
 git rev-parse --short HEAD
 
