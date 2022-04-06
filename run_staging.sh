@@ -12,7 +12,7 @@ batch=4096
 
 CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev2_cropv2_donate_olkNN_syncbn_fixbug
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_vmap_normpix_sincos_initmaev2_cropv2_donate_olkNN_NOexCls
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
@@ -32,7 +32,7 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
 cd ~/flax_dev
 git pull
-git checkout mae.knn.online
+git checkout mae
 git pull
 git rev-parse --short HEAD
 
