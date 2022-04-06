@@ -43,11 +43,11 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
         return False
     return True
 
-def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
-    """Filter to exclude cls token and pos emb."""
+def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
+    """Filter to exclude pos emb."""
     del val
     name = '.'.join(path)
-    if 'pos_embedding' in name or 'cls' == name:
+    if 'pos_embedding' in name:
         return False
     return True
 
