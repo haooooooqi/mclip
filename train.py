@@ -333,11 +333,10 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
 
   # optional: exclude some wd
   if config.exclude_wd:
-    # mask = jax.tree_util.tree_multimap(lambda x, y: bool(x and y), 
-    #   opt_util.filter_parameters(params, opt_util.filter_bias_and_norm),
-    #   opt_util.filter_parameters(params, opt_util.filter_cls_and_posembed)
-    # )
-    mask = opt_util.filter_parameters(params, opt_util.filter_bias_and_norm)
+    mask = jax.tree_util.tree_multimap(lambda x, y: bool(x and y), 
+      opt_util.filter_parameters(params, opt_util.filter_bias_and_norm),
+      opt_util.filter_parameters(params, opt_util.filter_posembed)
+    )
   else:
     mask = None
   logging.info('Apply weight decay: {}'.format(mask))
