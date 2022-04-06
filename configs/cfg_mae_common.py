@@ -93,6 +93,8 @@ def get_config():
 
   config.aug.color_jit = None  # [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
+  config.aug.make_mask_noise = False
+
   # mixup config
   config.aug.mix = ml_collections.ConfigDict()
   config.aug.mix.mixup = False
