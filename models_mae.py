@@ -211,15 +211,25 @@ class Encoder1DBlock(nn.Module):
     # Attention block.
     assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
     x = nn.LayerNorm(dtype=self.dtype)(inputs)
-    # revised
+
+    # ----------------------------------------------------
+    # revised, QKV
     MsaBlock = functools.partial(
-      attention_util.MultiHeadDotProductAttention,
-      qkv_kernel_init=qkv_kernel_init,
+      attention_util.MultiHeadDotProductAttentionQKV,
       out_kernel_init=out_kernel_init)
+
+    # revised
+    # MsaBlock = functools.partial(
+    #   attention_util.MultiHeadDotProductAttention,
+    #   qkv_kernel_init=qkv_kernel_init,
+    #   out_kernel_init=out_kernel_init)
+
     # original
     # MsaBlock = functools.partial(
     #   nn.MultiHeadDotProductAttention,
     #   kernel_init=msa_kernel_init,)
+    # ----------------------------------------------------
+
     x = MsaBlock(
         dtype=self.dtype,
         broadcast_dropout=False,
