@@ -18,7 +18,7 @@ WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
 mkdir -p ${LOGDIR}
 
-# source run_init_remote.sh
+source run_init_remote.sh
 
 # check libraries
 # gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
