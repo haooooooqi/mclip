@@ -19,6 +19,7 @@ python3 main.py \
     --config.aug.mix.cutmix=False \
     --config.aug.mix.lambda_elementwise=False \
     --config.aug.autoaug=randaugv2 \
+    --config.reshuffle_every_epochs=0.001 \
 
     # --config.pretrain_dir='gs://kmh-gcp/from_pytorch/checkpoint/kaiminghe/converted/2021-10-26-22-16-05-v3-128-mb4096-epo1600-PMAEp16-ViTLarge-lr1e-4-wd5e-2-warm40-mask0.75-pred8d512-exNB-msaLNmlpLNeLNpLNkBN0-1view-NOrelpos-abspos-clstoken-qkv-NOlayerscale-LNtgt-resume3_convert_pt2jax'
 

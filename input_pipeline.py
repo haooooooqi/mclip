@@ -140,7 +140,7 @@ def preprocess_for_eval(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
 
 
 def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
-                 image_size=IMAGE_SIZE, cache=False, aug=None):
+                 image_size=IMAGE_SIZE, cache=False, reshuffle=False, aug=None):
   """Creates a split from the ImageNet dataset using TensorFlow Datasets.
 
   Args:
@@ -168,7 +168,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
 
   num_classes = dataset_builder.info.features['label'].num_classes
 
-  ds = dataset_builder.as_dataset(split=split, decoders={
+  ds = dataset_builder.as_dataset(split=split, shuffle_files=reshuffle, decoders={
       'image': tfds.decode.SkipDecoding(),
   })
   options = tf.data.Options()

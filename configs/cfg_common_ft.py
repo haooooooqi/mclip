@@ -51,6 +51,8 @@ def get_config():
   config.num_epochs = 100.0
   config.log_every_steps = 100
   config.save_every_epochs = 10
+  
+  config.reshuffle_every_epochs = -1.  # reshuffle the training set
 
   # If num_train_steps==-1 then the number of training steps is calculated from
   # num_epochs using the entire dataset. Similarly for steps_per_eval.

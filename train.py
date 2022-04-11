@@ -257,10 +257,10 @@ def prepare_tf_data(xs, batch_size):
 
 
 def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, aug=None):
+                      cache, reshuffle=False, aug=None):
   ds = input_pipeline.create_split(
       dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, aug=aug)
+      train=train, cache=cache, reshuffle=reshuffle, aug=aug)
 
   if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
     apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
@@ -448,6 +448,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     steps_per_eval = config.steps_per_eval
 
   steps_per_checkpoint = int(steps_per_epoch * config.save_every_epochs)
+  steps_per_reshuffle = int(steps_per_epoch * config.reshuffle_every_epochs)
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
@@ -512,7 +513,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   train_metrics_last_t = time.time()
   logging.info('Initial compilation, this might take some minutes...')
 
-  for step, batch in zip(range(step_offset, num_steps), train_iter):
+  # for step, batch in zip(range(step_offset, num_steps), train_iter):
+  for step in range(step_offset, num_steps):
+    batch = next(train_iter)
     state, metrics = p_train_step(state, batch)
     for h in hooks:
       h(step)
@@ -562,6 +565,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
       state = sync_batch_stats(state)
       save_checkpoint(state, workdir)
+
+    if steps_per_reshuffle > 0 and ((step + 1) % steps_per_reshuffle == 0 or step + 1 == 10):
+      logging.info('Reshuffling.')
+      train_iter = create_input_iter(
+        dataset_builder, local_batch_size, image_size, input_dtype, train=True,
+        cache=config.cache, aug=config.aug, reshuffle=True)
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
