@@ -169,7 +169,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
 
   if train or force_shuffle:
     ds = ds.repeat()
-    ds = ds.shuffle(1280 * batch_size, seed=0)
+    ds = ds.shuffle(320 * batch_size, seed=0)  # 1281167 / 4096 = 312
 
   use_torchvision = (aug is not None and aug.torchvision)
   if use_torchvision:
