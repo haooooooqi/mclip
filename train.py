@@ -566,11 +566,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       state = sync_batch_stats(state)
       save_checkpoint(state, workdir)
 
-    if steps_per_reshuffle > 0 and ((step + 1) % steps_per_reshuffle == 0 or step + 1 == 10):
+    if steps_per_reshuffle > 0 and ((step + 1) % steps_per_reshuffle == 0 or step + 1 == 110):
+      jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
       logging.info('Reshuffling.')
+      del train_iter
       train_iter = create_input_iter(
         dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-        cache=config.cache, aug=config.aug, reshuffle=True)
+        cache=False, aug=config.aug, reshuffle=True)
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()

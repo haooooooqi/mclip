@@ -40,7 +40,7 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
 cd ~/flax_dev
 git pull
-git checkout vit.ft.subtleties
+git checkout vit.ft.reshuffle
 git pull
 git rev-parse --short HEAD
 
@@ -69,7 +69,7 @@ python3 main.py \
     --config.aug.randerase.on=False \
     --config.aug.autoaug=autoaug \
     --config.model.transformer.droppath_rate=${dp} \
-    --config.reshuffle_every_epochs = 1. \
+    --config.reshuffle_every_epochs=1. \
 " 2>&1 | tee $LOGDIR/finetune.log
 
 echo ${VM_NAME}
