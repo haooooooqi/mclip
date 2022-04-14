@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow.python.ops import random_ops
 
+from absl import logging
+
 CROP_PADDING = 32
 MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
 STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
@@ -168,7 +170,9 @@ def distorted_bounding_box_crop(image_bytes,
 
 
 def _resize(image, image_size):
-  image = tf.image.resize([image], [image_size, image_size], method=tf.image.ResizeMethod.BICUBIC)[0]
+  # image = tf.image.resize([image], [image_size, image_size], method=tf.image.ResizeMethod.BICUBIC)[0]
+  logging.warn('Using tf.compat.v1.image.resize_bicubic. This is altered from TF MAE API.')
+  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
   return image
 
 
