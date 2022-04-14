@@ -339,7 +339,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     )
   else:
     mask = None
-  # logging.info('Apply weight decay: {}'.format(mask))
+  logging.info('Apply weight decay: {}'.format(mask))
 
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
@@ -378,7 +378,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0)
 
-  rng = random.PRNGKey(0)
+  rng = random.PRNGKey(config.seed_jax)  # used to be 0
 
   image_size = 224
 
