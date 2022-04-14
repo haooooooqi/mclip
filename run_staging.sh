@@ -6,14 +6,14 @@ BRANCH=main
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c8`
 
-lr=1.5e-4
+lr=1.0e-4
 ep=1600
 batch=4096
 
 
 CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_normpix_sincos_initmaev2_cropv2resz_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed_TFMAEresz
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}

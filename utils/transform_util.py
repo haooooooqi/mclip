@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow.python.ops import random_ops
 
+from absl import logging
+
 CROP_PADDING = 32
 MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
 STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
@@ -229,7 +231,8 @@ def _decode_and_random_crop_v2(image_bytes, image_size,
   crop_window = tf.stack([offset_h, offset_w, h, w])
   image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
   # image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)  # TF MAE: tf.image.resize (different than crop v1, v3)
-  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0] # TF MAE: tf.image.resize_bicubic
+  logging.warn('Using tf.compat.v1.image.resize_bicubic. This is altered from TF MAE API.')
+  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
   return image
 
 
