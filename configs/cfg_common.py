@@ -113,8 +113,4 @@ def get_config():
   config.donate = False
   config.init_backend = 'tpu'
 
-  # seeds
-  config.seed_jax = 0
-  config.seed_tf = 0
-
   return config

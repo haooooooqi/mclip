@@ -137,4 +137,8 @@ def get_config():
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
 
+  # seeds
+  config.seed_jax = 0
+  config.seed_tf = 0
+
   return config
