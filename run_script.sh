@@ -14,7 +14,7 @@ python3 main.py \
     --config.donate=False \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=False \
-    --config.aug.crop_ver=v2 \
+    --config.aug.crop_ver=vc \
     --config.model.visualize=True \
     --config.aug.make_mask_noise=True \
 

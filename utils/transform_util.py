@@ -168,9 +168,9 @@ def distorted_bounding_box_crop(image_bytes,
 
 
 def _resize(image, image_size):
-  return tf.image.resize([image], [image_size, image_size],
-                         method=tf.image.ResizeMethod.BICUBIC)[0]
-
+  # return tf.image.resize([image], [image_size, image_size],
+  #                        method=tf.image.ResizeMethod.BICUBIC)[0]
+  return tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
 
 def _at_least_x_are_equal(a, b, x):
   """At least `x` of `a` and `b` `Tensors` are equal."""
