@@ -48,7 +48,7 @@ python3 main.py \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
-    --config.save_every_epochs=10 \
+    --config.save_every_epochs=50 \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
     --config.aug.crop_ver=v2 \
