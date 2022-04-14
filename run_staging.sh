@@ -1,5 +1,5 @@
 # VM_NAME=kmh-tpuvm-v3-128-1
-VM_NAME=kmh-tpuvm-v3-256-3
+VM_NAME=kmh-tpuvm-v3-256-4
 echo $VM_NAME
 REPO=https://71d519550fe3430ecbf39b70467e9210aed5da69:@github.com/KaimingHe/flax_dev.git
 BRANCH=main
@@ -7,13 +7,13 @@ BRANCH=main
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c8`
 
 lr=1.5e-4
-ep=800
+ep=1600
 batch=4096
 
 
 CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_normpix_sincos_initmaev2_cropv2_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed_TFMAEresz
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_normpix_sincos_initmaev2_cropv2resz_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed_TFMAEresz
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
