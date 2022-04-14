@@ -13,7 +13,7 @@ batch=4096
 
 CONFIG=cfg_mae_large
 # pytorch_recipe: _autoaug_lb0.1_cropv4_exwd_initv2_rsinit_dp0.1_cutmixup_minlr
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_NOnormpix_sincos_initmaev2_cropvc_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed_tfv1resz
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_maeDBG_batch${batch}_lr${lr}_vmap_NOnormpix_sincos_initmaev2_cropvc_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed_TFMAEresz
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
@@ -51,7 +51,7 @@ python3 main.py \
     --config.save_every_epochs=10 \
     --config.model.norm_pix_loss=False \
     --config.model.sincos=True \
-    --config.aug.crop_ver=vc \
+    --config.aug.crop_ver=v2 \
     --config.donate=True \
     --config.aug.make_mask_noise=True \
 
