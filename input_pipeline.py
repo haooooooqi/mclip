@@ -172,9 +172,9 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
       'image': tfds.decode.SkipDecoding(),
   })
   options = tf.data.Options()
-  options.experimental_threading.private_threadpool_size = 48
+  options.threading.private_threadpool_size = 48
   if aug is not None and aug.torchvision:
-    options.experimental_threading.private_threadpool_size = 8
+    options.threading.private_threadpool_size = 8
   ds = ds.with_options(options)
 
   if cache:
