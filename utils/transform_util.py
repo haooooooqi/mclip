@@ -170,9 +170,10 @@ def distorted_bounding_box_crop(image_bytes,
 
 
 def _resize(image, image_size):
-  # image = tf.image.resize([image], [image_size, image_size], method=tf.image.ResizeMethod.BICUBIC)[0]
-  logging.warn('Using tf.compat.v1.image.resize_bicubic. This is altered from TF MAE API.')
-  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
+  logging.warn('Using tf.compat.image.resize. This is NOT altered.')
+  image = tf.image.resize([image], [image_size, image_size], method=tf.image.ResizeMethod.BICUBIC)[0]
+  # logging.warn('Using tf.compat.v1.image.resize_bicubic. This is altered from TF MAE API.')
+  # image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
   return image
 
 
