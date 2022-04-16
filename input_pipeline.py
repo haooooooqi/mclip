@@ -16,6 +16,7 @@
 """
 
 import functools
+import os
 
 import jax
 import tensorflow as tf
@@ -253,9 +254,43 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   """
   assert train
 
+  # step 0: get info
   split = 'train'
   train_examples = dataset_builder.info.splits['train'].num_examples
   num_classes = dataset_builder.info.features['label'].num_classes
+
+  from IPython import embed; embed();
+  if (0 == 0): raise NotImplementedError
+  
+  # step 1: get list of tfrecords and shuffle based on seed
+  file_pattern = os.path.join(str(dataset_builder.data_path), 'imagenet2012-train.*')
+  seed_tfds = 0
+  seed_steps = seed_tfds + steps
+  ds = tf.data.Dataset.list_files(file_pattern, shuffle=True, seed=seed_steps)
+  assert len(ds) == 1024
+
+  # step 2: shard tfrecords
+  num_hosts = jax.process_count()
+  host_idx = jax.process_index()
+  ds = ds.shard(num_shards=num_hosts, index=host_idx)
+
+  # step 3: fetch from tfrecords
+  def fetch_dataset(filename):
+    buffer_size = 8 * 1024 * 1024  # 8 MiB per file
+    dataset = tf.data.TFRecordDataset(filename, buffer_size=buffer_size)
+    return dataset
+  # Read the data from disk in parallel
+  ds = ds.interleave(fetch_dataset, cycle_length=64)
+
+  # step 4: parse the examples
+  example_specs = dataset_builder.info.features.get_serialized_info()
+  parser = tfds.core.example_parser.ExampleParser(example_specs)
+  def parse(ex):
+    return parser.parse_example(ex)
+  ds = ds.map(parse, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+
+  # ----------------------------------------------------------------------------
 
   ds = dataset_builder.as_dataset(split=split, decoders={
       'image': tfds.decode.SkipDecoding(),
@@ -264,10 +299,6 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   if cache:
     ds = ds.cache()
 
-  # ds = ds.repeat()  # do not repeat
-  # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
-  seed_tfds = 0
-  seed_steps = seed_tfds + steps
   # ds = ds.shuffle(buffer_size=train_examples, seed=seed_steps)  # random shuffle using the same seed across hosts
 
   num_hosts = jax.process_count()
