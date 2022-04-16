@@ -238,35 +238,10 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   return ds
 
 
-def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
-                 image_size=IMAGE_SIZE, cache=False, aug=None, steps=None):
-  """Creates a split from the ImageNet dataset using TensorFlow Datasets.
-
-  Args:
-    dataset_builder: TFDS dataset builder for ImageNet.
-    batch_size: the batch size returned by the data pipeline.
-    train: Whether to load the train or evaluation split.
-    dtype: data type of the image.
-    image_size: The target size of the images.
-    cache: Whether to cache the dataset.
-  Returns:
-    A `tf.data.Dataset`.
-  """
-  assert train
-
-  # step 0: get info
-  split = 'train'
-  train_examples = dataset_builder.info.splits['train'].num_examples
-  num_classes = dataset_builder.info.features['label'].num_classes
-
-  from IPython import embed; embed();
-  if (0 == 0): raise NotImplementedError
-  
+def _as_sharded_dataset(dataset_builder, seed):
   # step 1: get list of tfrecords and shuffle based on seed
   file_pattern = os.path.join(str(dataset_builder.data_path), 'imagenet2012-train.*')
-  seed_tfds = 0
-  seed_steps = seed_tfds + steps
-  ds = tf.data.Dataset.list_files(file_pattern, shuffle=True, seed=seed_steps)
+  ds = tf.data.Dataset.list_files(file_pattern, shuffle=True, seed=seed)
   assert len(ds) == 1024
 
   # step 2: shard tfrecords
@@ -288,23 +263,36 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   def parse(ex):
     return parser.parse_example(ex)
   ds = ds.map(parse, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  return ds
 
 
-  # ----------------------------------------------------------------------------
+def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
+                 image_size=IMAGE_SIZE, cache=False, aug=None, steps=None):
+  """Creates a split from the ImageNet dataset using TensorFlow Datasets.
 
-  ds = dataset_builder.as_dataset(split=split, decoders={
-      'image': tfds.decode.SkipDecoding(),
-  })  # len: 1281167
+  Args:
+    dataset_builder: TFDS dataset builder for ImageNet.
+    batch_size: the batch size returned by the data pipeline.
+    train: Whether to load the train or evaluation split.
+    dtype: data type of the image.
+    image_size: The target size of the images.
+    cache: Whether to cache the dataset.
+  Returns:
+    A `tf.data.Dataset`.
+  """
+  assert train
 
-  if cache:
-    ds = ds.cache()
+  # step 0: get info
+  split = 'train'
+  train_examples = dataset_builder.info.splits['train'].num_examples
+  num_classes = dataset_builder.info.features['label'].num_classes
 
-  # ds = ds.shuffle(buffer_size=train_examples, seed=seed_steps)  # random shuffle using the same seed across hosts
+  # get the sharded dataset from tfrecords
+  seed_tfds = 0
+  seed_steps = seed_tfds + steps
+  ds = _as_sharded_dataset(dataset_builder, seed_steps)
 
-  num_hosts = jax.process_count()
-  host_idx = jax.process_index()
-  ds = ds.shard(num_shards=num_hosts, index=host_idx)
-
+  # prepare for torchvision
   use_torchvision = (aug is not None and aug.torchvision)
   if use_torchvision:
     transform_aug = get_torchvision_aug(image_size, aug)
@@ -348,7 +336,7 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   ds = ds.batch(batch_size, drop_remainder=train)  # we drop the remainder if eval
 
   # logging_util.verbose_on()
-  logging.info('len(ds): {}'.format(len(ds)))
+  # logging.info('len(ds): {}'.format(len(ds)))
   # logging_util.verbose_off()
 
   ds = ds.prefetch(10)
