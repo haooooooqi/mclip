@@ -316,9 +316,9 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
 
   ds = ds.batch(batch_size, drop_remainder=train)  # we drop the remainder if eval
 
-  logging_util.verbose_on()
+  # logging_util.verbose_on()
   logging.info('len(ds): {}'.format(len(ds)))
-  logging_util.verbose_off()
+  # logging_util.verbose_off()
 
   ds = ds.prefetch(10)
 
