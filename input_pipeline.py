@@ -27,6 +27,8 @@ from utils.transform_util import \
 
 from utils.autoaug_util import distort_image_with_autoaugment, distort_image_with_randaugment, distort_image_with_randaugment_v2
 from utils.randerase_util import random_erase
+from utils import logging_util
+
 
 from absl import logging
 from PIL import Image
@@ -250,40 +252,25 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
     A `tf.data.Dataset`.
   """
   assert train
-  from IPython import embed; embed();
-  if (0 == 0): raise NotImplementedError
-  
-  if train:
-    train_examples = dataset_builder.info.splits['train'].num_examples
-    split_size = train_examples // jax.process_count()
-    start = jax.process_index() * split_size
-    split = 'train[{}:{}]'.format(start, start + split_size)
-  else:
-    validate_examples = dataset_builder.info.splits['validation'].num_examples
-    split_size = math.ceil(validate_examples / jax.process_count())
-    start = split_size * jax.process_index()
-    end = min(start + split_size, validate_examples)
-    split = 'validation[{}:{}]'.format(start, end)
-    assert math.ceil(split_size / batch_size) == math.ceil((end - start) / batch_size)  # hack to make sure every host has the same # iter
 
+  split = 'train'
+  train_examples = dataset_builder.info.splits['train'].num_examples
   num_classes = dataset_builder.info.features['label'].num_classes
 
   ds = dataset_builder.as_dataset(split=split, decoders={
       'image': tfds.decode.SkipDecoding(),
-  })
-  options = tf.data.Options()
-  options.experimental_threading.private_threadpool_size = 48
-  if aug is not None and aug.torchvision:
-    options.experimental_threading.private_threadpool_size = 8
-  ds = ds.with_options(options)
+  })  # len: 1281167
 
   if cache:
     ds = ds.cache()
 
-  if train:
-    ds = ds.repeat()
-    # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
-    ds = ds.shuffle(buffer_size=aug.shuffle_buffer_size, seed=0)
+  # ds = ds.repeat()  # do not repeat
+  # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
+  ds = ds.shuffle(buffer_size=train_examples, seed=0)  # random shuffle using the same seed across hosts
+
+  num_hosts = jax.process_count()
+  host_idx = jax.process_index()
+  ds = ds.shard(num_shards=num_hosts, index=host_idx)
 
   use_torchvision = (aug is not None and aug.torchvision)
   if use_torchvision:
@@ -326,6 +313,10 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   ds = ds.map(ds_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
   ds = ds.batch(batch_size, drop_remainder=train)  # we drop the remainder if eval
+
+  logging_util.verbose_on()
+  logging.info('len(ds): {}'.format(len(ds)))
+  logging_util.verbose_off()
 
   if not train:
     ds = ds.repeat()
