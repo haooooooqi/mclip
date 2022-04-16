@@ -268,7 +268,7 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
   seed_tfds = 0
   seed_steps = seed_tfds + steps
-  ds = ds.shuffle(buffer_size=train_examples, seed=seed_steps)  # random shuffle using the same seed across hosts
+  # ds = ds.shuffle(buffer_size=train_examples, seed=seed_steps)  # random shuffle using the same seed across hosts
 
   num_hosts = jax.process_count()
   host_idx = jax.process_index()
