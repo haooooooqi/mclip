@@ -575,7 +575,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
       train_iter = create_input_iter(
           dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-          cache=config.cache, aug=config.aug, step=step)
+          cache=config.cache, aug=config.aug, steps=step)
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
