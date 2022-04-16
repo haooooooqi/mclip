@@ -233,3 +233,103 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   ds = ds.prefetch(10)
 
   return ds
+
+
+def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
+                 image_size=IMAGE_SIZE, cache=False, aug=None):
+  """Creates a split from the ImageNet dataset using TensorFlow Datasets.
+
+  Args:
+    dataset_builder: TFDS dataset builder for ImageNet.
+    batch_size: the batch size returned by the data pipeline.
+    train: Whether to load the train or evaluation split.
+    dtype: data type of the image.
+    image_size: The target size of the images.
+    cache: Whether to cache the dataset.
+  Returns:
+    A `tf.data.Dataset`.
+  """
+  assert train
+  from IPython import embed; embed();
+  if (0 == 0): raise NotImplementedError
+  
+  if train:
+    train_examples = dataset_builder.info.splits['train'].num_examples
+    split_size = train_examples // jax.process_count()
+    start = jax.process_index() * split_size
+    split = 'train[{}:{}]'.format(start, start + split_size)
+  else:
+    validate_examples = dataset_builder.info.splits['validation'].num_examples
+    split_size = math.ceil(validate_examples / jax.process_count())
+    start = split_size * jax.process_index()
+    end = min(start + split_size, validate_examples)
+    split = 'validation[{}:{}]'.format(start, end)
+    assert math.ceil(split_size / batch_size) == math.ceil((end - start) / batch_size)  # hack to make sure every host has the same # iter
+
+  num_classes = dataset_builder.info.features['label'].num_classes
+
+  ds = dataset_builder.as_dataset(split=split, decoders={
+      'image': tfds.decode.SkipDecoding(),
+  })
+  options = tf.data.Options()
+  options.experimental_threading.private_threadpool_size = 48
+  if aug is not None and aug.torchvision:
+    options.experimental_threading.private_threadpool_size = 8
+  ds = ds.with_options(options)
+
+  if cache:
+    ds = ds.cache()
+
+  if train:
+    ds = ds.repeat()
+    # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
+    ds = ds.shuffle(buffer_size=aug.shuffle_buffer_size, seed=0)
+
+  use_torchvision = (aug is not None and aug.torchvision)
+  if use_torchvision:
+    transform_aug = get_torchvision_aug(image_size, aug)
+    logging.info(transform_aug)
+
+  # define the decode function
+  def decode_example(example):
+    label = example['label']
+    label_one_hot = tf.one_hot(label, depth=num_classes, dtype=dtype)
+    if train:
+      if use_torchvision:
+        image = preprocess_for_train_torchvision(example['image'], dtype, image_size, transform_aug=transform_aug)
+      else:
+        image = preprocess_for_train(example['image'], dtype, image_size, aug=aug)
+      label_one_hot = label_one_hot * (1 - aug.label_smoothing) + aug.label_smoothing / num_classes
+    else:
+      assert not use_torchvision
+      image = preprocess_for_eval(example['image'], dtype, image_size)
+    return {'image': image, 'label': label, 'label_one_hot': label_one_hot}
+
+  if use_torchvision:
+    # kaiming: reference: https://github.com/tensorflow/tensorflow/issues/38212
+    def py_func(image, label):
+      d = decode_example({'image': image, 'label': label})
+      return list(d.values())
+    def ds_map_fn(x):
+      flattened_output = tf.py_function(py_func, [x['image'], x['label']], [tf.float32, tf.int64, tf.float32])
+      return {"image": flattened_output[0], "label": flattened_output[1], "label_one_hot": flattened_output[2]}
+  else:
+    ds_map_fn = decode_example
+
+  # ---------------------------------------
+  # debugging 
+  # x = next(iter(ds))
+  # decode_example(x)
+  # raise NotImplementedError
+  # ---------------------------------------
+
+  ds = ds.map(ds_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+  ds = ds.batch(batch_size, drop_remainder=train)  # we drop the remainder if eval
+
+  if not train:
+    ds = ds.repeat()
+
+  ds = ds.prefetch(10)
+
+  return ds

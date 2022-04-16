@@ -258,7 +258,11 @@ def prepare_tf_data(xs, batch_size):
 
 def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
                       cache, aug=None):
-  ds = input_pipeline.create_split(
+  if train:
+    create_split = input_pipeline.create_split_v2
+  else:
+    create_split = input_pipeline.create_split
+  ds = create_split(
       dataset_builder, batch_size, image_size=image_size, dtype=dtype,
       train=train, cache=cache, aug=aug)
 
