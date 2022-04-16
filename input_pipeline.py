@@ -263,6 +263,7 @@ def _as_sharded_dataset(dataset_builder, seed):
   def parse(ex):
     return parser.parse_example(ex)
   ds = ds.map(parse, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  ds = ds.shuffle(buffer_size=64 * 1024, seed=seed+1)
   return ds
 
 
