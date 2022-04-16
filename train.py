@@ -484,9 +484,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     epoch_1000x = int(step * config.batch_size / 1281167 * 1000)  # normalize to IN1K epoch anyway
 
     if config.get('log_every_steps'):
-      # train_metrics.append(metrics)
+      train_metrics.append(metrics)
       if (step + 1) % config.log_every_steps == 0:        
-        train_metrics.append(metrics)
         # if (step + 1) == config.log_every_steps and config.profile_memory:
         #   profile_memory(workdir)
         # Wait until computations are done before exiting
