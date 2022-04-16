@@ -238,7 +238,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
 
 
 def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
-                 image_size=IMAGE_SIZE, cache=False, aug=None):
+                 image_size=IMAGE_SIZE, cache=False, aug=None, steps=None):
   """Creates a split from the ImageNet dataset using TensorFlow Datasets.
 
   Args:
@@ -266,7 +266,9 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
 
   # ds = ds.repeat()  # do not repeat
   # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
-  ds = ds.shuffle(buffer_size=train_examples, seed=0)  # random shuffle using the same seed across hosts
+  seed_tfds = 0
+  seed_steps = seed_tfds + steps
+  ds = ds.shuffle(buffer_size=train_examples, seed=seed_steps)  # random shuffle using the same seed across hosts
 
   num_hosts = jax.process_count()
   host_idx = jax.process_index()
@@ -317,9 +319,6 @@ def create_split_v2(dataset_builder, batch_size, train, dtype=tf.float32,
   logging_util.verbose_on()
   logging.info('len(ds): {}'.format(len(ds)))
   logging_util.verbose_off()
-
-  if not train:
-    ds = ds.repeat()
 
   ds = ds.prefetch(10)
 

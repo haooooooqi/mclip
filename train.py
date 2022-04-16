@@ -257,14 +257,15 @@ def prepare_tf_data(xs, batch_size):
 
 
 def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, aug=None):
+                      cache, aug=None, steps=0):
   if train:
-    create_split = input_pipeline.create_split_v2
+    ds = input_pipeline.create_split_v2(
+        dataset_builder, batch_size, image_size=image_size, dtype=dtype,
+        train=train, cache=False, aug=aug, steps=steps)
   else:
-    create_split = input_pipeline.create_split
-  ds = create_split(
-      dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, aug=aug)
+    ds = input_pipeline.create_split(
+        dataset_builder, batch_size, image_size=image_size, dtype=dtype,
+        train=train, cache=cache, aug=aug)
 
   if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
     apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
@@ -437,6 +438,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
   )
+  logging.info('steps_per_epoch: {}'.format(steps_per_epoch))
 
   if config.num_train_steps == -1:
     num_steps = int(steps_per_epoch * config.num_epochs)
@@ -516,7 +518,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   train_metrics_last_t = time.time()
   logging.info('Initial compilation, this might take some minutes...')
 
-  for step, batch in zip(range(step_offset, num_steps), train_iter):
+  for step in range(step_offset, num_steps):
+    batch = next(train_iter)
     state, metrics = p_train_step(state, batch)
     for h in hooks:
       h(step)
@@ -566,6 +569,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
       state = sync_batch_stats(state)
       save_checkpoint(state, workdir)
+
+    if (step + 1) % steps_per_epoch == 0:
+      # re-build the dataset
+      jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+      train_iter = create_input_iter(
+          dataset_builder, local_batch_size, image_size, input_dtype, train=True,
+          cache=config.cache, aug=config.aug, step=step)
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
