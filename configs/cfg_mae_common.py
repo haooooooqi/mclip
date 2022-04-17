@@ -137,6 +137,8 @@ def get_config():
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
 
+  config.model.knn.eval_sampling = 1.  # sample a portion for kNN eval
+
   # seeds
   config.seed_jax = 0
   config.seed_tf = 0
