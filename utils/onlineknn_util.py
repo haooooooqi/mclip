@@ -40,8 +40,7 @@ class OnlineKNN(nn.Module):
       return None
 
     # compute knn accuracy
-    num_samples = int(self.knn.eval_sampling * features.shape[0])
-    knn_accuracy = self.compute_knn_accuracy(features[:num_samples], labels[:num_samples], queue_features, queue_labels)
+    knn_accuracy = self.compute_knn_accuracy(features, labels, queue_features, queue_labels)
 
     # update queue with the current batch
     self.update_queue(features, labels, queue_features, queue_labels, queue_ptr)

@@ -17,7 +17,6 @@ python3 main.py \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
-    --config.model.knn.eval_sampling=0.25 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
