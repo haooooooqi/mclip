@@ -195,6 +195,7 @@ class Encoder1DBlock(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   layer_id: int = None
+  torch_qkv: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, deterministic):
@@ -213,16 +214,17 @@ class Encoder1DBlock(nn.Module):
     x = nn.LayerNorm(dtype=self.dtype)(inputs)
 
     # ----------------------------------------------------
-    # revised, QKV
-    MsaBlock = functools.partial(
-      attention_util.MultiHeadDotProductAttentionQKV,
-      out_kernel_init=out_kernel_init)
-
-    # revised
-    # MsaBlock = functools.partial(
-    #   attention_util.MultiHeadDotProductAttention,
-    #   qkv_kernel_init=qkv_kernel_init,
-    #   out_kernel_init=out_kernel_init)
+    if self.torch_qkv:
+      # revised, QKV
+      MsaBlock = functools.partial(
+        attention_util.MultiHeadDotProductAttentionQKV,
+        out_kernel_init=out_kernel_init)
+    else:
+      # revised
+      MsaBlock = functools.partial(
+        attention_util.MultiHeadDotProductAttention,
+        qkv_kernel_init=qkv_kernel_init,
+        out_kernel_init=out_kernel_init)
 
     # original
     # MsaBlock = functools.partial(
@@ -273,6 +275,7 @@ class Encoder(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
+  torch_qkv: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -297,7 +300,8 @@ class Encoder(nn.Module):
           droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
           name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
           num_heads=self.num_heads,
-          layer_id=lyr)(
+          layer_id=lyr,
+          torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
     encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
 

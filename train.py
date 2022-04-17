@@ -335,7 +335,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   if config.exclude_wd:
     mask = jax.tree_util.tree_multimap(lambda x, y: bool(x and y), 
       opt_util.filter_parameters(params, opt_util.filter_bias_and_norm),
-      opt_util.filter_parameters(params, opt_util.filter_posembed)
+      opt_util.filter_parameters(params, opt_util.filter_posembed)  # Note: we must exclude posembed wd in adamw
     )
   else:
     mask = None

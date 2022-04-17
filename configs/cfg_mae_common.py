@@ -63,6 +63,8 @@ def get_config():
   # model config
   config.model = mae.get_config()
   
+  config.model.transformer.torch_qkv = False  # the torch qkv format (one conv for qkv); JAX default is torch_qkv=False
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()
