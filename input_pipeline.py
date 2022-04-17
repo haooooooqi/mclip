@@ -196,8 +196,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
       assert not use_torchvision
       image = preprocess_for_eval(example['image'], dtype, image_size)
     
-    noise = tf.random.uniform([14 * 14,], 0, 1, dtype=tf.float32) if (aug and aug.make_mask_noise) else None
-    return {'image': image, 'label': label, 'label_one_hot': label_one_hot, 'noise': noise}
+    return {'image': image, 'label': label, 'label_one_hot': label_one_hot}
 
   if use_torchvision:
     # kaiming: reference: https://github.com/tensorflow/tensorflow/issues/38212

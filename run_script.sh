@@ -16,7 +16,6 @@ python3 main.py \
     --config.model.sincos=False \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
-    --config.aug.make_mask_noise=True \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

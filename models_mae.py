@@ -326,16 +326,13 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
 
-  def random_mask(self, x, noise=None):
+  def random_mask(self, x):
     
     N, L, _ = x.shape  # batch, length, dim
     len_keep = int(L * (1 - self.mask_ratio))
 
-    if noise is not None:
-      pass
-    else:
-      rng = self.make_rng('dropout')
-      noise = random.uniform(rng, shape=(N, L))
+    rng = self.make_rng('dropout')
+    noise = random.uniform(rng, shape=(N, L))
 
     ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
     ids_restore = jnp.argsort(ids_shuffle, axis=1)
@@ -417,7 +414,7 @@ class VisionTransformer(nn.Module):
     axis=1)
     return imgs_vis
 
-  def apply_encoder(self, inputs, train, noise=None):
+  def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
@@ -443,7 +440,7 @@ class VisionTransformer(nn.Module):
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x, noise=noise)
+    x, mask, ids_restore = self.random_mask(x)
     ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
 
     # If we want to add a class token, add it here.
@@ -525,10 +522,9 @@ class VisionTransformer(nn.Module):
   def __call__(self, inputs, *, train):
     imgs = inputs['image']
     labels = inputs['label']
-    noise = inputs['noise']
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs, train=train, noise=noise)
+    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
