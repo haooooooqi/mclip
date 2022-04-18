@@ -27,7 +27,7 @@ WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
 mkdir -p ${LOGDIR}
 
-# source run_init_remote.sh
+source run_init_remote.sh
 
 # check libraries
 # gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
@@ -41,7 +41,7 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
 cd ~/flax_dev
 git pull
-git checkout vit.ft
+git checkout vit.ft.torchvision
 git pull
 git rev-parse --short HEAD
 
@@ -73,7 +73,7 @@ python3 main.py \
     --config.aug.mix.cutmix=True \
     --config.aug.mix.batch_size=32 \
     --config.aug.randerase.on=False \
-    --config.aug.autoaug=autoaug \
+    --config.aug.autoaug=randaugv2 \
     --config.model.transformer.droppath_rate=${dp} \
     --config.aug.mix.switch_mode=host_batch \
     --config.seed_tf=${seed} \
