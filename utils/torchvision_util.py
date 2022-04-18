@@ -112,13 +112,13 @@ def get_torchvision_map_mix_fn(aug, num_classes):
   def apply_mix_func(batch):
     images = batch['image']
     images = torch.tensor(images.numpy())
-    images = torch.permute(images, [0, 3, 1, 2])  # [n, h, w, c] -> [n, c, h, w]
+    images = images.permute([0, 3, 1, 2])  # [n, h, w, c] -> [n, c, h, w]
     
     labels = batch['label']
     labels = torch.tensor(labels.numpy())
 
     images, labels_one_hot = mix_func(images, labels)
-    images = torch.permute(images, [0, 2, 3, 1])  # [n, c, h, w] -> [n, h, w, c]
+    images = images.permute([0, 2, 3, 1])  # [n, c, h, w] -> [n, h, w, c]
     images = tf.constant(images.numpy(), dtype=batch['image'].dtype)
     labels_one_hot = tf.constant(labels_one_hot.numpy(), dtype=batch['label_one_hot'].dtype)
 
