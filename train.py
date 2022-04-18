@@ -59,6 +59,10 @@ import numpy as np
 import os
 import math
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=FutureWarning) 
 
 NUM_CLASSES = 1000
 

@@ -151,7 +151,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
       'image': tfds.decode.SkipDecoding(),
   })
   options = tf.data.Options()
-  options.experimental_threading.private_threadpool_size = 48 if not use_torchvision else 8
+  options.threading.private_threadpool_size = 48 if not use_torchvision else 8
   ds = ds.with_options(options)
 
   if cache:

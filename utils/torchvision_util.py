@@ -19,7 +19,7 @@ CROP_PADDING = 32
 def get_torchvision_aug(image_size, aug):
 
   transform_aug = [
-    transforms.RandomResizedCrop(image_size, scale=aug.area_range, ratio=aug.aspect_ratio_range, interpolation=transforms.InterpolationMode.BICUBIC),
+    transforms.RandomResizedCrop(image_size, scale=aug.area_range, ratio=aug.aspect_ratio_range, interpolation=Image.BICUBIC),
     transforms.RandomHorizontalFlip()]
 
   if aug.color_jit is not None:
@@ -76,7 +76,7 @@ def preprocess_for_eval_torchvision(image_bytes, dtype=tf.float32, image_size=IM
   image = image.convert('RGB')
 
   transform_aug = [
-    transforms.Resize(image_size + CROP_PADDING, interpolation=transforms.InterpolationMode.BICUBIC),  # 256
+    transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC),  # 256
     transforms.CenterCrop(image_size),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
