@@ -133,7 +133,10 @@ def get_config():
 
   # utils
   config.pretrain_dir = ''
+  config.resume_dir = ''
 
+  config.eval_only = False
+  
   # seeds
   config.seed_jax = 0
   config.seed_tf = 0

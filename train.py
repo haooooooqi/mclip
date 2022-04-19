@@ -468,8 +468,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
 
-  if config.pretrain_dir == '':
-    state = restore_checkpoint(state, workdir)
+  if config.resume_dir != '':
+    state = restore_checkpoint(state, config.resume_dir)
   else:
     logging.info('Loading from pre-training:')
     state = checkpoint_util.load_from_pretrain(state, config.pretrain_dir)
@@ -477,6 +477,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # stds = jax.tree_util.tree_map(lambda x: np.array(x).std(), state.params)
     # logging.info('std: {}'.format(stds))
 
+  # try to restore
+  state = restore_checkpoint(state, workdir)
 
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
@@ -518,6 +520,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   logging.info('Work dir: {}'.format(workdir))
   train_metrics_last_t = time.time()
   logging.info('Initial compilation, this might take some minutes...')
+
+  if config.eval_only:
+    # run eval only and return
+    logging.info('Evaluating...')
+    run_eval(state, p_eval_step, eval_iter, steps_per_eval, epoch=-1)
+    return
 
   for step, batch in zip(range(step_offset, num_steps), train_iter):
     state, metrics = p_train_step(state, batch)
