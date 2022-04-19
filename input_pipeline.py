@@ -29,7 +29,8 @@ from utils.autoaug_util import distort_image_with_autoaugment, distort_image_wit
 from utils.randerase_util import random_erase
 from utils.torchvision_util import \
   get_torchvision_aug, get_torchvision_aug_eval, \
-  preprocess_for_train_torchvision, preprocess_for_eval_torchvision, preprocess_for_eval_torchvision_dbg, get_torchvision_map_fn
+  preprocess_for_train_torchvision, preprocess_for_eval_torchvision, get_torchvision_map_fn, \
+  preprocess_for_eval_torchvision_dbg
 
 from absl import logging
 

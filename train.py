@@ -599,6 +599,7 @@ def run_eval(state, p_eval_step, eval_iter, steps_per_eval, epoch):
   state = sync_batch_stats(state)
   tic = time.time()
   for i in range(steps_per_eval):
+    logging.info('eval batch: {} / {}'.format(i, steps_per_eval))
     eval_batch = next(eval_iter)
     metrics = p_eval_step(state, eval_batch)
     eval_metrics.append(metrics)

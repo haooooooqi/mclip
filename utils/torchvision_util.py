@@ -105,44 +105,24 @@ def preprocess_for_eval_torchvision_dbg(image_bytes, dtype=tf.float32, image_siz
   """
   image = Image.open(io.BytesIO(image_bytes.numpy()))
   image = image.convert('RGB')
-
-
-  # image_tf = tf.io.decode_jpeg(image_bytes, channels=3, fancy_upscaling=False, dct_method='INTEGER_ACCURATE')
+  image = transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC)(image)  # PIL, uint8
 
   image = np.array(image)
   image = tf.constant(image, dtype=dtype)
 
-  image_height, image_width = image.shape[:2]
-  new_size = image_size + CROP_PADDING
-  min_size = tf.math.minimum(image_height, image_width)
-  new_height = tf.cast(new_size * image_height / min_size, dtype=tf.int32)
-  new_width = tf.cast(new_size * image_width / min_size, dtype=tf.int32)
-
-  image = np.array(image)
-  image = gen_image_ops.resize_bicubic([image], [new_height, new_width], align_corners=False)[0]
-  image = tf.clip_by_value(image, 0, 255.)
-  image = tf.round(image)
-
-  image = normalize_image(image)
-
+  new_height, new_width = image.shape[:2]
   offset_height = ((new_height - image_size) + 1) // 2
   offset_width = ((new_width - image_size) + 1) // 2
-
   image = image[offset_height:(offset_height + image_size), offset_width:(offset_width + image_size), :]
+  image = tf.cast(image, dtype=tf.float32)
+
+  image = normalize_image(image)
 
   # -------
   # im = transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC)(image)  # PIL, uint8
   # im = transforms.CenterCrop(image_size)(im)  # PIL, uint8
   # im = transforms.ToTensor()(im)  # numpy, float32, [0, 1]
 
-
-
-  # transform_aug = [
-  #   transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC),  # 256
-  #   transforms.CenterCrop(image_size),
-  #   transforms.ToTensor(),
-  #   transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
-  # transform_aug = transforms.Compose(transform_aug)
   # image = transform_aug(image)
 
   # image = tf.constant(image.numpy(), dtype=dtype)  # [3, 224, 224]
