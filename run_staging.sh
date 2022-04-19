@@ -21,7 +21,9 @@ source scripts/select_chkpt_${vitsize}.sh
 name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_ftpy_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_TVrandaugv2_TVmix_shf512x32_hostbatch_seed${seed}_torch171
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_ftpy_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_TVrandaugv2_TVmix_shf512x32_hostbatch_seed${seed}_torch171_EVALdbg
+
+RESUME_DIR='gs://kmh-gcp/checkpoints/flax/2021-10-26-22-16-05-v3-128-mb4096-epo1600-PMAEp16-ViTLarge-lr1e-4-wd5e-2-warm40-mask0.75-pred8d512-exNB-msaLNmlpLNeLNpLNkBN0-1view-NOrelpos-abspos-clstoken-qkv-NOlayerscale-LNtgt-resume3_convert_pt2jax_finetune/20220418_201436_kmh-tpuvm-v3-256-3_cfg_vit_large_50ep_ftpy_b1024_lr1e-3_lrd0.75_dp0.2_randaugv2_shf512x32_hostbatch_seed0_TorchLoader_DBGbest'
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
@@ -41,7 +43,7 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
 cd ~/flax_dev
 git pull
-git checkout vit.ft.torchvision
+git checkout vit.ft.torchvision.centercrop
 git pull
 git rev-parse --short HEAD
 
@@ -81,7 +83,9 @@ python3 main.py \
     --config.aug.shuffle_buffer_size=16384 \
     --config.model.transformer.torch_qkv=False \
     --config.aug.torchvision=True \
-    --config.aug.mix.torchvision=True \
+    --config.aug.mix.torchvision=False \
+    --config.resume_dir=${RESUME_DIR} \
+    --config.eval_only=True
 
 " 2>&1 | tee $LOGDIR/finetune.log
 

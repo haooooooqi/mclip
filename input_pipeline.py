@@ -29,7 +29,7 @@ from utils.autoaug_util import distort_image_with_autoaugment, distort_image_wit
 from utils.randerase_util import random_erase
 from utils.torchvision_util import \
   get_torchvision_aug, get_torchvision_aug_eval, \
-  preprocess_for_train_torchvision, preprocess_for_eval_torchvision, get_torchvision_map_fn
+  preprocess_for_train_torchvision, preprocess_for_eval_torchvision, preprocess_for_eval_torchvision_dbg, get_torchvision_map_fn
 
 from absl import logging
 
@@ -115,7 +115,7 @@ def get_preprocess_for_eval_func(image_size, use_torchvision):
   if use_torchvision:
     transform_aug = get_torchvision_aug_eval(image_size)
     logging.info('Eval aug: {}'.format(transform_aug))
-    return functools.partial(preprocess_for_eval_torchvision, transform_aug=transform_aug)
+    return functools.partial(preprocess_for_eval_torchvision_dbg, transform_aug=transform_aug)
   else:
     return preprocess_for_eval
 

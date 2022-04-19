@@ -328,6 +328,8 @@ def _decode_and_center_crop_v2(image_bytes, image_size):
   new_width = tf.cast(new_size * image_width / min_size, dtype=tf.int32)
   
   image = gen_image_ops.resize_bicubic([image], [new_height, new_width], align_corners=False)[0]
+  image = tf.clip_by_value(image, 0, 255.)
+  image = tf.round(image)
 
   offset_height = ((new_height - image_size) + 1) // 2
   offset_width = ((new_width - image_size) + 1) // 2
