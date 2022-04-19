@@ -27,7 +27,9 @@ from utils.transform_util import \
 
 from utils.autoaug_util import distort_image_with_autoaugment, distort_image_with_randaugment, distort_image_with_randaugment_v2
 from utils.randerase_util import random_erase
-from utils.torchvision_util import get_torchvision_aug, preprocess_for_train_torchvision, preprocess_for_eval_torchvision, get_torchvision_map_fn
+from utils.torchvision_util import \
+  get_torchvision_aug, get_torchvision_aug_eval, \
+  preprocess_for_train_torchvision, preprocess_for_eval_torchvision, get_torchvision_map_fn
 
 from absl import logging
 
@@ -103,15 +105,17 @@ def preprocess_for_eval(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
 def get_preprocess_for_train_func(image_size, aug, use_torchvision):
   if use_torchvision:
     transform_aug = get_torchvision_aug(image_size, aug)
-    logging.info(transform_aug)
+    logging.info('Train aug: {}'.format(transform_aug))
     return functools.partial(preprocess_for_train_torchvision, transform_aug=transform_aug)
   else:
     return functools.partial(preprocess_for_train, aug=aug)
 
 
-def get_preprocess_for_eval_func(use_torchvision):
+def get_preprocess_for_eval_func(image_size, use_torchvision):
   if use_torchvision:
-    return preprocess_for_eval_torchvision
+    transform_aug = get_torchvision_aug_eval(image_size)
+    logging.info('Eval aug: {}'.format(transform_aug))
+    return functools.partial(preprocess_for_eval_torchvision, transform_aug=transform_aug)
   else:
     return preprocess_for_eval
 
@@ -130,7 +134,8 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   Returns:
     A `tf.data.Dataset`.
   """
-  use_torchvision = (aug and aug.torchvision)
+  use_torchvision = aug.torchvision
+  aug = None if not train else aug
 
   if train:
     train_examples = dataset_builder.info.splits['train'].num_examples
@@ -162,8 +167,10 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
     # ds = ds.shuffle(512 * batch_size, seed=0)  # batch_size = 1024 (faster in local)
     ds = ds.shuffle(buffer_size=aug.shuffle_buffer_size, seed=0)
 
-  preprocess_for_train_func = get_preprocess_for_train_func(image_size, aug, use_torchvision)
-  preprocess_for_eval_func = get_preprocess_for_eval_func(use_torchvision)
+  if train:
+    preprocess_for_train_func = get_preprocess_for_train_func(image_size, aug, use_torchvision)
+  else:
+    preprocess_for_eval_func = get_preprocess_for_eval_func(image_size, use_torchvision)
 
   # define the decode function
   def decode_example(example):
@@ -185,7 +192,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   # ---------------------------------------
   # debugging 
   # x = next(iter(ds))
-  # decode_example(x)
+  # x = decode_example(x)
   # raise NotImplementedError
   # ---------------------------------------
 

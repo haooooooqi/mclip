@@ -266,10 +266,10 @@ def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
       dataset_builder, batch_size, image_size=image_size, dtype=dtype,
       train=train, cache=cache, aug=aug)
 
-  if aug and (aug.mix.mixup or aug.mix.cutmix) and (not aug.mix.torchvision):
+  if train and aug and (aug.mix.mixup or aug.mix.cutmix) and (not aug.mix.torchvision):
     apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
     ds = map(apply_mix, ds)
-  elif aug and (aug.mix.mixup or aug.mix.cutmix) and (aug.mix.torchvision):
+  elif train and aug and (aug.mix.mixup or aug.mix.cutmix) and (aug.mix.torchvision):
     num_classes = dataset_builder.info.features['label'].num_classes
     ds = map(torchvision_util.get_torchvision_map_mix_fn(aug, num_classes), ds)
 
@@ -430,12 +430,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     input_dtype = tf.float32
 
   dataset_builder = tfds.builder(config.dataset)
+  eval_iter = create_input_iter(
+      dataset_builder, local_batch_size, image_size, input_dtype, train=False,
+      cache=config.cache, aug=config.aug)
   train_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=True,
       cache=config.cache, aug=config.aug)
-  eval_iter = create_input_iter(
-      dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-      cache=config.cache)
 
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
@@ -470,7 +470,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   if config.resume_dir != '':
     state = restore_checkpoint(state, config.resume_dir)
-  else:
+  elif config.pretrain_dir != '':
     logging.info('Loading from pre-training:')
     state = checkpoint_util.load_from_pretrain(state, config.pretrain_dir)
 

@@ -32,12 +32,22 @@ def get_torchvision_aug(image_size, aug):
   else:
     raise NotImplementedError
 
-
   transform_aug += [
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
   transform_aug = transforms.Compose(transform_aug)
+  return transform_aug
+
+
+def get_torchvision_aug_eval(image_size):
+  transform_aug = [
+    transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC),  # 256
+    transforms.CenterCrop(image_size),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+  transform_aug = transforms.Compose(transform_aug)
+
   return transform_aug
 
 
@@ -61,7 +71,7 @@ def preprocess_for_train_torchvision(image_bytes, dtype=tf.float32, image_size=I
   return image
 
 
-def preprocess_for_eval_torchvision(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
+def preprocess_for_eval_torchvision(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE, transform_aug=None):
   """Preprocesses the given image for training.
 
   Args:
@@ -74,13 +84,6 @@ def preprocess_for_eval_torchvision(image_bytes, dtype=tf.float32, image_size=IM
   """
   image = Image.open(io.BytesIO(image_bytes.numpy()))
   image = image.convert('RGB')
-
-  transform_aug = [
-    transforms.Resize(image_size + CROP_PADDING, interpolation=Image.BICUBIC),  # 256
-    transforms.CenterCrop(image_size),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
-  transform_aug = transforms.Compose(transform_aug)
 
   image = transform_aug(image)
   image = tf.constant(image.numpy(), dtype=dtype)  # [3, 224, 224]
