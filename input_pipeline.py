@@ -23,7 +23,7 @@ import tensorflow_datasets as tfds
 
 from utils.transform_util import \
   decode_and_random_crop, \
-  _decode_and_center_crop, normalize_image, color_jitter
+  _decode_and_center_crop_v2, normalize_image, color_jitter
 
 from utils.autoaug_util import distort_image_with_autoaugment, distort_image_with_randaugment, distort_image_with_randaugment_v2
 from utils.randerase_util import random_erase
@@ -95,7 +95,7 @@ def preprocess_for_eval(image_bytes, dtype=tf.float32, image_size=IMAGE_SIZE):
   Returns:
     A preprocessed image `Tensor`.
   """
-  image = _decode_and_center_crop(image_bytes, image_size)
+  image = _decode_and_center_crop_v2(image_bytes, image_size)
   image = tf.reshape(image, [image_size, image_size, 3])
   image = normalize_image(image)
   image = tf.image.convert_image_dtype(image, dtype=dtype)
@@ -192,7 +192,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
   # ---------------------------------------
   # debugging 
   # x = next(iter(ds))
-  # x = decode_example(x)
+  # decode_example(x)
   # raise NotImplementedError
   # ---------------------------------------
 

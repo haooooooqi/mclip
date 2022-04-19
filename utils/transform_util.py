@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.python.ops import random_ops
+from tensorflow.python.ops import gen_image_ops
 
 CROP_PADDING = 32
 MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
@@ -292,14 +293,6 @@ def _get_center_crop_window(img_shape, image_size=224):
   return crop_window
 
 
-
-decode_and_random_crop ={
-    'v1': _decode_and_random_crop,
-    'v3': _decode_and_random_crop_v3,
-    'v4': _decode_and_random_crop_v4,
-  }
-  
-
 def _decode_and_center_crop(image_bytes, image_size):
   """Crops to center of image with padding then scales image_size."""
   shape = tf.io.extract_jpeg_shape(image_bytes)
@@ -319,6 +312,48 @@ def _decode_and_center_crop(image_bytes, image_size):
   image = _resize(image, image_size)
 
   return image
+
+
+def _decode_and_center_crop_v2(image_bytes, image_size):
+  """Crops to center of image with padding then scales image_size."""
+  shape = tf.io.extract_jpeg_shape(image_bytes)
+  image_height = shape[0]
+  image_width = shape[1]
+
+  image = tf.io.decode_jpeg(image_bytes, channels=3, fancy_upscaling=False, dct_method='INTEGER_ACCURATE')
+
+  new_size = image_size + CROP_PADDING
+  min_size = tf.math.minimum(image_height, image_width)
+  new_height = tf.cast(new_size * image_height / min_size, dtype=tf.int32)
+  new_width = tf.cast(new_size * image_width / min_size, dtype=tf.int32)
+  
+  image = gen_image_ops.resize_bicubic([image], [new_height, new_width], align_corners=False)[0]
+
+  offset_height = ((new_height - image_size) + 1) // 2
+  offset_width = ((new_width - image_size) + 1) // 2
+
+  image = image[offset_height:(offset_height + image_size), offset_width:(offset_width + image_size), :]
+
+  # padded_center_crop_size = tf.cast(
+  #     ((image_size / (image_size + CROP_PADDING)) *
+  #      tf.cast(tf.minimum(image_height, image_width), tf.float32)),
+  #     tf.int32)
+
+  # offset_height = ((image_height - padded_center_crop_size) + 1) // 2
+  # offset_width = ((image_width - padded_center_crop_size) + 1) // 2
+  # crop_window = tf.stack([offset_height, offset_width,
+  #                         padded_center_crop_size, padded_center_crop_size])
+  # image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
+  # image = _resize(image, image_size)
+
+  return image
+
+
+decode_and_random_crop ={
+    'v1': _decode_and_random_crop,
+    'v3': _decode_and_random_crop_v3,
+    'v4': _decode_and_random_crop_v4,
+  }
 
 
 def normalize_image(image):
