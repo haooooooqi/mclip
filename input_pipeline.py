@@ -159,9 +159,9 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
       'image': tfds.decode.SkipDecoding(),
   })
   options = tf.data.Options()
-  options.experimental_threading.private_threadpool_size = 48
+  options.threading.private_threadpool_size = 48
   if aug is not None and aug.torchvision:
-    options.experimental_threading.private_threadpool_size = 8
+    options.threading.private_threadpool_size = 8
   ds = ds.with_options(options)
 
   if cache:
@@ -171,7 +171,11 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
     seed = 0
     seed += jax.process_index() if seed_per_host else 0
     ds = ds.repeat()
-    ds = ds.shuffle(16 * batch_size, seed=seed)
+    # ds = ds.shuffle(16 * batch_size, seed=seed)
+    if aug is not None:
+      ds = ds.shuffle(buffer_size=aug.shuffle_buffer_size, seed=seed)  # training
+    else:
+      ds = ds.shuffle(16 * batch_size, seed=seed)  # eval (monitor)
 
   use_torchvision = (aug is not None and aug.torchvision)
   if use_torchvision:
@@ -191,6 +195,7 @@ def create_split(dataset_builder, batch_size, train, dtype=tf.float32,
     else:
       assert not use_torchvision
       image = preprocess_for_eval(example['image'], dtype, image_size)
+    
     return {'image': image, 'label': label, 'label_one_hot': label_one_hot}
 
   if use_torchvision:

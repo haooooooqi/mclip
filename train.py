@@ -50,27 +50,15 @@ from utils import mix_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=FutureWarning) 
 
 import jax.profiler
 
 import numpy as np
 import os
-
-
-NUM_CLASSES = 1000
-
-
-def create_model(*, model_cls, half_precision, **kwargs):
-  assert not half_precision
-  # platform = jax.local_devices()[0].platform
-  # if half_precision:
-  #   if platform == 'tpu':
-  #     model_dtype = jnp.bfloat16
-  #   else:
-  #     model_dtype = jnp.float16
-  # else:
-  #   model_dtype = jnp.float32
-  return model_cls(num_classes=NUM_CLASSES, **kwargs)
 
 
 def initialized(key, image_size, model, init_backend='tpu', init_batch=None):
@@ -85,7 +73,7 @@ def initialized(key, image_size, model, init_backend='tpu', init_batch=None):
 
   def init(*args):
     return model.init(*args, train=False)
-  # init = jax.jit(init, backend=init_backend)
+  init = jax.jit(init, backend=init_backend)
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
     init_batch)
@@ -147,19 +135,12 @@ def train_step(state, batch, learning_rate_fn, config):
     return loss, (new_variables, loss, knn_accuracy)
 
   step = state.step
-  dynamic_scale = state.dynamic_scale
   lr = learning_rate_fn(step)
 
-  if dynamic_scale:
-    grad_fn = dynamic_scale.value_and_grad(
-        loss_fn, has_aux=True, axis_name='batch')
-    dynamic_scale, is_fin, aux, grads = grad_fn(state.params)
-    # dynamic loss takes care of averaging gradients across replicas
-  else:
-    grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-    aux, grads = grad_fn(state.params)
-    # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
-    grads = lax.pmean(grads, axis_name='batch')
+  grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+  aux, grads = grad_fn(state.params)
+  # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
+  grads = lax.pmean(grads, axis_name='batch')
 
   new_variables, loss, knn_accuracy = aux[1]
 
@@ -196,20 +177,6 @@ def train_step(state, batch, learning_rate_fn, config):
     ema_state=new_ema_state
   )
   # ----------------------------------------------------------------------------
-
-  if dynamic_scale:
-    # if is_fin == False the gradients contain Inf/NaNs and optimizer state and
-    # params should be restored (= skip this step).
-    new_state = new_state.replace(
-        opt_state=jax.tree_multimap(
-            functools.partial(jnp.where, is_fin),
-            new_state.opt_state,
-            state.opt_state),
-        params=jax.tree_multimap(
-            functools.partial(jnp.where, is_fin),
-            new_state.params,
-            state.params))
-    metrics['scale'] = dynamic_scale.scale
 
   return new_state, metrics
 
@@ -266,8 +233,6 @@ def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
 class TrainState(train_state.TrainState):
   rng: Any
   variables: flax.core.FrozenDict[str, Any]
-  # dynamic_scale: flax.optim.DynamicScale
-  dynamic_scale: Any
   ema_tx: optax.GradientTransformation = struct.field(pytree_node=False)
   ema_state: optax.EmaState
 
@@ -281,7 +246,7 @@ def save_checkpoint(state, workdir):
     # get train state from the first replica
     state = jax.device_get(jax.tree_map(lambda x: x[0], state))
     step = int(state.step)
-    checkpoints.save_checkpoint(workdir, state, step, keep=3)
+    checkpoints.save_checkpoint(workdir, state, step, keep=10)
 
 
 def profile_memory(workdir):
@@ -310,12 +275,6 @@ def sync_batch_stats(state):
 def create_train_state(rng, config: ml_collections.ConfigDict,
                        model, image_size, learning_rate_fn, init_batch=None):
   """Create initial training state."""
-  dynamic_scale = None
-  platform = jax.local_devices()[0].platform
-  if config.half_precision and platform == 'gpu':
-    dynamic_scale = optim.DynamicScale()
-  else:
-    dynamic_scale = None
 
   # split rng for init and for state
   rng_init, rng_state = jax.random.split(rng)
@@ -335,11 +294,11 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   if config.exclude_wd:
     mask = jax.tree_util.tree_multimap(lambda x, y: bool(x and y), 
       opt_util.filter_parameters(params, opt_util.filter_bias_and_norm),
-      opt_util.filter_parameters(params, opt_util.filter_posembed)
+      opt_util.filter_parameters(params, opt_util.filter_posembed)  # Note: we must exclude posembed wd in adamw
     )
   else:
     mask = None
-  logging.info('Apply weight decay: {}'.format(mask))
+  # logging.info('Apply weight decay: {}'.format(mask))
 
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
@@ -357,7 +316,6 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
       tx=tx,
       rng=rng_state,
       variables=variables_states,
-      dynamic_scale=dynamic_scale,
       ema_tx=ema_tx,
       ema_state=ema_state)
   return state
@@ -378,7 +336,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0)
 
-  rng = random.PRNGKey(0)
+  rng = random.PRNGKey(config.seed_jax)  # used to be 0
 
   image_size = 224
 
@@ -386,23 +344,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // jax.process_count()
 
-  platform = jax.local_devices()[0].platform
-
-  if config.half_precision:
-    if platform == 'tpu':
-      input_dtype = tf.bfloat16
-    else:
-      input_dtype = tf.float16
-  else:
-    input_dtype = tf.float32
-
+  input_dtype = tf.float32
   dataset_builder = tfds.builder(config.dataset)
   train_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=True,
       cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
   eval_iter = create_input_iter(
       dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-      cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)
+      cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)  # for visualization
 
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
@@ -413,22 +362,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   else:
     num_steps = config.num_train_steps
 
-  if config.steps_per_eval == -1:
-    num_validation_examples = dataset_builder.info.splits[
-        'validation'].num_examples
-    steps_per_eval = num_validation_examples // config.batch_size
-  else:
-    steps_per_eval = config.steps_per_eval
-
   steps_per_checkpoint = int(steps_per_epoch * config.save_every_epochs)
   steps_per_visualize = int(steps_per_epoch * config.vis_every_epochs)
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
-  # model_cls = getattr(models, config.model)
-  model_cls = models_mae.VisionTransformer
-  model = create_model(
-      model_cls=model_cls, half_precision=config.half_precision, **config.model)
+  model = models_mae.VisionTransformer(num_classes=-1, **config.model)  # num_classes not used
 
   learning_rate_fn = create_learning_rate_fn(
       config, abs_learning_rate, steps_per_epoch)
@@ -486,8 +425,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     if config.get('log_every_steps'):
       train_metrics.append(metrics)
       if (step + 1) % config.log_every_steps == 0:        
-        # if (step + 1) == config.log_every_steps and config.profile_memory:
-        #   profile_memory(workdir)
         # Wait until computations are done before exiting
         jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
         train_metrics = common_utils.get_metrics(train_metrics)
@@ -526,27 +463,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       summary = jax.tree_map(lambda x: x.mean(), metrics)
       values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
       logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
-
-    # if (step + 1) % steps_per_epoch == 0:
-    #   epoch = step // steps_per_epoch
-    #   eval_metrics = []
-
-    #   # sync batch statistics across replicas
-    #   state = sync_batch_stats(state)
-    #   for _ in range(steps_per_eval):
-    #     eval_batch = next(eval_iter)
-    #     metrics = p_eval_step(state, eval_batch)
-    #     eval_metrics.append(metrics)
-    #   eval_metrics = common_utils.get_metrics(eval_metrics)
-    #   summary = jax.tree_map(lambda x: x.mean(), eval_metrics)
-    #   values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
-    #   logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
-
-    #   # to make it consistent with PyTorch log
-    #   summary['step_tensorboard'] = epoch  # step for tensorboard (no need to minus 1)
-
-    #   writer.write_scalars(step + 1, summary)
-    #   writer.flush()
 
     if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
       state = sync_batch_stats(state)

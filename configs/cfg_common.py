@@ -58,7 +58,6 @@ def get_config():
   # train on a larger pod slice.
   config.batch_size = 1024
   config.cache = True
-  config.half_precision = False  # kaiming: TODO, support it
 
   # model config
   config.model = vit.get_b16_config()  # ViT-B/16

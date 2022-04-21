@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow.python.ops import random_ops
 
+from absl import logging
+
 CROP_PADDING = 32
 MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
 STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
@@ -167,11 +169,6 @@ def distorted_bounding_box_crop(image_bytes,
   return image
 
 
-def _resize(image, image_size):
-  return tf.image.resize([image], [image_size, image_size],
-                         method=tf.image.ResizeMethod.BICUBIC)[0]
-
-
 def _at_least_x_are_equal(a, b, x):
   """At least `x` of `a` and `b` `Tensors` are equal."""
   match = tf.equal(a, b)
@@ -198,7 +195,8 @@ def _decode_and_random_crop(image_bytes, image_size,
   image = tf.cond(
       bad,
       lambda: _decode_and_center_crop(image_bytes, image_size),
-      lambda: _resize(image, image_size))
+      lambda: tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]  # TF MAE: tf.image.resize_bicubic
+  )
 
   return image
 
@@ -232,7 +230,9 @@ def _decode_and_random_crop_v2(image_bytes, image_size,
 
   crop_window = tf.stack([offset_h, offset_w, h, w])
   image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
-  image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)
+  # image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)  # TF MAE: tf.image.resize (different than crop v1, v3)
+  logging.warn('Using tf.compat.v1.image.resize_bicubic. This is altered from TF MAE API.')
+  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]
   return image
 
 
@@ -248,7 +248,7 @@ def _decode_and_random_crop_v3(image_bytes, image_size,
       aspect_ratio_range=aspect_ratio_range,
       area_range=area_range,
       max_attempts=100)
-  image = _resize(image, image_size)
+  image =  tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0] # TF MAE: tf.image.resize_bicubic
 
   return image
 
@@ -288,7 +288,7 @@ def _decode_and_random_crop_v4(image_bytes, image_size,
   )
   
   image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
-  image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)
+  image = tf.image.resize(image, [image_size, image_size], tf.image.ResizeMethod.BICUBIC)  # not in TF MAE
   return image
 
 
@@ -341,7 +341,7 @@ def _decode_and_center_crop(image_bytes, image_size, **kwargs):
   crop_window = tf.stack([offset_height, offset_width,
                           padded_center_crop_size, padded_center_crop_size])
   image = tf.io.decode_and_crop_jpeg(image_bytes, crop_window, channels=3)
-  image = _resize(image, image_size)
+  image = tf.compat.v1.image.resize_bicubic([image], [image_size, image_size])[0]  # TF MAE: tf.image.resize_bicubic
 
   return image
 

@@ -58,11 +58,12 @@ def get_config():
   # train on a larger pod slice.
   config.batch_size = 1024
   config.cache = True
-  config.half_precision = False  # kaiming: TODO, support it
 
   # model config
   config.model = mae.get_config()
   
+  config.model.transformer.torch_qkv = False  # the torch qkv format (one conv for qkv); JAX default is torch_qkv=False
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()
@@ -103,6 +104,9 @@ def get_config():
 
   config.aug.mix.switch_elementwise = False  # element-wise switch between mixup/cutmix
 
+  # shuffle config
+  config.aug.shuffle_buffer_size = 16 * 1024  # following TF
+
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id
 
@@ -131,5 +135,9 @@ def get_config():
 
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
+
+  # seeds
+  config.seed_jax = 0
+  config.seed_tf = 0
 
   return config
