@@ -50,6 +50,10 @@ from utils import mix_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=FutureWarning) 
 
 import jax.profiler
 
