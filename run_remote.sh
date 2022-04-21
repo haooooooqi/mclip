@@ -12,6 +12,7 @@ JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
 mkdir -p ${LOGDIR}
+chmod 777 ${LOGDIR}
 
 # source run_init_remote.sh
 
@@ -25,6 +26,8 @@ echo Current commit: $(git show -s --format=%h)
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 
+source run_get_ssh_id.sh
+
 python3 main.py \
     --workdir=$WORKDIR \
     --config=configs/$CONFIG.py \
@@ -37,7 +40,7 @@ python3 main.py \
     --config.model.sincos=True \
     --config.aug.crop_ver=v2 \
     --config.donate=True \
-
+2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
 echo ${VM_NAME}
