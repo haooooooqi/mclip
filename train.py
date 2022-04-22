@@ -49,6 +49,9 @@ from utils import opt_util
 from utils import mix_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
+from utils import torchloader_util
+
+import torch
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -59,6 +62,7 @@ import jax.profiler
 
 import numpy as np
 import os
+import random as _random
 
 
 def initialized(key, image_size, model, init_backend='tpu', init_batch=None):
@@ -321,6 +325,21 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   return state
 
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32 + jax.process_index()
+    np.random.seed(worker_seed)
+    _random.seed(worker_seed)
+
+
+def set_seed_torch(seed):
+  rng_torch = torch.Generator()
+  rng_torch.manual_seed(seed)
+  torch.manual_seed(seed)
+  np.random.seed(seed)
+  _random.seed(seed)
+  return rng_torch
+
+
 def train_and_evaluate(config: ml_collections.ConfigDict,
                        workdir: str) -> TrainState:
   """Execute model training and evaluation loop.
@@ -332,6 +351,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   Returns:
     Final TrainState.
   """
+  # ------------------------------------
+  # Set random seed
+  # ------------------------------------
+  rng_torch = set_seed_torch(config.seed_pt)
+  tf.random.set_seed(config.seed_tf + jax.process_index())
+  rng = random.PRNGKey(config.seed_jax)  # used to be 0
+  # ------------------------------------
 
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0)
@@ -344,14 +370,55 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // jax.process_count()
 
-  input_dtype = tf.float32
-  dataset_builder = tfds.builder(config.dataset)
-  train_iter = create_input_iter(
-      dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-      cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
-  eval_iter = create_input_iter(
-      dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-      cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)  # for visualization
+  # input_dtype = tf.float32
+  # dataset_builder = tfds.builder(config.dataset)
+  # train_iter = create_input_iter(
+  #     dataset_builder, local_batch_size, image_size, input_dtype, train=True,
+  #     cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
+  # eval_iter = create_input_iter(
+  #     dataset_builder, local_batch_size, image_size, input_dtype, train=False,
+  #     cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)  # for visualization
+
+  dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
+  dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
+
+  sampler_train = torch.utils.data.DistributedSampler(
+    dataset_train,
+    num_replicas=jax.process_count(),
+    rank=jax.process_index(),
+    shuffle=True,
+    seed=config.seed_pt,
+  )
+  sampler_val = torch.utils.data.DistributedSampler(
+    dataset_val,
+    num_replicas=jax.process_count(),
+    rank=jax.process_index(),
+    shuffle=False,
+  )
+
+  data_loader_train = torch.utils.data.DataLoader(
+    dataset_train, sampler=sampler_train,
+    batch_size=local_batch_size,
+    num_workers=config.torchload.num_workers,
+    pin_memory=True,
+    drop_last=True,
+    generator=rng_torch,
+    worker_init_fn=seed_worker,
+    persistent_workers=True,
+    timeout=60.,
+  )
+  data_loader_val = torch.utils.data.DataLoader(
+    dataset_val, sampler=sampler_val,
+    batch_size=local_batch_size,
+    num_workers=config.torchload.num_workers,
+    pin_memory=True,
+    drop_last=False,
+    persistent_workers=True,
+    timeout=60.,
+  )
+
+  from IPython import embed; embed();
+  if (0 == 0): raise NotImplementedError
 
   steps_per_epoch = (
       dataset_builder.info.splits['train'].num_examples // config.batch_size
