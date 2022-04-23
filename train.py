@@ -322,10 +322,11 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   return state
 
 
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32 + jax.process_index()
+def seed_worker(worker_id, offset_seed=0):
+    worker_seed = torch.initial_seed() % 2**32 + jax.process_index() + offset_seed
     np.random.seed(worker_seed)
     _random.seed(worker_seed)
+    logging.info('worker_id: {}, worker_seed: {}; offset_seed {}'.format(worker_id, worker_seed, offset_seed))
 
 
 def set_seed_torch(seed):
@@ -335,6 +336,21 @@ def set_seed_torch(seed):
   np.random.seed(seed)
   _random.seed(seed)
   return rng_torch
+
+
+def rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed):
+  data_loader_train = torch.utils.data.DataLoader(
+    dataset_train, sampler=sampler_train,
+    batch_size=local_batch_size,
+    num_workers=config.torchload.num_workers,
+    pin_memory=True,
+    drop_last=True,
+    generator=rng_torch,
+    worker_init_fn=functools.partial(seed_worker, offset_seed=offset_seed),
+    persistent_workers=True,
+    timeout=60.,
+  )
+  return data_loader_train
 
 
 def train_and_evaluate(config: ml_collections.ConfigDict,
@@ -393,37 +409,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     shuffle=True,  # shuffle for visualization
   )
 
-  data_loader_train = torch.utils.data.DataLoader(
-    dataset_train, sampler=sampler_train,
-    batch_size=local_batch_size,
-    num_workers=config.torchload.num_workers,
-    pin_memory=True,
-    drop_last=True,
-    generator=rng_torch,
-    worker_init_fn=seed_worker,
-    persistent_workers=True,
-    timeout=60.,
-  )
-  data_loader_val = torch.utils.data.DataLoader(
-    dataset_val, sampler=sampler_val,
-    batch_size=local_batch_size,
-    num_workers=config.torchload.num_workers,
-    pin_memory=True,
-    drop_last=True,
-    persistent_workers=True,
-    timeout=60.,
-  )
-
-  steps_per_epoch = len(data_loader_train)
-  assert steps_per_epoch == len(dataset_train) // config.batch_size
-
-  # if config.num_train_steps == -1:
-  #   num_steps = int(steps_per_epoch * config.num_epochs)
-  # else:
-  #   num_steps = config.num_train_steps
-
-  # steps_per_checkpoint = int(steps_per_epoch * config.save_every_epochs)
-  # steps_per_visualize = int(steps_per_epoch * config.vis_every_epochs)
+  # steps_per_epoch = len(data_loader_train)
+  # assert steps_per_epoch == len(dataset_train) // config.batch_size
+  steps_per_epoch = len(dataset_train) // config.batch_size
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
@@ -435,6 +423,28 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   state = restore_checkpoint(state, workdir if config.resume_dir == '' else config.resume_dir)
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
+
+  data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed=step_offset)
+  # data_loader_train = torch.utils.data.DataLoader(
+  #   dataset_train, sampler=sampler_train,
+  #   batch_size=local_batch_size,
+  #   num_workers=config.torchload.num_workers,
+  #   pin_memory=True,
+  #   drop_last=True,
+  #   generator=rng_torch,
+  #   worker_init_fn=functools.partial(seed_worker, offset_seed=step_offset),
+  #   persistent_workers=True,
+  #   timeout=60.,
+  # )
+  data_loader_val = torch.utils.data.DataLoader(
+    dataset_val, sampler=sampler_val,
+    batch_size=local_batch_size,
+    num_workers=config.torchload.num_workers,
+    pin_memory=True,
+    drop_last=True,
+    persistent_workers=True,
+    timeout=60.,
+  )
 
   # --------------------------------------------------------------------------------
   # up til now, state.params are for one device
@@ -475,9 +485,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   epoch_offset = (step_offset + 1) // steps_per_epoch
   step = epoch_offset * steps_per_epoch
   assert step == int(state.step[0])  # sanity when loading
-
-  torch.utils.data
-
 
   for epoch in range(epoch_offset, int(config.num_epochs)):
     data_loader_train.sampler.set_epoch(epoch)  # reset random seed
@@ -547,61 +554,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       state = sync_batch_stats(state)
       save_checkpoint(state, workdir)
 
-
-  # for step, batch in zip(range(step_offset, num_steps), train_iter):
-  #   state, metrics = p_train_step(state, batch)
-  #   for h in hooks:
-  #     h(step)
-  #   if step == step_offset:
-  #     logging.info('Initial compilation completed.')
-
-  #   epoch_1000x = int(step * config.batch_size / 1281167 * 1000)  # normalize to IN1K epoch anyway
-
-  #   if config.get('log_every_steps'):
-  #     train_metrics.append(metrics)
-  #     if (step + 1) % config.log_every_steps == 0:        
-  #       # Wait until computations are done before exiting
-  #       jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
-  #       train_metrics = common_utils.get_metrics(train_metrics)
-  #       summary = {
-  #           f'train_{k}': float(v)
-  #           for k, v in jax.tree_map(lambda x: x.mean(), train_metrics).items()
-  #       }
-  #       summary['steps_per_second'] = config.log_every_steps / (
-  #           time.time() - train_metrics_last_t)
-
-  #       # to make it consistent with PyTorch log
-  #       summary['loss'] = summary['train_loss']  # add extra name
-  #       summary['lr'] = summary.pop('train_learning_rate')  # rename
-  #       summary['knn_accuracy'] = summary.pop('train_knn_accuracy')  # rename
-  #       # summary['class_acc'] = summary.pop('train_accuracy')  # this is [0, 1]
-  #       summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
-
-  #       writer.write_scalars(step + 1, summary)
-  #       train_metrics = []
-  #       train_metrics_last_t = time.time()
-
-  #   if (step + 1) % steps_per_epoch == 0:
-  #     writer.flush()
-
-  #   # visualize
-  #   if ((step + 1) % steps_per_visualize == 0 or step == step_offset) and config.model.visualize:
-  #     epoch = step // steps_per_epoch
-  #     eval_batch = next(eval_iter)
-  #     metrics = p_eval_step(state, eval_batch)
-
-  #     imgs_vis = metrics.pop('imgs_vis')[0]  # keep the master device
-  #     imgs_vis = imgs_vis * jnp.asarray(STDDEV_RGB) + jnp.asarray(MEAN_RGB)
-  #     imgs_vis = jnp.uint8(jnp.clip(imgs_vis, 0, 255.))
-  #     writer.write_images(step=epoch_1000x, images=dict(imgs_vis=imgs_vis))
-
-  #     summary = jax.tree_map(lambda x: x.mean(), metrics)
-  #     values = [f"{k}: {v:.6f}" for k, v in sorted(summary.items())]
-  #     logging.info('eval epoch: %d, %s', epoch, ', '.join(values))
-
-  #   if (step + 1) % steps_per_checkpoint == 0 or step + 1 == num_steps:
-  #     state = sync_batch_stats(state)
-  #     save_checkpoint(state, workdir)
+      # rebuild the data loader for reproducibility (TODO: verify)
+      data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed=step)
+      assert step == int(state.step)
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()

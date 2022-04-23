@@ -7,7 +7,7 @@ batch=4096
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_TorchLoader
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_TorchLoader_save3
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -35,7 +35,7 @@ python3 main.py \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
-    --config.save_every_epochs=50 \
+    --config.save_every_epochs=3 \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
     --config.aug.crop_ver=v2 \
