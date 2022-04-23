@@ -4,11 +4,12 @@ lr=1.0e-4
 ep=1600
 batch=4096
 
+seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed_save3_re9360
-RESUME_DIR='/kmh-gcp/checkpoints/flax/20220423_030646_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_1600ep_b4096_lr1.0e-4_TorchLoader_wseed_save3/checkpoint_9360'
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed${seed}_dbg_save3_resume936
+RESUME_DIR='gs://kmh-gcp/checkpoints/flax/20220423_052222_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_1600ep_b4096_lr1.0e-4_TorchLoader_wseed100_dbg_save3/checkpoint_936'
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -41,8 +42,12 @@ python3 main.py \
     --config.model.sincos=True \
     --config.aug.crop_ver=v2 \
     --config.donate=True \
+    --config.seed_jax=${seed} \
+    --config.seed_pt=${seed} \
+    --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
+
 
 echo ${VM_NAME}

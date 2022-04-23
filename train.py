@@ -75,9 +75,11 @@ def initialized(key, image_size, model, init_backend='tpu'):
   def init(*args):
     return model.init(*args, train=False)
   init = jax.jit(init, backend=init_backend)
+  logging.info('Initializing params...')
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
     init_batch)
+  logging.info('Initializing params done.')
   return variables
 
 
@@ -322,10 +324,12 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   return state
 
 
-def seed_worker(worker_id, offset_seed=0):
-    worker_seed = torch.initial_seed() % 2**32 + jax.process_index() + offset_seed
+def seed_worker(worker_id, global_seed, offset_seed=0):
+    # worker_seed = torch.initial_seed() % 2**32 + jax.process_index() + offset_seed
+    worker_seed = (global_seed + worker_id + jax.process_index() + offset_seed) % 2**32
     np.random.seed(worker_seed)
     _random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
     logging.info('worker_id: {}, worker_seed: {}; offset_seed {}'.format(worker_id, worker_seed, offset_seed))
 
 
@@ -338,7 +342,9 @@ def set_seed_torch(seed):
   return rng_torch
 
 
-def rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed):
+def rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, offset_seed):
+  rng_torch = torch.Generator()
+  rng_torch.manual_seed(offset_seed)
   data_loader_train = torch.utils.data.DataLoader(
     dataset_train, sampler=sampler_train,
     batch_size=local_batch_size,
@@ -346,7 +352,7 @@ def rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, co
     pin_memory=True,
     drop_last=True,
     generator=rng_torch,
-    worker_init_fn=functools.partial(seed_worker, offset_seed=offset_seed),
+    worker_init_fn=functools.partial(seed_worker, offset_seed=offset_seed, global_seed=config.seed_pt),
     persistent_workers=True,
     timeout=60.,
   )
@@ -424,7 +430,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
 
-  data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed=step_offset)
+  data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, offset_seed=step_offset)
   # data_loader_train = torch.utils.data.DataLoader(
   #   dataset_train, sampler=sampler_train,
   #   batch_size=local_batch_size,
@@ -555,7 +561,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       save_checkpoint(state, workdir)
 
       # rebuild the data loader for reproducibility (TODO: verify)
-      data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed=step)
+      data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, offset_seed=step)
       assert step == int(state.step[0])
 
   # Wait until computations are done before exiting
