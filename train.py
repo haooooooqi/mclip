@@ -556,7 +556,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
       # rebuild the data loader for reproducibility (TODO: verify)
       data_loader_train = rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, config, rng_torch, offset_seed=step)
-      assert step == int(state.step)
+      assert step == int(state.step[0])
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
