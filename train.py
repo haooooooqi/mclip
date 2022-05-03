@@ -46,7 +46,7 @@ import models_mae
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import opt_util
-from utils import mix_util
+# from utils import mix_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
