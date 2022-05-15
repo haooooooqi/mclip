@@ -2,21 +2,20 @@ echo 'code dir: '$STAGEDIR
 
 # seed=0
 batch=1024
-lr=1e-3
-lrd=0.75
+lr=1e-4
+wd=0.3
+lrd=1.0
 ep=50
 dp=0.2
 ema=0.9999
 
 vitsize=large
 CONFIG=cfg_vit_${vitsize}
-source scripts/select_chkpt_${vitsize}.sh
 
-name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_s${seed}_${ema}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_scratch_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_s${seed}  # _${ema}
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -45,6 +44,7 @@ python3 main.py \
     --config.batch_size=${batch} \
     --config.learning_rate=${lr} \
     --config.learning_rate_decay=${lrd} \
+    --config.opt.weight_decay=${wd} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.save_every_epochs=10 \
@@ -60,8 +60,8 @@ python3 main.py \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
     --config.model.transformer.torch_qkv=False \
-    --config.ema=True \
-    --config.ema_eval=True \
+    --config.ema=False \
+    --config.ema_eval=False \
     --config.ema_decay=${ema} \
     --config.model.classifier=gap \
 2>&1 | tee $LOGDIR/finetune_\$SSH_ID.log
