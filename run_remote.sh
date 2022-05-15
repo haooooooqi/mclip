@@ -6,6 +6,7 @@ lr=1e-4
 wd=0.3
 lrd=1.0
 ep=50
+warm=20
 dp=0.2
 ema=0.9999
 
@@ -15,7 +16,7 @@ CONFIG=cfg_vit_${vitsize}
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_scratch_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_s${seed}  # _${ema}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_scratch_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}  # _${ema}
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -40,11 +41,11 @@ source run_get_ssh_id.sh
 python3 main.py \
     --workdir=${WORKDIR} \
     --config=configs/$CONFIG.py \
-    --config.pretrain_dir=${PRETRAIN_DIR} \
     --config.batch_size=${batch} \
     --config.learning_rate=${lr} \
     --config.learning_rate_decay=${lrd} \
     --config.opt.weight_decay=${wd} \
+    --config.warmup_epochs=${warm} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.save_every_epochs=10 \
@@ -63,7 +64,7 @@ python3 main.py \
     --config.ema=False \
     --config.ema_eval=False \
     --config.ema_decay=${ema} \
-    --config.model.classifier=gap \
+    --config.model.classifier=token \
 2>&1 | tee $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/finetune.log
 
