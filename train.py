@@ -345,7 +345,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     state = p_init_fn(rng_init)
     logging.info('Initializing train_state done.')
 
-    state = ckp.restore_from_pretrain(state, config, partitioner, state_axes)
+    state = ckp.restore_from_pretrain(state, checkpointer, config, partitioner, state_axes)
   else:
     logging.info('Initializing train_state...')
     state = p_init_fn(rng_init)
