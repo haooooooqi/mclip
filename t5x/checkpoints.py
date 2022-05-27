@@ -956,9 +956,9 @@ class Checkpointer(object):
     if fallback_state is not None:
       state_dict = state_utils.merge_state(state_dict, fallback_state)
 
-    for key in state_utils.flatten_state_dict(state_dict).keys():
-      if key not in restore_parameter_infos_flat:
-        logging.info('Not restoring key from ckpt: %s', key)
+    # for key in state_utils.flatten_state_dict(state_dict).keys():
+    #   if key not in restore_parameter_infos_flat:
+    #     logging.info('Not restoring key from ckpt: %s', key)
 
     if self._dataset_ckpt:
       logging.info("Restoring dataset iterator from '%s'.",

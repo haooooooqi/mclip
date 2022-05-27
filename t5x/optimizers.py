@@ -22,7 +22,6 @@ Additional support for the legacy Adafactor implementation.
 
 import functools
 from typing import Any, Optional, Union, Sequence, Tuple
-from warnings import catch_warnings
 
 import flax
 from flax import optim  # just used for transitional type definitions

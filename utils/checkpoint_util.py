@@ -46,8 +46,17 @@ def restore_from_pretrain(state, checkpointer, config, partitioner, state_axes):
 def load_from_t5x_pretrain(state, checkpointer, path):
   step = t5x.checkpoints.latest_step(path)  # try to load the latest checkpoint if not specified
   path_chkpt = path if step is None else t5x.checkpoints.get_checkpoint_dir(path, step)
-  new_state = checkpointer.restore(path=path_chkpt, fallback_state=state.state_dict())
+  new_state = checkpointer.restore(
+    path=path_chkpt,
+    fallback_state=state.state_dict(),
+    state_transformation_fns=[remove_optimizer_state,])
   return new_state
+
+
+def remove_optimizer_state(ckpt_optimizer_state, optimizer_state):
+  ckpt_optimizer_state.pop('state')
+  return ckpt_optimizer_state
+
 
 # --------------------------------------------
 # load JAX/pmap checkpoint from pre-training
