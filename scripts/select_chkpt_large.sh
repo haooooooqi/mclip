@@ -38,4 +38,6 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220509_045043_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_cls147_dbgpos'
 
 # t5x models
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis'  # no normpix, no exwd
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_053945_maet5x_kmh-tpuvm-v3-256-2_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_071100_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adarows16'
