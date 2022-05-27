@@ -972,8 +972,15 @@ class Checkpointer(object):
       self,
       state_dict: optimizers.OptimizerStateType) -> train_state_lib.TrainState:
     """Restores a TrainState from an Optimizer state_dict."""
-    # from IPython import embed; embed();
-    # if (0 == 0): raise NotImplementedError
+    # ----------------------------------------------------------------
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+    self._train_state.param_states
+    state_dict['state']['param_states']
+
+    from flax.serialization import from_state_dict
+    from_state_dict(self._train_state.param_states, state_dict['state']['param_states'])
+    # ----------------------------------------------------------------
     train_state = self._train_state.restore_state(state_dict)
 
     if not self._use_gda and self._partitioner.params_on_devices:
