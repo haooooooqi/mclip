@@ -106,7 +106,7 @@ def merge_state(state_dict: Mapping[str, Any],
 
   for k in from_scratch_state_flat:
     if k not in state_dict_flat:
-      logging.warning("Initializing param=%s from scratch", k)
+      # logging.warning("Initializing param=%s from scratch", k)
       state_dict_flat[k] = from_scratch_state_flat[k]
 
   state_dict = traverse_util.unflatten_dict(state_dict_flat, sep="/")

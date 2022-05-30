@@ -60,7 +60,7 @@ def log_model_info(log_file: Optional[str],
       if isinstance(arr, dict) and not arr:
         return
       if arr is None:
-        _log_info_and_write_to_file(writer, '%-80s None', name)
+        # _log_info_and_write_to_file(writer, '%-80s None', name)
         return
       if logical_axes is None or len(logical_axes) != len(arr.shape):
         shape_str = str(arr.shape)
@@ -72,7 +72,7 @@ def log_model_info(log_file: Optional[str],
       #     writer, '%-96s %-20s %-40s %s',
       #     name, arr.size, shape_str, mesh_axes)
       arr_size = '{:,d}'.format(arr.size)
-      logging.info('{:96s} {:>16s} {:48s} {}'.format(name, arr_size, str(shape_str), str(mesh_axes)))
+      logging.info('{:108s} {:>16s} {:48s} {}'.format(name, arr_size, str(shape_str), str(mesh_axes)))
 
     logging_util.set_time_logging_short(logging)  # make the logging shorter
 

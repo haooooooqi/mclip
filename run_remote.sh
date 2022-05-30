@@ -4,10 +4,10 @@ echo 'code dir: '$STAGEDIR
 batch=1024
 lr=1e-3
 wd=0.05
-lrd=0.75
+lrd=1.0
 ep=50
 warm=5
-dp=0.2
+dp=0.0
 beta2=0.999
 
 partitions=1
@@ -21,7 +21,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft_speedcheck
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft_token_pred
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -68,7 +68,7 @@ python3 main.py \
     --config.seed_tf=${seed} \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
-    --config.model.classifier=tgap \
+    --config.model.classifier=token \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
     --config.model.freeze_encoder=True \

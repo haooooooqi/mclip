@@ -69,6 +69,16 @@ def get_config():
   config.model.num_classes = 1000
   config.model.freeze_encoder = False  # partial fine-tune
 
+  config.model.predictor = ml_collections.ConfigDict()
+  config.model.predictor.hidden_size = 512
+  config.model.predictor.transformer = ml_collections.ConfigDict()
+  config.model.predictor.transformer.mlp_dim = config.model.predictor.hidden_size * 4
+  config.model.predictor.transformer.num_heads = 16
+  config.model.predictor.transformer.num_layers = 4
+  config.model.predictor.transformer.attention_dropout_rate = 0.0
+  config.model.predictor.transformer.dropout_rate = 0.0
+  config.model.predictor.transformer.droppath_rate = 0.0
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()

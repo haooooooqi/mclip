@@ -53,6 +53,8 @@ def filter_head(path: Tuple[Any], val: jnp.ndarray):
     name = '.'.join(path)
     if name.startswith('head.'):
         return True
+    elif name.startswith('pred.'):
+        return True
     return False
 
 
