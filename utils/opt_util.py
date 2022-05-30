@@ -45,6 +45,18 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
+# freeze head
+# ---------------------------------------------------------
+def filter_head(path: Tuple[Any], val: jnp.ndarray):
+    """Filter to exclude cls token and pos emb."""
+    del val
+    name = '.'.join(path)
+    if name.startswith('head.'):
+        return True
+    return False
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):

@@ -51,7 +51,22 @@ def create_optimizer(config, params_names, steps_per_epoch):
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
-  if config.opt_type in {'adamw', 'adarows'}:
+
+  if config.opt_type in {'adamw', 'adarows'} and config.freeze_encoder:
+
+    # True: trainable; False: frozen
+    mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_head)
+
+    opt = getattr(adamw, config.opt_type)
+    def opt_masked(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+      return optax.masked(inner=opt(**kwargs), mask=mask_trainable)
+
+    opt_new = t5x.optimizers.wrap_optax_optimizer(opt_masked)
+    opt_new = opt_new(learning_rate=learning_rate_fn, **config.opt, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+    opt_new.metric_learning_rate_fn = learning_rate_fn  # hack for metric
+    return opt_new
+
+  elif config.opt_type in {'adamw', 'adarows'} and not config.freeze_encoder:
     # optional: exclude some wd
     mask = None
     if config.exclude_wd:
@@ -71,10 +86,9 @@ def create_optimizer(config, params_names, steps_per_epoch):
       lrd = lrd_util.filter_parameters(params_names, lrd_func)
       # logging.info('Apply lrd: {}'.format(lrd))
       opt.optax_optimizer = optax._src.combine.chain(opt.optax_optimizer, lrd_util.scale_by_lrd(lrd))
+    return opt
   else:
     raise NotImplementedError
-
-  return opt
 
 
 def create_train_state(config, model, image_size, steps_per_epoch, partitioner):

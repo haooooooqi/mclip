@@ -142,5 +142,7 @@ def get_config():
   config.partitioning = ml_collections.ConfigDict()
   config.partitioning.num_partitions = 1
 
+  # partial fine-tune
+  config.freeze_encoder = False
 
   return config
