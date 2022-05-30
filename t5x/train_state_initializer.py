@@ -51,34 +51,28 @@ def create_optimizer(config, params_names, steps_per_epoch):
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
-
-  if config.opt_type in {'adamw', 'adarows'} and config.model.freeze_encoder:
-
-    # True: trainable; False: frozen
-    mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_head)
-
-    opt = getattr(adamw, config.opt_type)
-    def opt_masked(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
-      return optax.masked(inner=opt(**kwargs), mask=mask_trainable)
-
-    opt_new = t5x.optimizers.wrap_optax_optimizer(opt_masked)
-    opt_new = opt_new(learning_rate=learning_rate_fn, **config.opt, mu_dtype=getattr(jnp, config.opt_mu_dtype))
-    opt_new.metric_learning_rate_fn = learning_rate_fn  # hack for metric
-    return opt_new
-
-  elif config.opt_type in {'adamw', 'adarows'} and not config.model.freeze_encoder:
+  if config.opt_type in {'adamw', 'adarows'}:
     # optional: exclude some wd
-    mask = None
+    mask_wd = None
     if config.exclude_wd:
-      mask = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
+      # True: apply wd; False: not apply wd
+      mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
         opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed)
       )
-    # logging.info('Apply wd: {}'.format(mask))
+    # logging.info('Apply wd: {}'.format(mask_wd))
 
-    opt = getattr(adamw, config.opt_type)  # optax.adamw
+    if config.model.freeze_encoder:
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+      # True: trainable; False: frozen
+      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_head)
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return optax.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    else:
+      opt = getattr(adamw, config.opt_type)
+
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
-    opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+    opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask_wd, mu_dtype=getattr(jnp, config.opt_mu_dtype))
     opt.metric_learning_rate_fn = learning_rate_fn  # hack for metric
 
     if config.learning_rate_decay < 1.:
