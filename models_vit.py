@@ -16,6 +16,7 @@ import functools
 from typing import Any, Callable, Optional, Tuple
 
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
 
 import t5x.layers
@@ -282,6 +283,7 @@ class VisionTransformer(nn.Module):
   classifier: str = 'token'
   dtype: Any = jnp.float32
   rescale_head_init: float = 1.
+  freeze_encoder: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -327,6 +329,9 @@ class VisionTransformer(nn.Module):
     x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
     x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'))
+
+    if self.freeze_encoder:
+      x = jax.lax.stop_gradient(x)
 
     if self.classifier == 'token':
       x = x[:, 0]

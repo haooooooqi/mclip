@@ -67,6 +67,7 @@ def get_config():
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.1
   config.model.num_classes = 1000
+  config.model.freeze_encoder = False  # partial fine-tune
 
   # optimizer config
   config.opt_type = 'adamw'
@@ -141,8 +142,5 @@ def get_config():
   # partitioning
   config.partitioning = ml_collections.ConfigDict()
   config.partitioning.num_partitions = 1
-
-  # partial fine-tune
-  config.freeze_encoder = False
 
   return config

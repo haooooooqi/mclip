@@ -52,7 +52,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
 
-  if config.opt_type in {'adamw', 'adarows'} and config.freeze_encoder:
+  if config.opt_type in {'adamw', 'adarows'} and config.model.freeze_encoder:
 
     # True: trainable; False: frozen
     mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_head)
@@ -66,7 +66,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
     opt_new.metric_learning_rate_fn = learning_rate_fn  # hack for metric
     return opt_new
 
-  elif config.opt_type in {'adamw', 'adarows'} and not config.freeze_encoder:
+  elif config.opt_type in {'adamw', 'adarows'} and not config.model.freeze_encoder:
     # optional: exclude some wd
     mask = None
     if config.exclude_wd:
