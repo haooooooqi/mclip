@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import logging
 import functools
 from typing import Any, Callable, Optional, Tuple
 
@@ -308,15 +309,18 @@ class Encoder(nn.Module):
     assert inputs.ndim == 3  # (batch, len, emb)
 
     x = inputs
-
+    
     # Input Encoder
     for lyr in range(self.num_layers):
+      dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
+      name = self.prefix + 'block_{:02d}'.format(lyr)
+      logging.info('layer: {}, dp: {}'.format(name, dp))
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=self.prefix + 'block_{:02d}'.format(lyr),
+          droppath_rate=dp,
+          name=name,
           num_heads=self.num_heads,
           layer_id=lyr,
         )(x, deterministic=not train)
