@@ -50,12 +50,23 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
 def filter_head(path: Tuple[Any], val: jnp.ndarray):
     """Filter to exclude cls token and pos emb."""
     del val
-    name = '.'.join(path)
-    if name.startswith('head.'):
+
+    # hack: sanity check
+    all_keys = [
+        'Transformer', 'cls', 'embedding', 'posembed_encoder',
+        'head', 'pred_posembed', 'pred', 'pred_bottleneck']
+    assert path[0] in all_keys
+
+    pretrained_keys = ['Transformer', 'cls', 'embedding', 'posembed_encoder']
+    trainable_keys = ['head', 'pred_posembed', 'pred', 'pred_bottleneck']
+
+    if path[0] in trainable_keys:
         return True
-    elif name.startswith('pred.'):
-        return True
-    return False
+    elif path[0] in pretrained_keys:
+        return False
+    else:
+        assert False, 'key not valid: {}'.format(path[0])
+        raise NotImplementedError
 
 
 # ---------------------------------------------------------

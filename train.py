@@ -428,8 +428,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           # Wait until computations are done before exiting
           jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
 
-          x = state.params['Transformer']['encoderblock_01']['MlpBlock_0']['Dense_0']['kernel'][:5, 0]
-          logging.info(x)
+          # x = state.params['Transformer']['encoderblock_01']['MlpBlock_0']['Dense_0']['kernel'][:5, 0]
+          # logging.info(x)
 
           train_metrics = common_utils.get_metrics(jax.tree_map(lambda x: jnp.reshape(x, (-1,)), train_metrics))
           summary = {

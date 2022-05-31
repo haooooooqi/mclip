@@ -348,12 +348,12 @@ class VisionTransformer(nn.Module):
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
-      name='bottleneck')(x)
+      name='pred_bottleneck')(x)
 
     # add predictor pos emb
     # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
     use_cls_token = (self.classifier in {'token', 'tgap'})
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='posembed_pred')(x)
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
 
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
