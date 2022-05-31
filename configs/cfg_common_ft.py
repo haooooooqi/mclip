@@ -68,6 +68,7 @@ def get_config():
   config.model.transformer.droppath_rate = 0.1
   config.model.num_classes = 1000
   config.model.freeze_encoder = False  # partial fine-tune
+  config.model.sincos = False
 
   config.model.predictor = ml_collections.ConfigDict()
   config.model.predictor.hidden_size = 512

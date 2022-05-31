@@ -21,7 +21,8 @@ import jax.numpy as jnp
 
 import t5x.layers
 
-from utils import attention_util
+from utils import posembed_util
+from utils import initializers_util
 
 
 Array = Any
@@ -65,16 +66,74 @@ class IdentityLayer(nn.Module):
     return x
 
 
+# class AddPositionEmbs(nn.Module):
+#   """Adds (optionally learned) positional embeddings to the inputs.
+
+#   Attributes:
+#     posemb_init: positional embedding initializer.
+#   """
+
+#   posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+
+#   @nn.compact
+#   def __call__(self, inputs):
+#     """Applies AddPositionEmbs module.
+
+#     By default this layer uses a fixed sinusoidal embedding table. If a
+#     learned position embedding is desired, pass an initializer to
+#     posemb_init.
+
+#     Args:
+#       inputs: Inputs to the layer.
+
+#     Returns:
+#       Output tensor with shape `(bs, timesteps, in_dim)`.
+#     """
+#     # inputs.shape is (batch_size, seq_len, emb_dim).
+#     assert inputs.ndim == 3, ('Number of dimensions should be 3,'
+#                               ' but it is: %d' % inputs.ndim)
+#     pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
+#     pe = t5x.layers.param_with_axes(
+#         'pos_embedding',
+#         self.posemb_init,
+#         pos_emb_shape,
+#         jnp.float32,
+#         axes=('_null0', 'length', 'embed'))
+#     return inputs + pe
+
+
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
-
-  Attributes:
-    posemb_init: positional embedding initializer.
   """
+  sincos: bool
+  use_cls_token: bool
+  img_shape: Shape  # [h, w, c]
+  dtype: Any = jnp.float32
 
-  posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+  def setup(self):
+    h, w, c = self.img_shape
 
-  @nn.compact
+    num_clstokens = 1 if self.use_cls_token else 0
+    pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
+
+    if not self.sincos:
+      raise NotImplementedError
+      init_fn = posemb_init
+    else:
+      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
+      init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
+
+    self.pe = t5x.layers.param_with_axes(
+        'pos_embedding',
+        init_fn,
+        pos_emb_shape,
+        jnp.float32,
+        axes=('_null0', 'length', 'embed'))
+
+    # kaiming: in MAE, we should always set posembed for cls_token as zero.
+    # when loading for finetuning, this zero posembed can be tuned.
+    # but this is not addressed here if sincos=False
+
   def __call__(self, inputs):
     """Applies AddPositionEmbs module.
 
@@ -88,17 +147,16 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    # inputs.shape is (batch_size, seq_len, emb_dim).
-    assert inputs.ndim == 3, ('Number of dimensions should be 3,'
-                              ' but it is: %d' % inputs.ndim)
-    pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
-    pe = t5x.layers.param_with_axes(
-        'pos_embedding',
-        self.posemb_init,
-        pos_emb_shape,
-        jnp.float32,
-        axes=('_null0', 'length', 'embed'))
-    return inputs + pe
+    
+    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
+
+    if self.use_cls_token and inputs.shape[1] == pe.shape[1] + 1:
+      output = inputs + pe[:, 1:, :]
+    else:
+      assert inputs.shape[1] == pe.shape[1]
+      output = inputs + pe
+
+    return output
 
 
 class MlpBlock(nn.Module):
@@ -250,11 +308,6 @@ class Encoder(nn.Module):
     assert inputs.ndim == 3  # (batch, len, emb)
 
     x = inputs
-    # x = AddPositionEmbs(
-    #     posemb_init=posemb_init,  # from BERT.
-    #     name='posembed_input')(
-    #         inputs)
-    # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
     # Input Encoder
     for lyr in range(self.num_layers):
@@ -285,8 +338,9 @@ class VisionTransformer(nn.Module):
   rescale_head_init: float = 1.
   freeze_encoder: bool = False
   predictor: Any = None
+  sincos: bool = True
 
-  def apply_predictor(self, x, train):
+  def apply_predictor(self, x, train, img_shape):
 
     # apply the encoder-predictor bottleneck
     x = t5x.layers.Dense(
@@ -295,6 +349,11 @@ class VisionTransformer(nn.Module):
       bias_init=mlp_bias_init,
       kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
       name='bottleneck')(x)
+
+    # add predictor pos emb
+    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_cls_token = (self.classifier in {'token', 'tgap'})
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='posembed_pred')(x)
 
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
@@ -342,7 +401,9 @@ class VisionTransformer(nn.Module):
       x = jnp.concatenate([cls, x], axis=1)
 
     # we add posemb here
-    x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_cls_token = (self.classifier in {'token', 'tgap'})
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
     x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=use_encoder_norm)
@@ -351,7 +412,7 @@ class VisionTransformer(nn.Module):
       x = jax.lax.stop_gradient(x)
 
     # apply the predictor
-    x = self.apply_predictor(x, train)
+    x = self.apply_predictor(x, train, img_shape=(h, w,))
 
     if self.classifier == 'token':
       x = x[:, 0]

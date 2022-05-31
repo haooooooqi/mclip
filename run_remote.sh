@@ -2,7 +2,7 @@ echo 'code dir: '$STAGEDIR
 
 # seed=0
 batch=1024
-lr=1e-3
+lr=1e-4
 wd=0.05
 lrd=1.0
 ep=50
@@ -21,7 +21,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft_token_pred
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_NOmix_NOerase_pft_token_pred_posemb
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -60,9 +60,9 @@ python3 main.py \
     --config.profile_memory=True \
     --config.donate=True \
     --config.init_backend=tpu \
-    --config.aug.mix.mixup=True \
-    --config.aug.mix.cutmix=True \
-    --config.aug.randerase.on=True \
+    --config.aug.mix.mixup=False \
+    --config.aug.mix.cutmix=False \
+    --config.aug.randerase.on=False \
     --config.aug.autoaug=randaugv2 \
     --config.model.transformer.droppath_rate=${dp} \
     --config.seed_tf=${seed} \
@@ -72,6 +72,7 @@ python3 main.py \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
     --config.model.freeze_encoder=True \
+    --config.model.sincos=True \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
