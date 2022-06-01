@@ -221,6 +221,21 @@ class Encoder1DBlock(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   layer_id: int = None
+  adapter: Any = None
+
+  def apply_adapter(self, x, deterministic):
+    adater_mlp_dim = round(self.adapter.mlp_dim_ratio * x.shape[-1])
+    z = MlpBlock(
+        mlp_dim=adater_mlp_dim,
+        dtype=self.dtype,
+        dropout_rate=0.,
+        kernel_init=lambda *args: mlp_kernel_init(*args) * self.adapter.rescale_init,
+        bias_init=mlp_bias_init,
+        name='encoder_adapter',
+        )(x, deterministic=deterministic)
+    x = z + x
+    return x
+
 
   @nn.compact
   def __call__(self, inputs, *, deterministic):
@@ -258,7 +273,13 @@ class Encoder1DBlock(nn.Module):
         dropout_rate=self.attention_dropout_rate,
         num_heads=self.num_heads,
     )(x, x)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+    assert self.dropout_rate == 0.
+    # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)  # not used
+
+    # adapter
+    if self.adapter and self.adapter.on_use:
+      x = self.apply_adapter(x, deterministic)
+
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
     x = x + inputs
@@ -294,6 +315,7 @@ class Encoder(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
+  adapter: Any = None
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True):
@@ -323,6 +345,7 @@ class Encoder(nn.Module):
           name=name,
           num_heads=self.num_heads,
           layer_id=lyr,
+          adapter=self.adapter,
         )(x, deterministic=not train)
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x) if encoder_norm else x
 
@@ -342,6 +365,7 @@ class VisionTransformer(nn.Module):
   rescale_head_init: float = 1.
   freeze_encoder: bool = False
   predictor: Any = None
+  adapter: Any = None
   sincos: bool = True
 
   def apply_predictor(self, x, train, img_shape):
@@ -410,13 +434,14 @@ class VisionTransformer(nn.Module):
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=use_encoder_norm)
+    x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(x, train=train, encoder_norm=use_encoder_norm)
 
-    if self.freeze_encoder:
-      x = jax.lax.stop_gradient(x)
+    # if self.freeze_encoder:
+    #   x = jax.lax.stop_gradient(x)
 
     # apply the predictor
-    x = self.apply_predictor(x, train, img_shape=(h, w,))
+    if self.predictor.transformer.num_layers > 0:
+      x = self.apply_predictor(x, train, img_shape=(h, w,))
 
     if self.classifier == 'token':
       x = x[:, 0]

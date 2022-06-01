@@ -19,7 +19,7 @@ cd $STAGEDIR
 echo 'Current dir: '`pwd`
 # ------------------------------------------------
 
-for layers in 24
+for seed in 0
 do
 source run_remote.sh
 
