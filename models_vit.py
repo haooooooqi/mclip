@@ -314,7 +314,7 @@ class Encoder(nn.Module):
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
       name = self.prefix + 'block_{:02d}'.format(lyr)
-      logging.info('layer: {}, dp: {}'.format(name, dp))
+      # logging.info('layer: {}, dp: {}'.format(name, dp))
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
