@@ -75,13 +75,13 @@ def get_config():
   config.model.predictor.transformer = ml_collections.ConfigDict()
   config.model.predictor.transformer.mlp_dim = config.model.predictor.hidden_size * 4
   config.model.predictor.transformer.num_heads = 16
-  config.model.predictor.transformer.num_layers = 12
+  config.model.predictor.transformer.num_layers = 0
   config.model.predictor.transformer.attention_dropout_rate = 0.0
   config.model.predictor.transformer.dropout_rate = 0.0
   config.model.predictor.transformer.droppath_rate = 0.0
 
   config.model.adapter = ml_collections.ConfigDict()
-  config.model.adapter.on_use = False
+  config.model.adapter.on_use = True
   config.model.adapter.mlp_dim_ratio = 1 / 4.
   config.model.adapter.rescale_init = 1e-4
 
