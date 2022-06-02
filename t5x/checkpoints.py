@@ -626,21 +626,22 @@ class Checkpointer(object):
     timestamp = multihost_utils.broadcast_one_to_all(np.int32(time.time()))
 
     final_dir = os.path.join(self.checkpoints_dir, f'checkpoint_{step}')
-    tmp_dir = final_dir + f'.tmp-{timestamp}'
+    tmp_dir = final_dir # + f'.tmp-{timestamp}'  # do not create a different
 
     if gfile.exists(final_dir):
-      logging.info(
-          'Skipping save checkpoint for step %d (directory %s already exists)',
-          step, final_dir)
-      return
+      logging.warning('Directory %s already exists.', final_dir)
+      # final_dir = tmp_dir
+      # km: we cannt return here, which can break sync_global_devices barrier
+      # return
 
-    logging.info('Saving checkpoint for step %d to %s', step, tmp_dir)
+    logging.info('Saving checkpoint for step %d to: %s', step, tmp_dir)
 
     if jax.process_index() == 0:
       gfile.makedirs(tmp_dir)
     # Block all hosts until directory is ready.
     multihost_utils.sync_global_devices(f'checkpointer:make_dir:{tmp_dir}')
 
+    logging.info('Running _write_state_to_tensorstore...')
     written_state_dict = self._write_state_to_tensorstore(
         tmp_dir, train_state, concurrent_gb, state_transformation_fns)
 
@@ -670,12 +671,14 @@ class Checkpointer(object):
       with gfile.GFile(os.path.join(tmp_dir, 'checkpoint'), 'wb') as fp:
         fp.write(msgpack_bytes)
 
-      # Finalize checkpoint directory.
-      if final_dir.startswith('gs://'):
-        gfile.rename(tmp_dir, final_dir, overwrite=False)
-      else:
-        gfile.rename(tmp_dir, final_dir)
-      logging.info('Saved checkpoint for step %d to %s', step, final_dir)
+      logging.info('Saved checkpoint for step %d to %s', step, tmp_dir)
+
+      # # Finalize checkpoint directory.
+      # if final_dir.startswith('gs://'):
+      #   gfile.rename(tmp_dir, final_dir, overwrite=False)
+      # else:
+      #   gfile.rename(tmp_dir, final_dir)
+      # logging.info('Saved checkpoint for step %d to %s', step, final_dir)
 
       # Remove old checkpoints, if necessary.
       self._remove_old_checkpoints()
