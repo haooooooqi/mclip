@@ -65,7 +65,10 @@ def create_optimizer(config, params_names, steps_per_epoch):
     if config.model.freeze_encoder:
       opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
       # True: trainable; False: frozen
-      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_head)
+      mask_trainable = jax.tree_util.tree_map(lambda x, y: bool(x or y),  # OR, not AND
+        opt_util.filter_parameters(params_names, opt_util.filter_head),
+        opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+      )
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
     else:

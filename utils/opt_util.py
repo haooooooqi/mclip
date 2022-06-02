@@ -45,7 +45,7 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
-# freeze head
+# freeze backbone
 # ---------------------------------------------------------
 def filter_head(path: Tuple[Any], val: jnp.ndarray):
     """Filter to exclude cls token and pos emb."""
@@ -67,6 +67,16 @@ def filter_head(path: Tuple[Any], val: jnp.ndarray):
     else:
         assert False, 'key not valid: {}'.format(path[0])
         raise NotImplementedError
+
+
+def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
+    """Filter to exclude cls token and pos emb."""
+    del val
+    name = '.'.join(path)
+    if 'adapter' in name:
+        return True
+    else:
+        return False
 
 
 # ---------------------------------------------------------
