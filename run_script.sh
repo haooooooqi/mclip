@@ -8,7 +8,7 @@ python3 main.py \
     --config=configs/cfg_vit_large.py \
     --config.batch_size=32 \
     --config.log_every_steps=10 \
-    --config.num_epochs=1 \
+    --config.num_epochs=1000 \
     --config.profile_memory=True \
     --config.donate=True \
     --config.aug.randerase.on=True \
