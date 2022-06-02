@@ -3,11 +3,12 @@ echo 'code dir: '$STAGEDIR
 # seed=0
 batch=1024
 lr=1e-4
-wd=0.05
+wd=0.3
 lrd=1.0
 ep=50
 warm=5
 dp=0.0
+pdp=0.2
 beta2=0.999
 
 partitions=1
@@ -21,7 +22,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft768x12_adapter_token_pred_posemb
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_pdp${pdp}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft768x12_NOadapter_token_pred_posemb_dbgNOstopgrad
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -65,7 +66,7 @@ python3 main.py \
     --config.aug.randerase.on=True \
     --config.aug.autoaug=randaugv2 \
     --config.model.transformer.droppath_rate=${dp} \
-    --config.model.predictor.transformer.droppath_rate=0.0 \
+    --config.model.predictor.transformer.droppath_rate=${pdp} \
     --config.seed_tf=${seed} \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
