@@ -275,9 +275,12 @@ def masked(
     new_masked_updates, new_inner_state = inner.update(
         masked_updates, state.inner_state, masked_params)
 
+    # new_updates = jax.tree_map(
+    #     lambda m, new_u, old_u: new_u if m else old_u,
+    #     mask_tree, new_masked_updates, updates)  # this takes the old updates
     new_updates = jax.tree_map(
-        lambda m, new_u, old_u: new_u if m else old_u,
-        mask_tree, new_masked_updates, updates)
+        lambda m, new_u: new_u if m else 0.,
+        mask_tree, new_masked_updates)  # this takes zero
     return new_updates, MaskedState(inner_state=new_inner_state)
 
   return base.GradientTransformation(init_fn, update_fn)
