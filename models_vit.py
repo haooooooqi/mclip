@@ -223,7 +223,7 @@ class Encoder1DBlock(nn.Module):
   layer_id: int = None
   adapter: Any = None
 
-  def apply_adapter(self, x, deterministic):
+  def apply_adapter(self, x, deterministic, name):
     adater_mlp_dim = round(self.adapter.mlp_dim_ratio * x.shape[-1])
     z = MlpBlock(
         mlp_dim=adater_mlp_dim,
@@ -231,7 +231,7 @@ class Encoder1DBlock(nn.Module):
         dropout_rate=0.,
         kernel_init=lambda *args: mlp_kernel_init(*args) * self.adapter.rescale_init,
         bias_init=mlp_bias_init,
-        name='encoder_adapter',
+        name=name,
         )(x, deterministic=deterministic)
     x = z + x
     return x
@@ -278,7 +278,7 @@ class Encoder1DBlock(nn.Module):
 
     # adapter
     if self.adapter and self.adapter.on_use:
-      x = self.apply_adapter(x, deterministic)
+      x = self.apply_adapter(x, deterministic, name='adapter_msa')
 
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
@@ -291,6 +291,11 @@ class Encoder1DBlock(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         )(y, deterministic=deterministic)
+
+    # adapter
+    if self.adapter and self.adapter.on_use:
+      y = self.apply_adapter(y, deterministic, name='adapter_mlp')
+
     # droppath
     y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
 
