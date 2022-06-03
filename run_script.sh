@@ -19,7 +19,7 @@ python3 main.py \
     --config.aug.autoaug=autoaug \
     --config.eval_only=False \
     --config.model.classifier=token \
-    --config.learning_rate_decay=1. \
+    --config.learning_rate_decay=0.75 \
     --config.partitioning.num_partitions=1 \
     --config.opt_type=adamw \
     --config.model.freeze_encoder=True \
