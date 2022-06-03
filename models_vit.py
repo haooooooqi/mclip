@@ -443,6 +443,7 @@ class VisionTransformer(nn.Module):
 
     if self.freeze_encoder and not self.adapter.on_use:
       x = jax.lax.stop_gradient(x)
+      logging.info('Stop gradient.')
 
     # apply the predictor
     if self.predictor.transformer.num_layers > 0:
