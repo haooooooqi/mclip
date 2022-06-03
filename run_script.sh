@@ -27,6 +27,7 @@ python3 main.py \
     --config.model.transformer.droppath_rate=0.0 \
     --config.model.predictor.transformer.droppath_rate=0.2 \
     --config.model.adapter.on_use=True \
+    --config.partitioning.partition_states=True \
 
     # --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis' \
     # --config.pretrain_fmt='t5x' \

@@ -159,5 +159,6 @@ def get_config():
   # partitioning
   config.partitioning = ml_collections.ConfigDict()
   config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
 
   return config
