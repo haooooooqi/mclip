@@ -20,6 +20,7 @@ import jax.numpy as jnp
 import jax.random as random
 
 import flax.linen as nn
+from flax.linen.partitioning import remat
 
 import t5x.layers
 
@@ -187,7 +188,7 @@ class Encoder1DBlock(nn.Module):
   rescale_init: float = 1.
 
   @nn.compact
-  def __call__(self, inputs, *, deterministic):
+  def __call__(self, inputs, deterministic):
     """Applies Encoder1DBlock module.
 
     Args:
@@ -253,6 +254,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   rescale_init: float = 1.0
+  remat_policy: str = 'none'
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -267,9 +269,22 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
+    BlockLayer = Encoder1DBlock
+    if self.remat_policy not in (None, 'none'):
+      if self.remat_policy == 'minimal':
+        policy = jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
+      else:
+        policy = None
+      BlockLayer = remat(  # pylint: disable=invalid-name
+          Encoder1DBlock,
+          prevent_cse=True,
+          policy=policy,
+          static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
+
     x = inputs
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      deterministic = not train
+      x = BlockLayer(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -278,7 +293,7 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           rescale_init=self.rescale_init,
-        )(x, deterministic=not train)
+        )(x, deterministic)
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
 
     return encoded
