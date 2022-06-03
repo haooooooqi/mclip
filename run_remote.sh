@@ -3,7 +3,7 @@ echo 'code dir: '$STAGEDIR
 seed=0
 batch=1024
 # lr=1e-4
-wd=0.0
+wd=0.05
 lrd=1.0
 ep=50
 warm=5
