@@ -10,9 +10,9 @@ warm=5
 dp=0.2
 beta2=0.999
 
-partitions=1
+partitions=8
 
-vitsize=large
+vitsize=huge3x_p16
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
@@ -21,7 +21,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_firstrun
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}st_firstrun
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -38,6 +38,7 @@ git config --global --add safe.directory $STAGEDIR
 echo Current commit: $(git show -s --format=%h)
 echo Current dir: $(pwd)
 
+export GOOGLE_APPLICATION_CREDENTIALS=~/gcp_credential.json
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 
@@ -70,7 +71,7 @@ python3 main.py \
     --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
-    --config.partitioning.partition_states=False \
+    --config.partitioning.partition_states=True \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
