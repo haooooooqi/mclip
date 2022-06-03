@@ -49,7 +49,7 @@ from utils import logging_util
 from t5x.train_state_initializer import create_train_state
 import t5x.partitioning
 import t5x.rng
-from t5x.model_info import log_model_info
+import t5x.model_info
 import t5x.checkpoints
 
 import jax.profiler
@@ -324,7 +324,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   p_init_fn, state_axes, state_shape = create_train_state(config, model, image_size, steps_per_epoch, partitioner)
   rng_init, rng = jax.random.split(rng)
 
-  log_model_info(None, state_shape, partitioner)
+  t5x.model_info.log_model_info(None, state_shape, partitioner)
   # profile_memory(workdir)
 
   # ------------------------------------
@@ -352,6 +352,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     logging.info('Initializing train_state done.')
     # stds = jax.tree_util.tree_map(lambda x: np.array(x).std(), state.params)
     # logging.info('std: {}'.format(stds))
+
+  t5x.model_info.log_state_info(state)
 
   # debug
   # checkpointer.save(state)

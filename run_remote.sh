@@ -70,6 +70,7 @@ python3 main.py \
     --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
+    --config.partitioning.partition_states=False \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
