@@ -3,8 +3,8 @@ echo 'code dir: '$STAGEDIR
 seed=0
 batch=1024
 # lr=1e-4
-wd=0.05
-lrd=0.75
+wd=0.0
+lrd=1.0
 ep=50
 warm=5
 dp=0.0
@@ -24,7 +24,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_pdp${pdp}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft768x${pft}_adapter2 # _token_pred_posemb
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_pdp${pdp}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}_pft768x${pft}_NOadapter2 # _token_pred_posemb
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -78,6 +78,7 @@ python3 main.py \
     --config.pretrain_fmt=t5x \
     --config.model.freeze_encoder=True \
     --config.model.sincos=True \
+    --config.model.adapter.on_use=False \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

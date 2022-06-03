@@ -441,8 +441,8 @@ class VisionTransformer(nn.Module):
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(x, train=train, encoder_norm=use_encoder_norm)
 
-    # if self.freeze_encoder:
-    #   x = jax.lax.stop_gradient(x)
+    if self.freeze_encoder and not self.adapter.on_use:
+      x = jax.lax.stop_gradient(x)
 
     # apply the predictor
     if self.predictor.transformer.num_layers > 0:
