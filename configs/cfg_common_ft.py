@@ -95,6 +95,7 @@ def get_config():
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm, cls, posembed)
+  config.exclude_wd_adapter = False
 
   # config.ema = False
   # config.ema_decay = 0.9999

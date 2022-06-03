@@ -58,9 +58,16 @@ def create_optimizer(config, params_names, steps_per_epoch):
       # True: apply wd; False: not apply wd
       mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
-        opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed)
+        opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed),
       )
-    # logging.info('Apply wd: {}'.format(mask_wd))
+      if config.exclude_wd_adapter:
+        mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and not y), mask_wd,
+          opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+        )
+
+    logging.info('Apply wd: {}'.format(mask_wd))
+    # import t5x.state_utils
+    # t5x.state_utils.flatten_state_dict(mask_wd)
 
     if config.model.freeze_encoder:
       opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
