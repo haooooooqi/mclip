@@ -60,7 +60,7 @@ python3 main.py \
     --config.warmup_epochs=${warm} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
-    --config.save_every_epochs=50 \
+    --config.save_every_epochs=10 \
     --config.profile_memory=True \
     --config.donate=True \
     --config.init_backend=tpu \

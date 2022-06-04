@@ -7,6 +7,7 @@ import functools
 
 import t5x.train_state as train_state_lib
 import t5x.optimizers
+import t5x.state_utils
 
 from utils import opt_util
 from utils import lrd_util
@@ -65,9 +66,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
           opt_util.filter_parameters(params_names, opt_util.filter_adapter),
         )
 
-    logging.info('Apply wd: {}'.format(mask_wd))
-    # import t5x.state_utils
-    # t5x.state_utils.flatten_state_dict(mask_wd)
+    # logging.info('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)))
 
     if config.model.freeze_encoder:
       opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
@@ -76,6 +75,13 @@ def create_optimizer(config, params_names, steps_per_epoch):
         opt_util.filter_parameters(params_names, opt_util.filter_head),
         opt_util.filter_parameters(params_names, opt_util.filter_adapter),
       )
+      if config.model.stopgrad_after_block >= 0:
+        filter_block = functools.partial(opt_util.filter_block, stopgrad_after_block=config.model.stopgrad_after_block)
+        mask_block_trainable = opt_util.filter_parameters(params_names, filter_block)
+        mask_trainable = jax.tree_util.tree_map(lambda x, y: bool(x or y),  # OR, not AND
+          mask_trainable, mask_block_trainable)
+        logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))        
+
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
     else:
