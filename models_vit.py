@@ -323,7 +323,7 @@ class Encoder(nn.Module):
   adapter: Any = None
 
   @nn.compact
-  def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_after_block=None):
+  def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -352,7 +352,7 @@ class Encoder(nn.Module):
           layer_id=lyr,
           adapter=self.adapter,
         )(x, deterministic=not train)
-      if stopgrad_after_block is not None and stopgrad_after_block == lyr:
+      if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
         x = jax.lax.stop_gradient(x)
         logging.info('Stop gradient after block: {}'.format(name))
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x) if encoder_norm else x
@@ -372,7 +372,7 @@ class VisionTransformer(nn.Module):
   dtype: Any = jnp.float32
   rescale_head_init: float = 1.
   freeze_encoder: bool = False
-  stopgrad_after_block: int = -1
+  stopgrad_blocks: int = -1
   predictor: Any = None
   adapter: Any = None
   sincos: bool = True
@@ -444,7 +444,7 @@ class VisionTransformer(nn.Module):
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
-      x, train=train, encoder_norm=use_encoder_norm, stopgrad_after_block=self.stopgrad_after_block)
+      x, train=train, encoder_norm=use_encoder_norm, stopgrad_blocks=self.stopgrad_blocks)
 
     if self.freeze_encoder and not self.adapter.on_use:
       x = jax.lax.stop_gradient(x)

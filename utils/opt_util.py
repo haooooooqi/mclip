@@ -79,13 +79,13 @@ def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
         return False
 
 
-def filter_block(path: Tuple[Any], val: jnp.ndarray, stopgrad_after_block: int):
+def filter_block(path: Tuple[Any], val: jnp.ndarray, stopgrad_blocks: int):
     """Freeze/train blocks by layer_id."""
     del val
     if len(path) > 3 and path[0] == 'Transformer' and path[1].startswith("encoderblock_"):
         layer_id = path[1][len("encoderblock_"):]  # remove prefix
         layer_id = int(layer_id)
-        if layer_id > stopgrad_after_block:
+        if layer_id >= stopgrad_blocks:
             return True
         else:
             return False

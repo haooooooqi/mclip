@@ -68,7 +68,7 @@ def get_config():
   config.model.transformer.droppath_rate = 0.1
   config.model.num_classes = 1000
   config.model.freeze_encoder = False  # partial fine-tune
-  config.model.stopgrad_after_block = -1  # partial fine-tune
+  config.model.stopgrad_blocks = -1  # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
   config.model.sincos = False
 
   config.model.predictor = ml_collections.ConfigDict()

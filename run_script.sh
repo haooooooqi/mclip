@@ -29,7 +29,7 @@ python3 main.py \
     --config.model.predictor.transformer.num_layers=0 \
     --config.model.adapter.on_use=False \
     --config.partitioning.partition_states=True \
-    --config.model.stopgrad_after_block=0 \
+    --config.model.stopgrad_blocks=1 \
 
     # --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis' \
     # --config.pretrain_fmt='t5x' \

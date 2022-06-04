@@ -75,8 +75,8 @@ def create_optimizer(config, params_names, steps_per_epoch):
         opt_util.filter_parameters(params_names, opt_util.filter_head),
         opt_util.filter_parameters(params_names, opt_util.filter_adapter),
       )
-      if config.model.stopgrad_after_block >= 0:
-        filter_block = functools.partial(opt_util.filter_block, stopgrad_after_block=config.model.stopgrad_after_block)
+      if config.model.stopgrad_blocks > 0:
+        filter_block = functools.partial(opt_util.filter_block, stopgrad_blocks=config.model.stopgrad_blocks)
         mask_block_trainable = opt_util.filter_parameters(params_names, filter_block)
         mask_trainable = jax.tree_util.tree_map(lambda x, y: bool(x or y),  # OR, not AND
           mask_trainable, mask_block_trainable)
