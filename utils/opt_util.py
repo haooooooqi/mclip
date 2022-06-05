@@ -79,17 +79,43 @@ def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
         return False
 
 
-def filter_block(path: Tuple[Any], val: jnp.ndarray, stopgrad_blocks: int):
+def filter_block(path: Tuple[Any], val: jnp.ndarray, config: Any):
     """Freeze/train blocks by layer_id."""
     del val
-    if len(path) > 3 and path[0] == 'Transformer' and path[1].startswith("encoderblock_"):
-        layer_id = path[1][len("encoderblock_"):]  # remove prefix
-        layer_id = int(layer_id)
-        if layer_id >= stopgrad_blocks:
-            return True
-        else:
-            return False
-    return True
+    
+    layer_idx = _layerwise_index(path, config.model.transformer.num_layers)
+
+    return layer_idx >= config.model.stopgrad_blocks
+    
+
+def _layerwise_index(path: Tuple[Any], num_layers: int):
+    """Get the layerwise index based on name."""
+
+    layer_name = '.'.join(path)
+
+    if layer_name.startswith('Transformer.encoderblock_'):
+        layer_idx = path[1][len('encoderblock_'):]  # e.g., '01'
+        layer_idx = int(layer_idx)
+    elif layer_name.startswith('embedding.'):  # patch embedding
+        layer_idx = 0
+    elif layer_name.startswith('posembed_'):  # position embedding
+        layer_idx = 0
+    elif layer_name.startswith('cls'):  # cls token
+        layer_idx = 0
+    elif layer_name.startswith('Transformer.encoder_norm.'):  # last norm
+        layer_idx = num_layers
+    elif layer_name.startswith('fc_norm.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('head.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('bn_debug.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('pred'):
+        layer_idx = num_layers
+    else:
+        raise NotImplementedError('lrd not defined: {}'.format(layer_name))
+
+    return layer_idx
 
 
 # ---------------------------------------------------------

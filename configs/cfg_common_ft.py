@@ -67,8 +67,9 @@ def get_config():
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.1
   config.model.num_classes = 1000
-  config.model.freeze_encoder = False  # partial fine-tune
-  config.model.stopgrad_blocks = -1  # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
+  # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
+  # stopgrad_blocks=0 is for sanity check
+  config.model.stopgrad_blocks = -1
   config.model.sincos = False
 
   config.model.predictor = ml_collections.ConfigDict()
@@ -82,7 +83,7 @@ def get_config():
   config.model.predictor.transformer.droppath_rate = 0.0
 
   config.model.adapter = ml_collections.ConfigDict()
-  config.model.adapter.on_use = True
+  config.model.adapter.on_use = False
   config.model.adapter.mlp_dim_ratio = 1 / 4.
   config.model.adapter.rescale_init = 1e-4
 

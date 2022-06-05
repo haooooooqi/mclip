@@ -68,19 +68,23 @@ def create_optimizer(config, params_names, steps_per_epoch):
 
     # logging.info('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)))
 
-    if config.model.freeze_encoder:
+    if config.model.stopgrad_blocks >= 0 or config.model.adapter.on_use:
       opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+
       # True: trainable; False: frozen
-      mask_trainable = jax.tree_util.tree_map(lambda x, y: bool(x or y),  # OR, not AND
-        opt_util.filter_parameters(params_names, opt_util.filter_head),
-        opt_util.filter_parameters(params_names, opt_util.filter_adapter),
-      )
-      if config.model.stopgrad_blocks > 0:
-        filter_block = functools.partial(opt_util.filter_block, stopgrad_blocks=config.model.stopgrad_blocks)
-        mask_block_trainable = opt_util.filter_parameters(params_names, filter_block)
-        mask_trainable = jax.tree_util.tree_map(lambda x, y: bool(x or y),  # OR, not AND
-          mask_trainable, mask_block_trainable)
-        logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))        
+      mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
+
+      if config.model.stopgrad_blocks >= 0:
+        mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
+
+      if config.model.adapter.on_use:  # if adapter is on, we freeze the pre-trained backbone by default
+        mask_adapter_trainable = jax.tree_map(lambda x, y: bool(x or y),  # OR, not AND
+          opt_util.filter_parameters(params_names, opt_util.filter_head),
+          opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+        )
+        mask_trainable = jax.tree_map(lambda x, y: (x and y), mask_adapter_trainable, mask_trainable)
+
+      logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
 
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)

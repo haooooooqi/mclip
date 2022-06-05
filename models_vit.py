@@ -371,7 +371,6 @@ class VisionTransformer(nn.Module):
   classifier: str = 'token'
   dtype: Any = jnp.float32
   rescale_head_init: float = 1.
-  freeze_encoder: bool = False
   stopgrad_blocks: int = -1
   predictor: Any = None
   adapter: Any = None
@@ -446,7 +445,7 @@ class VisionTransformer(nn.Module):
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
       x, train=train, encoder_norm=use_encoder_norm, stopgrad_blocks=self.stopgrad_blocks)
 
-    if self.freeze_encoder and not self.adapter.on_use:
+    if not self.adapter.on_use and self.stopgrad_blocks >= self.transformer.num_layers:
       x = jax.lax.stop_gradient(x)
       logging.info('Stop gradient.')
 
