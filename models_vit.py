@@ -445,7 +445,7 @@ class VisionTransformer(nn.Module):
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
       x, train=train, encoder_norm=use_encoder_norm, stopgrad_blocks=self.stopgrad_blocks)
 
-    if not self.adapter.on_use and self.stopgrad_blocks >= self.transformer.num_layers:
+    if not self.adapter.on_use and self.stopgrad_blocks == self.transformer.num_layers + 1:
       x = jax.lax.stop_gradient(x)
       logging.info('Stop gradient.')
 
