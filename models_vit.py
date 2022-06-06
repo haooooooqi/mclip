@@ -19,6 +19,7 @@ from typing import Any, Callable, Optional, Tuple
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import jax.random as random
 
 import t5x.layers
 
@@ -151,7 +152,7 @@ class AddPositionEmbs(nn.Module):
     
     pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
 
-    if self.use_cls_token and inputs.shape[1] == pe.shape[1] + 1:
+    if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
       output = inputs + pe[:, 1:, :]
     else:
       assert inputs.shape[1] == pe.shape[1]
@@ -360,6 +361,18 @@ class Encoder(nn.Module):
     return encoded
 
 
+# the implemention for pjit
+def gather_by_einsum(x, ids):
+  """kaiming: vmap + gather is slow with pjit; use einsum instead
+  Args:
+    x: [N, L, ...]
+    ids: [N, K]
+  """
+  mat = jax.nn.one_hot(ids, x.shape[1])  # [N, K, L]
+  x = jnp.einsum('nl...,nkl->nk...', x, mat)
+  return x
+
+
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
@@ -375,6 +388,7 @@ class VisionTransformer(nn.Module):
   predictor: Any = None
   adapter: Any = None
   sincos: bool = True
+  split: Any = None
 
   def apply_predictor(self, x, train, img_shape):
 
@@ -394,6 +408,34 @@ class VisionTransformer(nn.Module):
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
 
+    return x
+
+  def apply_split(self, x):
+    """ x: [N, L, C] -> [N * 4, L // 4, C] """
+    N, L, C = x.shape
+
+    rng = self.make_rng('dropout')
+    noise = random.uniform(rng, shape=x.shape[:2])
+
+    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
+    # ids_restore = jnp.argsort(ids_shuffle, axis=1)
+
+    x_shuffled = gather_by_einsum(x, ids_shuffle)
+    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
+
+    splits = self.split.splits
+    x_shuffled = jnp.reshape(x_shuffled, [N * splits, L // splits, C])
+    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
+
+    return x_shuffled
+
+  def undo_split(self, x):
+    """ x: [N * 4, C] -> [N, C] """
+    N, C = x.shape
+    splits = self.split.splits
+    x = jnp.reshape(x, [N // splits, splits, C])
+    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'embed'))
+    x = jnp.mean(x, axis=1)  # average pool
     return x
 
   @nn.compact
@@ -430,16 +472,20 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
+    # we add posemb here
+    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_cls_token = (self.classifier in {'token', 'tgap'})
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
+
+    if self.split and self.split.on_use:
+      x = self.apply_split(x)
+      n = x.shape[0]
+
     # If we want to add a class token, add it here.
     if self.classifier in {'token', 'tgap'}:
       cls = t5x.layers.param_with_axes('cls', clstoken_init, (1, 1, c), jnp.float32, axes=('_null0', '_null1', 'embed'))
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
-
-    # we add posemb here
-    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
-    use_cls_token = (self.classifier in {'token', 'tgap'})
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
@@ -467,6 +513,9 @@ class VisionTransformer(nn.Module):
 
     x = IdentityLayer(name='pre_logits')(x)
     
+    if self.split and self.split.on_use:
+      x = self.undo_split(x)
+
     if self.num_classes:
       x = t5x.layers.Dense(
           features=self.num_classes,
