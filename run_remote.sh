@@ -2,21 +2,21 @@ echo 'code dir: '$STAGEDIR
 
 seed=0
 batch=1024
-# lr=1e-4
+lr=1e-3
 wd=0.05
 lrd=0.75
-ep=50
+# ep=50
 warm=5
-dp=0.2
-pdp=0.2
+dp=0.3
+pdp=0.0
 beta2=0.999
 
-partitions=1
+partitions=4
 
 pft=0  # predictor layers for ft
-stopg=0  # number of stopgrad blocks
+stopg=16  # number of stopgrad blocks
 
-vitsize=large
+vitsize=huge3x_p16
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
