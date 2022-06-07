@@ -205,7 +205,7 @@ def train_step(state, batch, model, rng):
 
 def eval_step(state, batch, model):
   variables = {'params': state.params, **state.flax_mutables}
-  logits = model.apply(variables, batch['image'], train=False, mutable=False)
+  logits = model.apply(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=jax.random.PRNGKey(0)))
   metrics = compute_eval_metrics(logits, batch['label'], batch['label_one_hot'])
   metrics['test_acc1'] = metrics.pop('accuracy') * 100  # rename
   metrics['perf/test_acc1'] = metrics['test_acc1']  # for comparing with pytorch
