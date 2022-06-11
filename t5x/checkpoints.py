@@ -442,9 +442,7 @@ class Checkpointer(object):
     if checkpoints_dir.startswith('gs://'):
       self.checkpoints_dir = checkpoints_dir
     else:  # kaiming: hack for local workdir
-      timestamp = multihost_utils.broadcast_one_to_all(np.int32(time.time()))
-      gs_bucket = os.environ.get('LOCAL_REDIRECT_CKPT_DIR', 'gs://kmh-gcp/checkpoints/flax')
-      checkpoints_dir = os.path.join(f'{gs_bucket}/t5x_tmp_{timestamp}')
+      checkpoints_dir = os.environ.get('LOCAL_REDIRECT_CKPT_DIR', 'gs://kmh-gcp/checkpoints/flax')
       logging.info(f'Redirecting checkpoints_dir to: {checkpoints_dir}')
       self.checkpoints_dir = checkpoints_dir
     self.keep = keep
