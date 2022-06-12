@@ -14,7 +14,7 @@ sleep 2s
 echo 'Killing jobs...'
 gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --project ${PROJECT_ID} --worker all \
   --command "
-pkill python
+sudo pkill python
 sudo lsof -w /dev/accel0 | grep .py | awk '{print \"kill -9 \" \$2}' | sh
 "
 

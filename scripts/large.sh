@@ -10,7 +10,7 @@ ZONE=europe-west4-a
 
 batch=4096
 lr=1.5e-4
-ep=1600
+ep=800
 mask=0.75
 rescale=1.0
 vitsize=large
@@ -19,12 +19,11 @@ seed=0
 partitions=1
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=vit_large
+JOBNAME=large_800ep
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-RESUME_DIR=$WORKDIR
+RESUME_DIR=''
 LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}
-# sudo mkdir -p ${WORKDIR} && sudo chmod -R 777 ${WORKDIR}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
@@ -34,6 +33,7 @@ cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --
   --command "
 cd $CODEDIR
 
+export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
 export LOCAL_REDIRECT_CKPT_DIR=${WORKDIR}
 python3 main.py \
     --workdir=${LOGDIR} \
