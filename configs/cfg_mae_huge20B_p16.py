@@ -65,6 +65,8 @@ def get_config():
 
   # partition
   config.partitioning.partition_states = True
+  config.partitioning.activation_partitioning_dims = 2
+  config.partitioning.parameter_partitioning_dims = 2
 
   # save
   config.save_every_epochs = 10
