@@ -47,6 +47,7 @@ def get_config():
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.0
   config.model.transformer.num_layers = 32
+  config.model.transformer.rescale_init = 1.0
 
   config.model.decoder = ml_collections.ConfigDict()
   config.model.decoder.hidden_size = 512
@@ -64,6 +65,8 @@ def get_config():
 
   # partition
   config.partitioning.partition_states = True
+  config.partitioning.activation_partitioning_dims = 2
+  config.partitioning.parameter_partitioning_dims = 2
 
   # save
   config.save_every_epochs = 10
