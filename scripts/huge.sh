@@ -1,6 +1,7 @@
 CODEDIR=/checkpoint/xinleic/mae_jax/repo
 
 TPU_NAME=xinleic-mae-iv-0
+# TPU_NAME=rh-512-x
 ZONE=europe-west4-a
 
 ################################################################
@@ -9,7 +10,7 @@ ZONE=europe-west4-a
 
 batch=4096
 lr=1.5e-4
-ep=1600
+ep=800
 mask=0.75
 rescale=1.0
 vitsize=huge_p16
@@ -18,12 +19,11 @@ seed=0
 partitions=1
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=vit_huge
+JOBNAME=huge_800ep
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-RESUME_DIR=$WORKDIR
+RESUME_DIR=''
 LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}
-# sudo mkdir -p ${WORKDIR} && sudo chmod -R 777 ${WORKDIR}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
@@ -33,15 +33,17 @@ cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --
   --command "
 cd $CODEDIR
 
+export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
+export LOCAL_REDIRECT_CKPT_DIR=${WORKDIR}
 python3 main.py \
-    --workdir=${WORKDIR} \
+    --workdir=${LOGDIR} \
     --config=configs/$CONFIG.py \
     --config.batch_size=${batch} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
     --config.model.transformer.rescale_init=${rescale} \
-    --config.profile_memory=True \
+    --config.profile_memory=False \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
     --config.model.mask_ratio=${mask} \
