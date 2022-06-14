@@ -88,6 +88,11 @@ def get_config():
 
   # memory
   config.profile_memory = False
+  config.profile = ml_collections.ConfigDict()
+  config.profile.use_profile_server = False
+  config.profile.profile_server_port = 9999
+  config.profile.profile_start_step = 50
+  config.profile.profile_num_steps = 10
 
   # utils
   config.resume_dir = ''

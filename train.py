@@ -23,6 +23,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 warnings.filterwarnings("ignore", category=FutureWarning) 
 
+import contextlib
 import functools
 import time, datetime
 from typing import Any
@@ -365,6 +366,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   data_layout = partitioner.get_data_layout(config.batch_size)
   shard_id = data_layout.shard_id
 
+  run_profiling = config.profile.use_profile_server and (jax.process_index() == 0)
+  if run_profiling:
+    logging.info(f'Starting profiler server at port {config.profile.profile_server_port}')
+    server = jax.profiler.start_server(config.profile.profile_server_port)
+
   for epoch in range(epoch_offset, int(config.num_epochs)):
     data_loader_train.sampler.set_epoch(epoch)  # reset random seed
     
@@ -372,8 +378,21 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # train one epoch
     # ------------------------------------------------------------
     for i, batch in enumerate(data_loader_train):
-      batch = parse_batch(batch, local_batch_size)
-      state, metrics = partitioned_train_step(state, batch)
+      if run_profiling:
+        profiler_context = jax.profiler.StepTraceAnnotation("train", step_num=step)
+        if step == config.profile.profile_start_step:
+          trace_dir = os.path.join(workdir, 'profile-log')
+          logging.info(f'Starting profiling trace at step {step}, saving to {trace_dir}')
+          jax.profiler.start_trace(trace_dir)
+        if step == config.profile.profile_start_step + config.profile.profile_num_steps:
+          run_profiling = False
+          logging.info(f'Stopping profiling trace at step {step}, saving to {trace_dir}')
+          jax.tree_map(lambda x: x.block_until_ready(), state)
+          jax.profiler.stop_trace()
+
+      with profiler_context if run_profiling else contextlib.nullcontext():
+        batch = parse_batch(batch, local_batch_size)
+        state, metrics = partitioned_train_step(state, batch)
 
       if epoch == epoch_offset and i == 0 and partitioner._num_partitions > 8:
         print_sanity_check(batch, shard_id)
