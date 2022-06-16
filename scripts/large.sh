@@ -1,7 +1,6 @@
 CODEDIR=/checkpoint/xinleic/mae_jax/repo
 
 TPU_NAME=xinleic-mae-iv-0
-# TPU_NAME=rh-512-x
 ZONE=europe-west4-a
 
 ################################################################

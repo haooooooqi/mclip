@@ -15,7 +15,9 @@ echo 'Killing jobs...'
 gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --project ${PROJECT_ID} --worker all \
   --command "
 sudo pkill python
-sudo lsof -w /dev/accel0 | grep .py | awk '{print \"kill -9 \" \$2}' | sh
+sudo lsof -w /dev/accel0 | grep .py | awk '{print \"sudo kill -9 \" \$2}' | sh
+sudo rm -f /tmp/libtpu_lockfile
+mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 "
 
 echo 'Killed jobs.'
