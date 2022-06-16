@@ -38,12 +38,12 @@ def get_config():
   config = cfg_common_ft.get_config()
 
   # model config
-  config.model.update(vit.get_h14_config())  # ViT-H/14
+  config.model.update(vit.get_l16_config())  # ViT-H/14
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.2
 
-  config.model.hidden_size = 1280 * 2
-  config.model.transformer.mlp_dim = 5120 * 2
+  config.model.hidden_size = 1280
+  config.model.transformer.mlp_dim = config.model.hidden_size * 4
   config.model.transformer.num_heads = 16
   config.model.transformer.num_layers = 32
 
