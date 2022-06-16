@@ -28,12 +28,14 @@ sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 ################################################################
 # launch on all nodes
 ################################################################
+
 cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --worker all \
   --command "
 cd $CODEDIR
 
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
 export LOCAL_REDIRECT_CKPT_DIR=${WORKDIR}
+
 python3 main.py \
     --workdir=${LOGDIR} \
     --config=configs/$CONFIG.py \
