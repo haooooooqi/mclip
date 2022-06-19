@@ -1,6 +1,6 @@
 CODEDIR=/checkpoint/xinleic/mae_jax/repo
 
-TPU_NAME=xinleic-mae-iv-0
+TPU_NAME=xinleic-mae-iv-1
 ZONE=europe-west4-a
 
 ################################################################
@@ -9,16 +9,16 @@ ZONE=europe-west4-a
 
 batch=4096
 lr=1.5e-4
-ep=800
+ep=1600
 mask=0.75
 rescale=1.0
-vitsize=huge_p16
+vitsize=huge
 
 seed=0
 partitions=1
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=huge_800ep
+JOBNAME=huge_p14_v1
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 RESUME_DIR=''

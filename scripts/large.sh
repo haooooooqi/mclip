@@ -9,16 +9,16 @@ ZONE=europe-west4-a
 
 batch=4096
 lr=1.5e-4
-ep=800
+ep=1600
 mask=0.75
 rescale=1.0
 vitsize=large
 
-seed=0
+seed=1
 partitions=1
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=large_800ep
+JOBNAME=large_v2
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 RESUME_DIR=''
