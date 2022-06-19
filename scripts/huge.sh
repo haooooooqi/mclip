@@ -7,7 +7,7 @@ ZONE=europe-west4-a
 # configs
 ################################################################
 
-vitsize=huge_p16
+vitsize=huge
 batch=1024
 lr=1e-3
 wd=0.05
@@ -21,7 +21,7 @@ seed=0
 partitions=1
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=huge
+JOBNAME=huge_p14_v1
 
 PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 WORKDIR=${PRETRAIN_DIR}/tune

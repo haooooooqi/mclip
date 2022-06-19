@@ -21,7 +21,7 @@ seed=0
 partitions=1
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=large
+JOBNAME=large_v2
 
 PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 WORKDIR=${PRETRAIN_DIR}/tune
