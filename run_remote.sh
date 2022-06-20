@@ -5,9 +5,9 @@ batch=1024
 lr=1e-3
 wd=0.05
 lrd=0.75
-# ep=50
+ep=50
 warm=5
-dp=0.3
+# dp=0.3
 pdp=0.0
 beta2=0.999
 
