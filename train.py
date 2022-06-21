@@ -82,6 +82,14 @@ def build_dataloaders(config, partitioner, rng_torch):
   dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
   dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
 
+  assert dataset_train.num_classes == config.model.num_classes
+
+  if dataset_train.num_classes == 21841:  # IN-22k
+    dataset_val.target_transform = torchloader_util.get_target_transform_1k_to_22k(dataset_train, dataset_val)
+    dataset_val.num_classes = dataset_train.num_classes
+    logging.info('Revised dataset_val:\n{}'.format(dataset_val))
+    logging.info(dataset_val)
+
   sampler_train = torch.utils.data.DistributedSampler(
     dataset_train,
     num_replicas=num_shards, # jax.process_count(),
@@ -312,7 +320,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # ------------------------------------
   data_loader_train, data_loader_val, local_batch_size = build_dataloaders(config, partitioner, rng_torch)
 
-  mixup_fn = torchloader_util.get_mixup_fn(config.aug)
+  mixup_fn = torchloader_util.get_mixup_fn(config.aug, num_classes=config.model.num_classes)
 
   steps_per_epoch = len(data_loader_train)
   
