@@ -33,3 +33,5 @@ sudo mount 10.60.38.146:/kmh_data /kmh_data
 sudo chmod go+rw /kmh_data
 ls /kmh_data
 "
+
+source ~/run_mount_data.sh
