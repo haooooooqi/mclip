@@ -16,7 +16,9 @@ import functools
 from typing import Any, Callable, Optional, Tuple
 
 import flax.linen as nn
+import jax
 import jax.numpy as jnp
+from flax.linen.partitioning import remat
 
 import t5x.layers
 
@@ -163,7 +165,7 @@ class Encoder1DBlock(nn.Module):
   layer_id: int = None
 
   @nn.compact
-  def __call__(self, inputs, *, deterministic):
+  def __call__(self, inputs, deterministic):
     """Applies Encoder1DBlock module.
 
     Args:
@@ -233,6 +235,9 @@ class Encoder(nn.Module):
   dropout_rate: float = 0.1
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
+  prefix: str = 'encoder'
+  adapter: Any = None
+  remat_policy: str = 'none'
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True):
@@ -247,6 +252,18 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
+    BlockLayer = Encoder1DBlock
+    if self.remat_policy not in (None, 'none'):
+      if self.remat_policy == 'minimal':
+        policy = jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
+      else:
+        policy = None
+      BlockLayer = remat(  # pylint: disable=invalid-name
+          Encoder1DBlock,
+          prevent_cse=True,
+          policy=policy,
+          static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
+
     x = inputs
     # x = AddPositionEmbs(
     #     posemb_init=posemb_init,  # from BERT.
@@ -256,7 +273,11 @@ class Encoder(nn.Module):
 
     # Input Encoder
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
+      name = self.prefix + 'block_{:02d}'.format(lyr)
+      # logging.info('layer: {}, dp: {}'.format(name, dp))
+      deterministic = not train
+      x = BlockLayer(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -264,8 +285,12 @@ class Encoder(nn.Module):
           name='encoderblock_{:02d}'.format(lyr),
           num_heads=self.num_heads,
           layer_id=lyr,
-        )(x, deterministic=not train)
-    encoded = t5x.layers.LayerNorm(name='encoder_norm', axes=('embed',))(x) if encoder_norm else x
+          adapter=self.adapter,
+        )(x, deterministic)
+      if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
+        x = jax.lax.stop_gradient(x)
+        logging.info('Stop gradient after block: {}'.format(name))
+    encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x) if encoder_norm else x
 
     return encoded
 
