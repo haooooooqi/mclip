@@ -17,6 +17,7 @@ import functools
 from typing import Any, Callable, Optional, Tuple
 
 import flax.linen as nn
+from flax.linen.partitioning import remat
 import jax
 import jax.numpy as jnp
 
@@ -238,7 +239,7 @@ class Encoder1DBlock(nn.Module):
 
 
   @nn.compact
-  def __call__(self, inputs, *, deterministic):
+  def __call__(self, inputs, deterministic):
     """Applies Encoder1DBlock module.
 
     Args:
@@ -321,6 +322,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   adapter: Any = None
+  remat_policy: str = 'none'
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
@@ -335,6 +337,18 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
+    BlockLayer = Encoder1DBlock
+    if self.remat_policy not in (None, 'none'):
+      if self.remat_policy == 'minimal':
+        policy = jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
+      else:
+        policy = None
+      BlockLayer = remat(  # pylint: disable=invalid-name
+          Encoder1DBlock,
+          prevent_cse=True,
+          policy=policy,
+          static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
+
     x = inputs
     
     # Input Encoder
@@ -342,7 +356,8 @@ class Encoder(nn.Module):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
       name = self.prefix + 'block_{:02d}'.format(lyr)
       # logging.info('layer: {}, dp: {}'.format(name, dp))
-      x = Encoder1DBlock(
+      deterministic = not train
+      x = BlockLayer(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -351,7 +366,7 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           adapter=self.adapter,
-        )(x, deterministic=not train)
+        )(x, deterministic)
       if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
         x = jax.lax.stop_gradient(x)
         logging.info('Stop gradient after block: {}'.format(name))

@@ -807,7 +807,11 @@ class PjitPartitioner(BasePjitPartitioner):
                params_on_devices: bool = True,
                backend: Optional[str] = None,
                logical_axis_rules: Optional[LogicalAxisRules] = None,
-               partition_states: bool = False,):
+               partition_states: bool = False,
+               force_partition_states_data_first: bool = False,
+               partition_states_for_encoder_only: bool = False,
+               activation_partitioning_dims: int = 1,
+               parameter_partitioning_dims: int = 1):
     """PjitPartitioner constructor.
 
     See https://github.com/google-research/text-to-text-transfer-transformer/blob/main/README.mdx/user/partitioning for details.
@@ -848,11 +852,15 @@ class PjitPartitioner(BasePjitPartitioner):
         params_on_devices=params_on_devices,
         backend=backend)
     if logical_axis_rules is None:
-      logical_axis_rules = standard_logical_axis_rules()
+      logical_axis_rules = standard_logical_axis_rules(
+        activation_partitioning_dims=activation_partitioning_dims,
+        parameter_partitioning_dims=parameter_partitioning_dims)
     self._logical_axis_rules = tuple(logical_axis_rules)
     self._data_axis, = flax_partitioning.logical_to_mesh_axes(
         ['batch'], logical_axis_rules)
     self._partition_states = partition_states
+    self._force_partition_states_data_first = force_partition_states_data_first
+    self._partition_states_for_encoder_only = partition_states_for_encoder_only
 
   def partition(
       self,
@@ -901,23 +909,35 @@ class PjitPartitioner(BasePjitPartitioner):
     # the hack
     if self._partition_states:
       logging.info('Splitting optimizer states...')
-      flat_mesh_axes = {k: revise_axes(k, v) for k, v in flat_mesh_axes.items()}
+      flat_mesh_axes = {
+        k: revise_axes(
+          k, v, self._force_partition_states_data_first, self._partition_states_for_encoder_only)
+        for k, v in flat_mesh_axes.items()
+      }
     # --------------------------------------------------------------------------------
 
     return logical_axes.restore_state(
         traverse_util.unflatten_dict(flat_mesh_axes, sep='/'))
 
 
-def revise_axes(name, axes):
+def revise_axes(name, axes, force_partition_states_data_first=False, partition_states_for_encoder_only=False):
   if not name.startswith('state/param_states'):
+    return axes
+  if partition_states_for_encoder_only and 'Transformer/encoderblock' not in name:
     return axes
   if type(axes) is not PartitionSpec:
     return axes
   if len(axes) == 2:
-    if axes[0] == None and axes[1] == 'model':
+    if force_partition_states_data_first:
+      axes = PartitionSpec('data', 'model')
+    elif axes[0] == None and axes[1] == 'model':
       axes = PartitionSpec('data', 'model')
     elif axes[0] == 'model' and axes[1] == None:
       axes = PartitionSpec('model', 'data')
+    elif axes[0] == None and axes[1] == 'data':
+      axes = PartitionSpec('model', 'data')
+    elif axes[0] == 'data' and axes[1] == None:
+      axes = PartitionSpec('data', 'model')
     return axes
   else:
     return axes

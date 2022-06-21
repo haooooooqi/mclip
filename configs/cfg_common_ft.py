@@ -163,5 +163,9 @@ def get_config():
   config.partitioning = ml_collections.ConfigDict()
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False
+  config.partitioning.force_partition_states_data_first = False
+  config.partitioning.partition_states_for_encoder_only = False
+  config.partitioning.activation_partitioning_dims = 1
+  config.partitioning.parameter_partitioning_dims = 1
 
   return config
