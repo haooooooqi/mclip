@@ -88,7 +88,6 @@ def build_dataloaders(config, partitioner, rng_torch):
     dataset_val.target_transform = torchloader_util.get_target_transform_1k_to_22k(dataset_train, dataset_val)
     dataset_val.num_classes = dataset_train.num_classes
     logging.info('Revised dataset_val:\n{}'.format(dataset_val))
-    logging.info(dataset_val)
 
   sampler_train = torch.utils.data.DistributedSampler(
     dataset_train,

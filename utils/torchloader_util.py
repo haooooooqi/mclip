@@ -38,7 +38,11 @@ class ImageFolder(datasets.ImageFolder):
         self.num_classes = len(self.classes)
 
     def __getitem__(self, index: int):
-        image, label = super(ImageFolder, self).__getitem__(index)
+        try:
+            image, label = super(ImageFolder, self).__getitem__(index)
+        except Exception as e:
+            logging.info('Replacing image due to error: {}'.format(e))
+            image, label = super(ImageFolder, self).__getitem__((index + 1) % self.__len__())  # offset
         label_one_hot = torch.nn.functional.one_hot(torch.tensor(label), self.num_classes).float()
         label_one_hot = label_one_hot * (1 - self.label_smoothing) + self.label_smoothing / self.num_classes
 
