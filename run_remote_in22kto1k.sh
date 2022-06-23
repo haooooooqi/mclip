@@ -7,7 +7,7 @@ wd=1e-8
 lrd=0.9
 ep=30
 warm=5
-dp=0.2
+dp=0.0
 pdp=0.0
 beta2=0.999
 
@@ -63,7 +63,7 @@ python3 main.py \
     --config.warmup_epochs=${warm} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
-    --config.save_every_epochs=2 \
+    --config.save_every_epochs=50 \
     --config.profile_memory=True \
     --config.donate=True \
     --config.init_backend=tpu \
