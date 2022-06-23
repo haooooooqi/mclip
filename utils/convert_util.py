@@ -193,9 +193,17 @@ def revise_merge_qkv(checkpoint):
       q = checkpoint[name_pt]
       k = checkpoint[name_pt.replace('.q.weight', '.k.weight')]
       v = checkpoint[name_pt.replace('.q.weight', '.v.weight')]
-      qkv = torch.concat([q, k, v], dim=0)
+      qkv = torch.cat([q, k, v], dim=0)
       checkpoint_revised[name_pt.replace('.q.weight', '.qkv.weight')] = qkv
     elif 'attn.k.weight' in name_pt or 'attn.v.weight' in name_pt:
+      pass
+    elif 'attn.q_bias' in name_pt:
+      q = checkpoint[name_pt]
+      k = torch.zeros(q.shape[0])
+      v = checkpoint[name_pt.replace('.q_bias', '.v_bias')]
+      qkv = torch.cat([q, k, v], dim=0)
+      checkpoint_revised[name_pt.replace('.q_bias', '.qkv.bias')] = qkv
+    elif 'attn.k_bias' in name_pt or 'attn.v_bias' in name_pt:
       pass      
     else:
       checkpoint_revised[name_pt] = p

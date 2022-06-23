@@ -62,9 +62,6 @@ def main(argv):
 
   logging.info(FLAGS.config)
 
-  if jax.local_devices()[0].platform != 'tpu':
-    logging.error('Not using TPU. Exit.')
-    exit()
   convert.convert_model(FLAGS.config, FLAGS.workdir, FLAGS.mode)
 
 

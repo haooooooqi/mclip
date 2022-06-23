@@ -1,6 +1,7 @@
 CONFIG=cfg_vit_large
 # CHKPT_DIR='gs://kmh-gcp/checkpoints/flax/20220404_170716_kmh-tpuvm-v3-256-4_cfg_mae_large_1600ep_maeDBG_batch4096_vmap_normpix_sincos_initmaev2_cropv2'
-CHKPT_DIR='gs://kmh-gcp/checkpoints/flax/20220415_011305_kmh-tpuvm-v3-256-3_cfg_mae_large_1600ep_maeDBG_batch4096_lr1.0e-4_vmap_normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed'
+# CHKPT_DIR='gs://kmh-gcp/checkpoints/flax/20220415_011305_kmh-tpuvm-v3-256-3_cfg_mae_large_1600ep_maeDBG_batch4096_lr1.0e-4_vmap_normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_masknoise_qkv_buf16x1024_noavelog_seed'
+CHKPT_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_large/20220621_023055_cx_256d_cfg_mae_large_maetf_1600ep_b4096_lr1.0e-4_TorchLoader_wseed100/mae_large_sd_2'
 
 rm -rf tmp
 
@@ -14,7 +15,8 @@ python3 main_convert.py \
     --config.num_epochs=0.005 \
     --config.model.classifier='token' \
     --config.pretrain_dir=${CHKPT_DIR} \
-    --config.model.transformer.torch_qkv=True \
+    --config.model.transformer.torch_qkv=False \
+    --config.init_backend='cpu' \
 
 
 
