@@ -49,12 +49,20 @@ def load_from_t5x_pretrain(state, checkpointer, path):
   new_state = checkpointer.restore(
     path=path_chkpt,
     fallback_state=state.state_dict(),
-    state_transformation_fns=[remove_optimizer_state,])
+    state_transformation_fns=[remove_optimizer_state, remove_head_state])
   return new_state
 
 
 def remove_optimizer_state(ckpt_optimizer_state, optimizer_state):
   ckpt_optimizer_state.pop('state')
+  return ckpt_optimizer_state
+
+
+def remove_head_state(ckpt_optimizer_state, optimizer_state):
+  # remove the pre-trained head if any
+  if 'head' in ckpt_optimizer_state['target']:
+    logging.info('Removing pre-trained head.')
+    ckpt_optimizer_state['target'].pop('head')
   return ckpt_optimizer_state
 
 
