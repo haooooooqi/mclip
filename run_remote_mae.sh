@@ -3,15 +3,15 @@ echo 'code dir: '$STAGEDIR
 # seed=0
 batch=4096
 lr=1e-4
-ep=1600
+ep=800
 
-mask=0.9
+mask=0.75
 
-partitions=8
+partitions=2
 
-rescale=0.5
+rescale=1.0
 
-vitsize=huge4x_p16
+vitsize=huge2x_p16
 CONFIG=cfg_mae_${vitsize}
 
 
