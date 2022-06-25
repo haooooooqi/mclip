@@ -16,6 +16,7 @@ python3 main.py \
     --config.opt_type=adamw \
     --config.opt_mu_dtype=float32 \
     --config.partitioning.partition_states=True \
+    --config.model.transformer.recurrent=3 \
 
 
     # --config.resume_dir='gs://kmh-gcp/checkpoints/flax/20220521_221137_scratch_kmh-tpuvm-v3-256-1_cfg_vit_large_50ep_fttl_b1024_wd0.3_lr1e-4_lrd1.0_dp0.2_warm20_s0_beta0.95_p16_dbgp16/checkpoint_62550'

@@ -62,6 +62,8 @@ def get_config():
 
   # model config
   config.model = mae.get_config()  # ViT-B/16
+  config.model.transformer.rescale_init = 1.0
+  config.model.transformer.recurrent = 1
 
   # optimizer config
   config.opt_type = 'adamw'

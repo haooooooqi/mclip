@@ -7,15 +7,16 @@ ep=800
 
 mask=0.75
 
-partitions=2
+partitions=1
 
 rescale=1.0
+recurrent=2
 
-vitsize=huge2x_p16
+vitsize=large
 CONFIG=cfg_mae_${vitsize}
 
-
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}_s${seed}_p${partitions}_re${rescale}_normpix_exwd_split_fastsave
+# _normpix_exwd_split_fastsave
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}_s${seed}_p${partitions}_re${rescale}_split_rec${recurrent}sanity
 RESUME=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -60,6 +61,7 @@ python3 main.py \
     --config.partitioning.partition_states=True \
     --config.model.visualize=False \
     --config.resume_dir=${RESUME} \
+    --config.model.transformer.recurrent=${recurrent} \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

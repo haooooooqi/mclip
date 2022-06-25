@@ -253,6 +253,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   rescale_init: float = 1.0
+  recurrent: int = 1
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -269,7 +270,7 @@ class Encoder(nn.Module):
 
     x = inputs
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      block = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -278,7 +279,9 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           rescale_init=self.rescale_init,
-        )(x, deterministic=not train)
+        )
+      for _ in range(self.recurrent):
+        x = block(x, deterministic=not train)
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
 
     return encoded
