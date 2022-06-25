@@ -135,32 +135,34 @@ class MlpBlock(nn.Module):
   bias_init: Callable[[PRNGKey, Shape, Dtype],
                       Array] = nn.initializers.normal(stddev=1e-6)
 
-  @nn.compact
-  def __call__(self, inputs, *, deterministic):
-    """Applies Transformer MlpBlock module."""
-    actual_out_dim = inputs.shape[-1] if self.out_dim is None else self.out_dim
-    x = t5x.layers.Dense(
+  def setup(self):
+    self.mlp0 = t5x.layers.Dense(
         features=self.mlp_dim,
         dtype=self.dtype,
         kernel_init=self.kernel_init,
         bias_init=self.bias_init,
         kernel_axes=('embed', 'mlp'),
-        name='Dense_0',
-    )(inputs)
-    x = nn.gelu(x)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
-    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'mlp'))
-    output = t5x.layers.Dense(
-        features=actual_out_dim,
+        name='Dense_0',)
+    self.drop0 = nn.Dropout(rate=self.dropout_rate)
+    self.mlp1 = t5x.layers.Dense(
+        features=self.out_dim,
         dtype=self.dtype,
         kernel_init=self.kernel_init,
         bias_init=self.bias_init,
         kernel_axes=('mlp', 'embed'),
-        name='Dense_1',
-    )(x)
-    output = nn.Dropout(
-        rate=self.dropout_rate)(
-            output, deterministic=deterministic)
+        name='Dense_1',)
+    self.drop1 = nn.Dropout(rate=self.dropout_rate)
+
+  # @nn.compact
+  def __call__(self, inputs, *, deterministic):
+    """Applies Transformer MlpBlock module."""
+    # actual_out_dim = inputs.shape[-1] if self.out_dim is None else self.out_dim
+    x = self.mlp0(inputs)
+    x = nn.gelu(x)
+    x = self.drop0(x, deterministic=deterministic)
+    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'mlp'))
+    output = self.mlp1(x)
+    output = self.drop1(output, deterministic=deterministic)
     return output
 
 
@@ -225,6 +227,7 @@ class Encoder1DBlock(nn.Module):
     y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(x)
     y = MlpBlock(
         mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
+        out_dim=y.shape[-1],
         kernel_init=lambda *args: mlp_kernel_init(*args) * self.rescale_init,
         bias_init=mlp_bias_init,
         )(y, deterministic=deterministic)
