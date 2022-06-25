@@ -321,6 +321,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   adapter: Any = None
+  recurrent: int = 1
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
@@ -342,7 +343,7 @@ class Encoder(nn.Module):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
       name = self.prefix + 'block_{:02d}'.format(lyr)
       # logging.info('layer: {}, dp: {}'.format(name, dp))
-      x = Encoder1DBlock(
+      block = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -351,7 +352,9 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           adapter=self.adapter,
-        )(x, deterministic=not train)
+        )
+      for _ in range(self.recurrent):
+        x = block(x, deterministic=not train)
       if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
         x = jax.lax.stop_gradient(x)
         logging.info('Stop gradient after block: {}'.format(name))

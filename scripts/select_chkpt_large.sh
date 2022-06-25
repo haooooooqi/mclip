@@ -41,5 +41,8 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis'  # no normpix, no exwd
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_053945_maet5x_kmh-tpuvm-v3-256-2_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220526_071100_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adarows16'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220527_064059_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_1600ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adamw32'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220527_064059_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_1600ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adamw32'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220529_034940_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_re0.5_normpix_exwd_NOsplit_fastsave'
+
+# recurrent
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220625_011536_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_re1.0_split_rec2sanity'

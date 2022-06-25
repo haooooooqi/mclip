@@ -66,6 +66,8 @@ def get_config():
   config.model = vit.get_b16_config()  # ViT-B/16
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.1
+  config.model.transformer.recurrent = 1
+
   config.model.num_classes = 1000
   # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
   # stopgrad_blocks=0 is for sanity check
