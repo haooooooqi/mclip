@@ -135,34 +135,32 @@ class MlpBlock(nn.Module):
   bias_init: Callable[[PRNGKey, Shape, Dtype],
                       Array] = nn.initializers.normal(stddev=1e-6)
 
-  def setup(self):
-    self.mlp0 = t5x.layers.Dense(
+  @nn.compact
+  def __call__(self, inputs, *, deterministic):
+    """Applies Transformer MlpBlock module."""
+    actual_out_dim = inputs.shape[-1] if self.out_dim is None else self.out_dim
+    x = t5x.layers.Dense(
         features=self.mlp_dim,
         dtype=self.dtype,
         kernel_init=self.kernel_init,
         bias_init=self.bias_init,
         kernel_axes=('embed', 'mlp'),
-        name='Dense_0',)
-    self.dropout0 = nn.Dropout(rate=self.dropout_rate)
-    self.mlp1 = t5x.layers.Dense(
-        features=self.out_dim,
+        name='Dense_0',
+    )(inputs)
+    x = nn.gelu(x)
+    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'mlp'))
+    output = t5x.layers.Dense(
+        features=actual_out_dim,
         dtype=self.dtype,
         kernel_init=self.kernel_init,
         bias_init=self.bias_init,
         kernel_axes=('mlp', 'embed'),
-        name='Dense_1',)
-    self.dropout1 = nn.Dropout(rate=self.dropout_rate)
-
-  # @nn.compact
-  def __call__(self, inputs, *, deterministic):
-    """Applies Transformer MlpBlock module."""
-    # actual_out_dim = inputs.shape[-1] if self.out_dim is None else self.out_dim
-    x = self.mlp0(inputs)
-    x = nn.gelu(x)
-    x = self.dropout0(x, deterministic=deterministic)
-    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'mlp'))
-    output = self.mlp1(x)
-    output = self.dropout1(output, deterministic=deterministic)
+        name='Dense_1',
+    )(x)
+    output = nn.Dropout(
+        rate=self.dropout_rate)(
+            output, deterministic=deterministic)
     return output
 
 
@@ -212,11 +210,12 @@ class Encoder1DBlock(nn.Module):
       out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_init,
     )
     # ----------------------------------------------------
-    msablock = MsaBlock(
+
+    x = MsaBlock(
         dtype=self.dtype,
         dropout_rate=self.attention_dropout_rate,
-        num_heads=self.num_heads,)
-    x = msablock(x, x)
+        num_heads=self.num_heads,
+    )(x, x)
     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
@@ -224,12 +223,11 @@ class Encoder1DBlock(nn.Module):
 
     # MLP block.
     y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(x)
-    mlpblock = MlpBlock(
+    y = MlpBlock(
         mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
-        out_dim=y.shape[-1],
         kernel_init=lambda *args: mlp_kernel_init(*args) * self.rescale_init,
-        bias_init=mlp_bias_init,)
-    y = mlpblock(y, deterministic=deterministic)
+        bias_init=mlp_bias_init,
+        )(y, deterministic=deterministic)
     # droppath
     y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
 
@@ -271,7 +269,7 @@ class Encoder(nn.Module):
 
     x = inputs
     for lyr in range(self.num_layers):
-      block = Encoder1DBlock(
+      x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -280,8 +278,7 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           rescale_init=self.rescale_init,
-        )
-      x = block(x, deterministic=not train)
+        )(x, deterministic=not train)
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
 
     return encoded
