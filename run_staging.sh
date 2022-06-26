@@ -1,5 +1,5 @@
-# VM_NAME=kmh-tpuvm-v3-512-2
-VM_NAME=kmh-tpuvm-v3-256-4
+VM_NAME=kmh-tpuvm-v3-512-2
+# VM_NAME=kmh-tpuvm-v3-256-4
 echo $VM_NAME
 
 # ------------------------------------------------
@@ -19,11 +19,17 @@ cd $STAGEDIR
 echo 'Current dir: '`pwd`
 # ------------------------------------------------
 
-for seed in 0
+for loop in {1..2}
 do
-source run_remote_in22kto1k.sh
 
-echo sleep 1m
-sleep 1m
-source run_kill_remote.sh
-done
+    for seed in 0
+    do
+    source run_remote_in22k.sh
+
+    echo sleep 1m
+    sleep 1m
+    source run_kill_remote.sh
+    done
+
+echo 'Attempt '$loop' done'
+done  # loop

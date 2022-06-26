@@ -45,6 +45,9 @@ from utils import summary_util as summary_util  # must be after 'from clu import
 from utils import checkpoint_util as ckp
 from utils import torchloader_util
 from utils import logging_util
+from utils import timeout_util
+import signal
+
 
 from t5x.train_state_initializer import create_train_state
 import t5x.partitioning
@@ -431,6 +434,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         logging.info('Initial compilation completed.')
         start_time = time.time()  # log the time after compilation
 
+      if i > 10:
+        logging.info('break for debug')
+        break
+
       if config.get('log_every_steps'):
         train_metrics.append(metrics)
         if (step + 1) % config.log_every_steps == 0:
@@ -462,7 +469,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     # finished one epoch: eval
     # ------------------------------------------------------------
-    if True:
+    if False:
       summary = run_eval(state, partitioned_eval_step, data_loader_val, local_batch_size, epoch)
       best_acc = max(best_acc, summary['test_acc1'])
 
@@ -477,7 +484,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     if (epoch + 1) % config.save_every_epochs == 0 or epoch + 1 == int(config.num_epochs):
       logging.info('Saving checkpoint: {}'.format(workdir))
-      checkpointer.save(state)
+      
+      signal.signal(signal.SIGALRM, timeout_util.timeout)
+      signal.alarm(2)  # turn on
+      try:
+        checkpointer.save(state)
+      except:
+        return  # crash
+      signal.alarm(0)  # turn off
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
