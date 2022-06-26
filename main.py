@@ -31,6 +31,7 @@ import train
 
 from utils import logging_util
 from jax.experimental import multihost_utils
+import time
 
 FLAGS = flags.FLAGS
 
@@ -74,10 +75,10 @@ def main(argv):
   
   train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
 
-  # logging_util.verbose_on()
-  # logging.info('To quit.')
-  # multihost_utils.sync_global_devices(f'quit')
-  exit()
+  logging_util.verbose_on()
+  logging.info('To quit.')
+  multihost_utils.sync_global_devices(f'quit')
+  time.sleep(10)
 
 
 if __name__ == '__main__':

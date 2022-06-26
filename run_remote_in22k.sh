@@ -52,6 +52,9 @@ export GOOGLE_APPLICATION_CREDENTIALS=~/gcp_credential.json
 
 source run_get_ssh_id.sh
 
+# VM_NAME=$VM_NAME
+# echo \$VM_NAME
+
 python3 main.py \
     --workdir=${WORKDIR} \
     --config=configs/$CONFIG.py \
