@@ -74,7 +74,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
 
   def init(*args):
     return model.init(*args, train=False)
-  init = jax.jit(init, backend=init_backend)
+  # init = jax.jit(init, backend=init_backend)
   logging.info('Initializing params...')
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key

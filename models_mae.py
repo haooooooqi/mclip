@@ -196,6 +196,7 @@ class Encoder1DBlock(nn.Module):
   droppath_rate: float = 0.0
   layer_id: int = None
   torch_qkv: bool = False
+  mask: Any = None
 
   @nn.compact
   def __call__(self, inputs, *, deterministic):
@@ -215,6 +216,7 @@ class Encoder1DBlock(nn.Module):
 
     # ----------------------------------------------------
     if self.torch_qkv:
+      raise NotImplementedError
       # revised, QKV
       MsaBlock = functools.partial(
         attention_util.MultiHeadDotProductAttentionQKV,
@@ -232,13 +234,13 @@ class Encoder1DBlock(nn.Module):
     #   kernel_init=msa_kernel_init,)
     # ----------------------------------------------------
 
-    x = MsaBlock(
+    msablock = MsaBlock(
         dtype=self.dtype,
         broadcast_dropout=False,
         deterministic=deterministic,
         dropout_rate=self.attention_dropout_rate,
-        num_heads=self.num_heads)(
-            x, x)
+        num_heads=self.num_heads)
+    x = msablock(x, x, mask=self.mask)
     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
@@ -290,10 +292,20 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
+    # build the mask:
+    # mask: mask for the attention weights. This should be broadcastable to the
+    #   shape `[batch..., num_heads, q_length, kv_length]`.
+    #   This can be used for incorporating causal masks.
+    #   Attention weights are masked out if their corresponding mask value
+    #   is `False`.
+    _, L, _ = inputs.shape
+    mask = jnp.tril(jnp.ones(shape=(L, L), dtype=jnp.bool_)) # make a lower triangle
+    mask = jnp.reshape(mask, (1, 1, L, L))
+
     x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      block = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -301,10 +313,10 @@ class Encoder(nn.Module):
           name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
           num_heads=self.num_heads,
           layer_id=lyr,
-          torch_qkv=self.torch_qkv)(
-              x, deterministic=not train)
+          torch_qkv=self.torch_qkv,
+          mask=mask)
+      x = block(x, deterministic=not train)
     encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
-
     return encoded
 
 
@@ -379,13 +391,12 @@ class VisionTransformer(nn.Module):
       imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
       return imgs
 
-  def compute_loss(self, imgs, pred, mask):
+  def compute_loss(self, pred, target):
     """
-    imgs: [N, H, W, 3]
-    pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
+    pred: [N, L-1, p*p*3]
+    target: [N, L-1, p*p*3]
     """
-    target = self.patchify(imgs)
+    # target = self.patchify(imgs)
     if self.norm_pix_loss:
       # target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
       mean = jnp.mean(target, axis=-1, keepdims=True)
@@ -395,7 +406,8 @@ class VisionTransformer(nn.Module):
     loss = jnp.square(pred - target)
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
-    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    # loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    loss = jnp.mean(loss)
     return loss
 
   def visualization(self, imgs, pred, mask):
@@ -420,7 +432,10 @@ class VisionTransformer(nn.Module):
 
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
-    assert use_cls_token  # kaiming: TODO: support both?
+    assert not use_cls_token  # kaiming: TODO: support both?
+
+    target = self.patchify(inputs)
+    target = target[:, 1:, :]  # shift by one
 
     x = inputs
 
@@ -443,26 +458,17 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
-
-    # If we want to add a class token, add it here.
-    if use_cls_token:
-      cls = self.param('cls', clstoken_init, (1, 1, c))
-      cls = jnp.tile(cls, [n, 1, 1])
-      x = jnp.concatenate([cls, x], axis=1)
+    # shift by one
+    x_encode = x[:, :-1, :] # remove the last one
 
     # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+    x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x_encode, train=train)
 
-    return x, mask, ids_restore
+    return x_encode, target
 
-  def apply_decoder(self, x, ids_restore, train):
+  def apply_decoder(self, x, train):
     use_cls_token=(self.classifier == 'token')
-
-    n, h, w = ids_restore.shape
-    ids_restore = jnp.reshape(ids_restore, [n, h * w])
+    assert not use_cls_token  # kaiming: TODO: support both?
 
     # apply the encoder-decoder bottleneck
     x = nn.Dense(
@@ -473,16 +479,16 @@ class VisionTransformer(nn.Module):
       name='bottleneck')(x)    
 
     # append mask token
-    num_clstokens = 1 if use_cls_token else 0
-    mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
-    mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
-    x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
-    x_ = vmapped_gather(x_, ids_restore)
+    # num_clstokens = 1 if use_cls_token else 0
+    # mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
+    # mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
+    # x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
+    # x_ = vmapped_gather(x_, ids_restore)
 
     # add decoder posembed (before cls token)
-    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
+    # x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
 
-    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
+    # x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
     x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
@@ -496,7 +502,9 @@ class VisionTransformer(nn.Module):
       name='pred')(x)
 
     # remove cls token
-    pred = x[:, num_clstokens:, :]
+    # pred = x[:, num_clstokens:, :]
+
+    pred = x
     return pred
 
   def apply_knn(self, x, labels, train):
@@ -528,16 +536,16 @@ class VisionTransformer(nn.Module):
     labels = inputs['label']
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
+    x, target = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
+    pred = self.apply_decoder(x, train=train)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
       outcome = self.visualization(imgs, pred, mask)

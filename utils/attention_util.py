@@ -13,7 +13,8 @@ from flax.linen.module import Module, compact, merge_param
 from flax.linen.initializers import zeros
 import flax.linen as nn
 
-from flax.linen.attention import dot_product_attention
+# from flax.linen.attention import dot_product_attention
+from utils.attention import dot_product_attention
 
 
 PRNGKey = Any
