@@ -503,7 +503,7 @@ class VisionTransformer(nn.Module):
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
       return
-    if self.knn.postprocess == 'tgap':
+    if self.knn.postprocess in ('tgap', 'gap'):
       x = jnp.mean(x, axis=1)
     else:
       raise NotImplementedError

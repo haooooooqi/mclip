@@ -16,7 +16,6 @@ python3 main.py \
     --config.model.sincos=False \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
-    --config.model.classifier=gap \
     --config.model.transformer.torch_qkv=False \
 
     # --config.model.transformer.num_layers=2 \
