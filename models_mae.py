@@ -410,24 +410,17 @@ class VisionTransformer(nn.Module):
     loss = jnp.mean(loss)
     return loss
 
-  def visualization(self, imgs, pred, mask):
+  def visualization(self, imgs, pred):
     """
     imgs: [N, H, W, 3]
-    pred: [N, L, p*p*3]
+    pred: [N, L-1, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
+    pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero
+
     imgs_pred = self.unpatchify(pred)
 
-    mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
-    mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
-    imgs_mask = imgs * (1 - mask)
-
-    imgs_plus = imgs * (1 - mask) + imgs_pred * mask
-
-    imgs_vis = jnp.concatenate(
-    [jnp.concatenate([imgs, imgs_mask], axis=2),
-     jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
-    axis=1)
+    imgs_vis = jnp.concatenate([imgs, imgs_pred], axis=2)
     return imgs_vis
 
   def apply_encoder(self, inputs, train):
@@ -548,7 +541,7 @@ class VisionTransformer(nn.Module):
     loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      outcome = self.visualization(imgs, pred)
     else:
       outcome = pred  # not used
 

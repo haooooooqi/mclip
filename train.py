@@ -326,7 +326,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
 
 def seed_worker(worker_id, global_seed, offset_seed=0):
     # worker_seed = torch.initial_seed() % 2**32 + jax.process_index() + offset_seed
-    worker_seed = (global_seed + worker_id + jax.process_index() + offset_seed) % 2**32
+    worker_seed = (global_seed + worker_id + jax.process_index() * 10000 + offset_seed) % 2**32
     np.random.seed(worker_seed)
     _random.seed(worker_seed)
     torch.manual_seed(worker_seed)
