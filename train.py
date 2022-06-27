@@ -74,7 +74,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
 
   def init(*args):
     return model.init(*args, train=False)
-  init = jax.jit(init, backend=init_backend)
+  # init = jax.jit(init, backend=init_backend)
   logging.info('Initializing params...')
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
@@ -539,7 +539,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     if ((epoch + 1) % config.vis_every_epochs == 0 or epoch == epoch_offset) and config.model.visualize:
       data_loader_val.sampler.set_epoch(epoch)
-      epoch = step // steps_per_epoch
+      # epoch = step // steps_per_epoch
       eval_batch = next(iter(data_loader_val))
       eval_batch = parse_batch(eval_batch)
       metrics = p_eval_step(state, eval_batch)

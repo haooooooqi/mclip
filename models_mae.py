@@ -398,6 +398,57 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
+  def compute_freq_loss(self, imgs, pred, mask):
+    """
+    imgs: [N, H, W, 3]
+    pred: [N, L, p*p*3]
+    mask: [N, L], 0 is keep, 1 is remove, 
+
+    # ------------------------------------------------------------
+    # for definition sanity
+    # x = imgs[0, :, :, 0]
+    # x_freq = jnp.fft.fftn(x, norm='ortho')
+    # norm_x = jnp.sum(x**2) ** .5
+    # norm_x_freq = jnp.sum(x_freq.real**2 + x_freq.imag ** 2) ** .5
+    # assert norm_x_freq == norm_x
+    # ------------------------------------------------------------
+    """
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+
+    imgs_pred = self.unpatchify(pred)  # [N, H, W, 3]
+
+    freq_pred = jnp.fft.fftn(imgs_pred, axes=(1, 2), norm='ortho')
+    freq_tgt = jnp.fft.fftn(imgs, axes=(1, 2), norm='ortho')
+
+    freq_diff = freq_pred - freq_tgt
+
+    # magnitude, squared
+    mag_sqr = (freq_diff.real ** 2 + freq_diff.imag ** 2)
+
+    # focal loss
+    beta = 0  # 1  # beta for focal loss (beta = 0 is Euclidean loss)
+    loss = mag_sqr ** (0.5 * (beta + 2))
+    loss = jnp.mean(loss, axis=(1, 2))  # [N, 3]
+
+    loss = jnp.mean(loss, axis=(-1))  # mean the channelss
+
+    # ------------------------------------------------------------
+    # sanity check
+    # target = self.patchify(imgs)
+    # diff = jnp.square(pred - target)
+    # loss2 = jnp.mean(diff, axis=-1)  # [N, L], mean loss per patch
+    # loss2 = jnp.mean(loss2, axis=-1)
+    # loss2 should equal to loss, if beta = 0
+    # ------------------------------------------------------------
+
+    # weight to compensate beta
+    lbd = 0.5  # 0.5  
+    loss *= lbd
+
+    loss = jnp.mean(loss)
+    return loss
+
   def visualization(self, imgs, pred, mask):
     """
     imgs: [N, H, W, 3]
@@ -538,6 +589,8 @@ class VisionTransformer(nn.Module):
 
     # compute loss
     loss = self.compute_loss(imgs, pred, mask)
+
+    self.compute_freq_loss(imgs, pred, mask)
 
     if self.visualize and not train:
       outcome = self.visualization(imgs, pred, mask)
