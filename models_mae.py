@@ -532,28 +532,30 @@ class VisionTransformer(nn.Module):
 
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
-    # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
-
+    # --------------------------------------------------------------------
+    # 1. apply the pix decoder
+    x_pix = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
     # apply the predictor
     pred_pix = nn.Dense(
       features=self.patches.size[0] * self.patches.size[1] * 3,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='pred')(x)
+      name='pred')(x_pix)
+    pred_pix = pred_pix[:, num_clstokens:, :]  # remove cls token
 
-    pred_fft = nn.Dense(
+    # --------------------------------------------------------------------
+    # 2. apply the fft decoder
+    x_frq = Encoder(name='TransformerDecoderFrq', **self.decoder.transformer, prefix='decoder_frq')(x, train=train)
+    pred_frq = nn.Dense(
       features=self.patches.size[0] * self.patches.size[1] * 3,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='pred_fft')(x)
+      name='pred_frq')(x_frq)    
+    pred_frq = pred_frq[:, num_clstokens:, :]  # remove cls token
 
-    # remove cls token
-    pred_pix = pred_pix[:, num_clstokens:, :]
-    pred_fft = pred_fft[:, num_clstokens:, :]
-    return pred_pix, pred_fft
+    return pred_pix, pred_frq
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -590,17 +592,17 @@ class VisionTransformer(nn.Module):
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
-    pred_pix, pred_fft = self.apply_decoder(x, ids_restore, train=train)
+    pred_pix, pred_frq = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
     loss_pix = self.compute_loss(imgs, pred_pix, mask)
-    loss_fft = self.compute_freq_loss(imgs, pred_fft, mask)
+    loss_frq = self.compute_freq_loss(imgs, pred_frq, mask)
 
-    loss = loss_pix + loss_fft
+    loss = loss_pix + loss_frq
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred_fft, mask)
+      outcome = self.visualization(imgs, pred_frq, mask)
     else:
-      outcome = pred_fft  # not used
+      outcome = pred_frq  # not used
 
     return loss, outcome, knn_accuracy
