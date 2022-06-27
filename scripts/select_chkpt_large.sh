@@ -32,7 +32,10 @@
 # debugging, 200ep
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220402_015256_kmh-tpuvm-v3-256-4_cfg_mae_large_200ep_maeDBG_batch4096_vmap_normpix_sincos_initmaev2_randuniform_normimpl_cropv3_qkvinit_patchinit'
 
-# explore
+# explore: more cls tokens
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220507_232714_kmh-tpuvm-v3-256-1_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_cls15_dbgpos'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220508_184006_kmh-tpuvm-v3-256-1_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_cls79_dbgpos'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220509_045043_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_cls147_dbgpos'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220509_045043_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_cls147_dbgpos'
+
+# explore: autoreg
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220626_063055_kmh-tpuvm-v3-256-4_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix'
