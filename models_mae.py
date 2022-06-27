@@ -409,10 +409,11 @@ class VisionTransformer(nn.Module):
     if self.num_ohem > 0:
       # remove the last ones
       _, len, _ = loss.shape
-      loss = jnp.sort(loss, axis=1)
-      loss = loss[:, len - self.num_ohem:, :]
-
-    loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
+      loss = jnp.einsum('nlc->ncl', loss)
+      loss = jax.lax.top_k(loss, self.num_ohem)[0]
+      loss = jnp.mean(loss, axis=-2)  # [N, L], mean loss per patch
+    else:
+      loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
     # loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     loss = jnp.mean(loss)
