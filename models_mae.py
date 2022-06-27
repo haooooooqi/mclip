@@ -341,6 +341,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  num_ohem: int = 0
 
   def random_mask(self, x):
     
@@ -404,6 +405,13 @@ class VisionTransformer(nn.Module):
       target = (target - mean) / (var + 1.e-6)**.5
 
     loss = jnp.square(pred - target)
+
+    if self.num_ohem > 0:
+      # remove the last ones
+      _, len, _ = loss.shape
+      loss = jnp.sort(loss, axis=1)
+      loss = loss[:, len - self.num_ohem:, :]
+
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
     # loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches

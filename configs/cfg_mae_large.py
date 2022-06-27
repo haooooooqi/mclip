@@ -48,6 +48,7 @@ def get_config():
   config.model.transformer.droppath_rate = 0.0
   # config.model.transformer.num_layers = 24
   config.model.classifier='gap'
+  config.model.num_ohem = 0
 
   config.model.decoder = ml_collections.ConfigDict()
   config.model.decoder.hidden_size = 512
