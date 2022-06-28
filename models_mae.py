@@ -257,6 +257,72 @@ class Encoder1DBlock(nn.Module):
     return x + y
 
 
+class EncoderFFTBlock(nn.Module):
+  """Transformer encoder layer.
+
+  Attributes:
+    inputs: input data.
+    mlp_dim: dimension of the mlp on top of attention block.
+    dtype: the dtype of the computation (default: float32).
+    dropout_rate: dropout rate.
+    attention_dropout_rate: dropout for attention heads.
+    deterministic: bool, deterministic or not (to apply dropout).
+    num_heads: Number of heads in nn.MultiHeadDotProductAttention
+  """
+
+  mlp_dim: int
+  num_heads: int
+  dtype: Dtype = jnp.float32
+  dropout_rate: float = 0.1
+  attention_dropout_rate: float = 0.1
+  droppath_rate: float = 0.0
+  layer_id: int = None
+  torch_qkv: bool = False
+
+  @nn.compact
+  def __call__(self, inputs, *, deterministic):
+    """Applies EncoderFFTBlock module.
+    """
+
+    # Attention block.
+    assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
+    x = nn.LayerNorm(dtype=self.dtype)(inputs)
+
+    # ----------------------------------------------------
+    N, L, C = x.shape
+    H = W = int(L**.5)
+    assert H * W == L
+    x = jnp.reshape(x, [N, H, W, C])
+    x_fft = jnp.fft.fft2(x, norm='ortho', axes=(1, 2))  # complex64
+
+    # x_fft = (x_fft.real ** 2 + x_fft.imag ** 2) ** .5  # float32
+    psi = self.param('psi', fixed_gaussian_init, [H, W, C])  # float32
+
+    x_fft = x_fft * psi
+    x_ifft = jnp.fft.ifft2(x_fft, norm='ortho', axes=(1, 2))
+
+    x = x_ifft.real  # keep the real part
+    x = jnp.reshape(x, [N, L, C])
+    # ----------------------------------------------------
+
+    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+    # droppath
+    x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
+    x = x + inputs
+
+    # MLP block.
+    y = nn.LayerNorm(dtype=self.dtype)(x)
+    y = MlpBlock(
+        mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        )(y, deterministic=deterministic)
+    # droppath
+    y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
+
+    return x + y
+
+
 class Encoder(nn.Module):
   """Transformer Model Encoder for sequence to sequence translation.
 
@@ -276,6 +342,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   torch_qkv: bool = False
+  block: Any = Encoder1DBlock
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -293,7 +360,7 @@ class Encoder(nn.Module):
     x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      x = self.block(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -546,14 +613,15 @@ class VisionTransformer(nn.Module):
 
     # --------------------------------------------------------------------
     # 2. apply the fft decoder
-    x_frq = Encoder(name='TransformerDecoderFrq', **self.decoder.transformer, prefix='decoder_frq')(x, train=train)
+    x_frq = x[:, num_clstokens:, :]  # remove cls token for FFT
+
+    x_frq = Encoder(name='TransformerDecoderFrq', **self.decoder.transformer, prefix='decoder_frq', block=EncoderFFTBlock)(x_frq, train=train)
     pred_frq = nn.Dense(
       features=self.patches.size[0] * self.patches.size[1] * 3,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       name='pred_frq')(x_frq)    
-    pred_frq = pred_frq[:, num_clstokens:, :]  # remove cls token
 
     return pred_pix, pred_frq
 
