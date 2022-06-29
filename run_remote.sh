@@ -11,12 +11,12 @@ dp=0.3
 pdp=0.0
 beta2=0.999
 
-partitions=1
+partitions=2
 
 pft=0  # predictor layers for ft
 stopg=0  # number of stopgrad blocks
 
-vitsize=huge1x_p16
+vitsize=huge2x_p16
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
