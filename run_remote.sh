@@ -15,7 +15,7 @@ PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_061006_kmh-tpuvm-v3-256-2_c
 
 for layers in {3..24}
 do
-echo 'layers: $layers' 
+echo 'layers: '$layers 
 # ------------------------------------------------
 
 freeze=$layers-1  # freeze all but one
