@@ -63,6 +63,7 @@ def get_config():
   config.model = mae.get_config()
   
   config.model.transformer.torch_qkv = False  # the torch qkv format (one conv for qkv); JAX default is torch_qkv=False
+  config.model.freeze_layers = 0
 
   # optimizer config
   config.opt_type = 'adamw'
@@ -116,6 +117,7 @@ def get_config():
   config.init_backend = 'tpu'
 
   # utils
+  config.pretrain_dir = ''
   config.resume_dir = ''
   config.vis_every_epochs = 20.
 

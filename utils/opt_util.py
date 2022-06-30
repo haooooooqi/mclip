@@ -53,6 +53,25 @@ def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
+# filter layerwise
+# ---------------------------------------------------------
+def trainable_layerwise(path: Tuple[Any], val: jnp.ndarray, config: Any):
+    """Filter for layerwise training."""
+    del val
+
+    name = '.'.join(path)
+
+    name_enc = 'encoderblock_{:02d}.'.format(config.model.transformer.num_layers - 1)
+    name_dec = 'decoderblock_rev{:02d}.'.format(config.model.decoder.transformer.num_layers - 1)
+    name_bot = 'bottleneck_dec{:02d}'.format(config.model.decoder.transformer.num_layers)
+
+    if name_enc in name or name_dec in name or name_bot in name:
+        return True
+    
+    return False
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):

@@ -14,6 +14,7 @@
 
 import functools
 from typing import Any, Callable, Optional, Tuple
+from absl import logging
 
 import jax
 import jax.numpy as jnp
@@ -208,6 +209,7 @@ class Encoder1DBlock(nn.Module):
     Returns:
       output after transformer encoder block.
     """
+    logging.info('Running: {}'.format(self.name))
 
     # Attention block.
     assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
@@ -276,6 +278,8 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   torch_qkv: bool = False
+  reverse_index: bool = False
+  freeze_layers: int = 0
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -293,16 +297,23 @@ class Encoder(nn.Module):
     x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
+      if self.reverse_index:
+        name=self.prefix + 'block_rev{:02d}'.format(self.num_layers - 1 - lyr)
+      else:
+        name=self.prefix + 'block_{:02d}'.format(lyr)
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
           droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
+          name=name,  # 'encoderblock_'
           num_heads=self.num_heads,
           layer_id=lyr,
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
+      if self.freeze_layers == lyr + 1:
+        logging.info('Stop grad after: {}'.format(name))
+        x = jax.lax.stop_gradient(x)
     encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
 
     return encoded
@@ -329,6 +340,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  freeze_layers: int = 0
 
   def random_mask(self, x):
     
@@ -454,7 +466,7 @@ class VisionTransformer(nn.Module):
       x = jnp.concatenate([cls, x], axis=1)
 
     # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+    x = Encoder(name='Transformer', **self.transformer, prefix='encoder', freeze_layers=self.freeze_layers)(x, train=train)
 
     return x, mask, ids_restore
 
@@ -470,7 +482,8 @@ class VisionTransformer(nn.Module):
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='bottleneck')(x)    
+      name='bottleneck_dec{:02d}'.format(self.decoder.transformer.num_layers)
+      )(x)    
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
@@ -485,7 +498,7 @@ class VisionTransformer(nn.Module):
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder', reverse_index=True, freeze_layers=0)(x, train=train)
 
     # apply the predictor
     x = nn.Dense(
@@ -524,6 +537,8 @@ class VisionTransformer(nn.Module):
 
   @nn.compact
   def __call__(self, inputs, *, train):
+    assert self.transformer.num_layers == self.decoder.transformer.num_layers  # hack
+
     imgs = inputs['image']
     labels = inputs['label']
 

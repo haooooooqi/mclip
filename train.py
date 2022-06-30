@@ -50,6 +50,8 @@ from utils import opt_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
+from utils import state_utils
+from utils import checkpoint_util
 
 import torch
 
@@ -302,12 +304,23 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   else:
     mask = None
   # logging.info('Apply weight decay: {}'.format(mask))
+  logging.info('Apply weight decay: {}'.format(state_utils.str_flatten_dict(mask)))
 
-  # tx = getattr(optax, config.opt_type)  # optax.adamw
+  tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
   tx = tx(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
-  tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
+
+  if config.model.freeze_layers > 0:
+    mask_trainable = opt_util.filter_parameters(params, functools.partial(opt_util.trainable_layerwise, config=config))
+    logging.info('Trainable: {}'.format(state_utils.str_flatten_dict(mask_trainable)))
+    tx = adamw_util.masked(inner=tx, mask=mask_trainable)
+  else:
+    # tx = getattr(adamw_util, config.opt_type)  # optax.adamw
+    # tx = tx(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+    tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
+
   if config.ema:
+    raise NotImplementedError
     ema_tx = optax.ema(decay=config.ema_decay, debias=False)
     ema_state = ema_tx.init(flax.core.frozen_dict.FrozenDict({'params': params, **variables_states}))
   else:
@@ -426,7 +439,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
-  state = restore_checkpoint(state, workdir if config.resume_dir == '' else config.resume_dir)
+
+  if config.resume_dir != '':
+    state = restore_checkpoint(state, config.resume_dir)
+  elif config.pretrain_dir != '':
+    logging.info('Loading from pre-training:')
+    state = checkpoint_util.load_from_pretrain(state, config.pretrain_dir)
+
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
 
@@ -539,7 +558,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     if ((epoch + 1) % config.vis_every_epochs == 0 or epoch == epoch_offset) and config.model.visualize:
       data_loader_val.sampler.set_epoch(epoch)
-      epoch = step // steps_per_epoch
+      # epoch = step // steps_per_epoch
       eval_batch = next(iter(data_loader_val))
       eval_batch = parse_batch(eval_batch)
       metrics = p_eval_step(state, eval_batch)
