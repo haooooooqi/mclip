@@ -11,11 +11,11 @@ import sys
 def timeout(signum, frame):
   logging_util.verbose_on()
   logging.info('Time out.')
-  logging_util.verbose_off()
-  try:
-    multihost_utils.sync_global_devices(f'timeout')
-  except:
-    sys.exit()
+  # logging_util.verbose_off()
+  # try:
+  #   multihost_utils.sync_global_devices(f'timeout')
+  # except:
+  #   sys.exit()
   sys.exit()
 
 

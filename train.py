@@ -344,7 +344,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     train_state=state_shape,
     partitioner=partitioner,
     checkpoints_dir=workdir,
-    keep=None,  # TODO: move to config
+    keep=50,  # TODO: move to config
   )
   
   if config.resume_dir != '':
@@ -434,10 +434,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         logging.info('Initial compilation completed.')
         start_time = time.time()  # log the time after compilation
 
-      if i > 10:
-        logging.info('break for debug')
-        break
-
       if config.get('log_every_steps'):
         train_metrics.append(metrics)
         if (step + 1) % config.log_every_steps == 0:
@@ -484,14 +480,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     if (epoch + 1) % config.save_every_epochs == 0 or epoch + 1 == int(config.num_epochs):
       logging.info('Saving checkpoint: {}'.format(workdir))
-      
+
+      logging_util.verbose_on()  # hack: turn it on      
       signal.signal(signal.SIGALRM, timeout_util.timeout)
-      signal.alarm(2)  # turn on
+      signal.alarm(900)  # turn on, crash after 15min
       try:
         checkpointer.save(state)
+        # while True: pass
       except:
         return  # crash
       signal.alarm(0)  # turn off
+      logging_util.verbose_off()  # hack: turn it on
 
   # Wait until computations are done before exiting
   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()

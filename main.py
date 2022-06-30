@@ -77,8 +77,7 @@ def main(argv):
 
   logging_util.verbose_on()
   logging.info('To quit.')
-  multihost_utils.sync_global_devices(f'quit')
-  time.sleep(10)
+  time.sleep(1)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 VM_NAME=kmh-tpuvm-v3-512-2
-# VM_NAME=kmh-tpuvm-v3-256-4
+# VM_NAME=kmh-tpuvm-v3-256-3
 echo $VM_NAME
 
 # ------------------------------------------------
@@ -19,7 +19,7 @@ cd $STAGEDIR
 echo 'Current dir: '`pwd`
 # ------------------------------------------------
 
-for loop in {1..2}
+for loop in {1..20}
 do
 
     for seed in 0
