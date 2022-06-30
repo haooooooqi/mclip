@@ -1,7 +1,7 @@
 # run remote
 
 lr=1.0e-4
-ep=800
+ep=100
 batch=4096
 mask=0.75
 
