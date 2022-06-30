@@ -7,12 +7,17 @@ mask=0.75
 
 seed=100
 
-layers=1
+declare -i layers
+declare -i freeze
+
+layers=2
+freeze=$layers-1  # freeze all but one
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
 JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeLW_${ep}ep_b${batch}_lr${lr}_mask${mask}_wseed${seed}_${layers}layers
 RESUME_DIR=''
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_035900_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_1layers'
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -52,6 +57,7 @@ python3 main.py \
     --config.resume_dir=$RESUME_DIR \
     --config.model.transformer.num_layers=${layers} \
     --config.model.decoder.transformer.num_layers=${layers} \
+    --config.pretrain_dir=${PRETRAIN_DIR} \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
