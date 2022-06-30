@@ -5,10 +5,10 @@ ep=100
 batch=4096
 mask=0.75
 
-seed=100
-
 declare -i layers
 declare -i freeze
+declare -i seed
+
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_035900_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_1layers'
 PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_061006_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_2layers'
@@ -20,9 +20,11 @@ echo 'layers: '$layers
 
 freeze=$layers-1  # freeze all but one
 
+seed=$layers+100
+
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeLW_${ep}ep_b${batch}_lr${lr}_mask${mask}_wseed${seed}_${layers}layers
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeLW_${ep}ep_b${batch}_lr${lr}_mask${mask}_Lseed${seed}_${layers}layers
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
