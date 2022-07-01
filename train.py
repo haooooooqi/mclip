@@ -459,6 +459,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           train_metrics_last_t = time.time()
 
       step += 1  
+
+      # ------------------------------------------------------------
+      # save extra
+      # ------------------------------------------------------------
+      if step % 5000 == 0 or step == epoch_offset + 100:
+        logging.info('Saving exra checkpoint: {}'.format(workdir))
+        checkpointer.save(state)
+
     # ------------------------------------------------------------
     # finished one epoch: eval
     # ------------------------------------------------------------
