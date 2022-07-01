@@ -10,6 +10,7 @@ from flax.training import checkpoints
 import jax.numpy as jnp
 
 import jax.tree_util as tu
+from utils import state_utils
 
 
 def load_from_pretrain(state, pretrain_dir):
@@ -33,10 +34,14 @@ def load_from_pretrain(state, pretrain_dir):
   ignored_keys = set(named_load_params.keys()) - load_keys - missing_keys
 
   # logging.info('Loaded keys: {}'.format(load_keys))
-  logging.info('Missing keys: {}'.format(missing_keys))
-  logging.info('Ignored keys: {}'.format(ignored_keys))
+  missing_keys = list(missing_keys)
+  missing_keys.sort()
+  ignored_keys = list(ignored_keys)
+  ignored_keys.sort()
+  logging.info('Missing keys: {}'.format(state_utils.str_set(missing_keys)))
+  logging.info('Ignored keys: {}'.format(state_utils.str_set(ignored_keys)))
 
-  assert len(missing_keys) == 2 or len(missing_keys) == 4
+  # assert len(missing_keys) == 2 or len(missing_keys) == 4
 
   named_params = {}
   for k in named_state_params.keys():

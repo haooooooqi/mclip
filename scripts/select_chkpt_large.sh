@@ -42,4 +42,9 @@
 
 # explore: FFT
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_011709_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_2dec'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_065825_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_decFSPdct'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_065825_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_decFSPdct'
+
+# 100ep MAE baseline
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_165012_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_100ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
+# explore: layerwise pre-train
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_182019_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_16layers'
