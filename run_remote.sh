@@ -1,7 +1,7 @@
 # run remote
 
 lr=1.0e-4
-ep=100
+ep=200
 batch=4096
 mask=0.75
 
@@ -11,9 +11,10 @@ declare -i seed
 
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_035900_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_1layers'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_061006_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_2layers'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_061006_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_2layers'
+PRETRAIN_DIR=''
 
-for layers in {3..24}
+for layers in {1..24}
 do
 echo 'layers: '$layers 
 # ------------------------------------------------
