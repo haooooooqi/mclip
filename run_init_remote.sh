@@ -26,12 +26,12 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
 # python3 -c 'import jax; print(jax.device_count()); print(\"jax done!\")'
 # python3 -c 'import flax; print(\"flax done!\")'
 
-sudo apt-get -y update
-sudo apt-get -y install nfs-common
-sudo mkdir -p /kmh_data
+# sudo apt-get -y update
+# sudo apt-get -y install nfs-common
+# sudo mkdir -p /kmh_data
 sudo mount 10.60.38.146:/kmh_data /kmh_data
 sudo chmod go+rw /kmh_data
 ls /kmh_data
 "
 
-source ~/run_mount_data.sh
+# source ~/run_mount_data.sh

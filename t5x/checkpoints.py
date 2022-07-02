@@ -720,6 +720,8 @@ class Checkpointer(object):
           return await maybe_arr.get_async()
         return maybe_arr
 
+      logging.info('Writing: {}, {}'.format(param_info.name, param_info.shape))
+
       # Only write each chunk of a parameter from one host
       if self._use_gda or param_info.local_chunk_info.replica_id == 0:
         arr = maybe_arr
@@ -792,6 +794,7 @@ class Checkpointer(object):
                                         self._parameter_infos,
                                         state_transformation_fns))
 
+    logging.info('Running _get_state_dict_for_save...')
     state_dict_for_save = self._get_state_dict_for_save(transformed_state_dict)
 
     def _cast_arr_if_not_partitioned(maybe_arr, param_info):
@@ -799,16 +802,19 @@ class Checkpointer(object):
         return _cast(maybe_arr, self._save_dtype)
       return maybe_arr
 
+    logging.info('Running _cast_arr_if_not_partitioned...')
     state_dict_for_save['target'] = jax.tree_multimap(
         _cast_arr_if_not_partitioned, state_dict_for_save['target'],
         transformed_parameter_infos['target'])
     future_written_state = {}
     for k in state_dict_for_save.keys():
       # ensure that only 'target' is cast
+      logging.info('Saving: {}'.format(k))
       future_written_state[k] = jax.tree_multimap(
           functools.partial(_write_array, cast=(k == 'target')),
           state_dict_for_save[k], transformed_parameter_infos[k])
 
+    logging.info('Running: _run_future_tree')
     # Block until complete on this host.
     written_state_dict = _run_future_tree(future_written_state)
 
