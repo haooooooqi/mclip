@@ -44,8 +44,10 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_011709_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_2dec'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_065825_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_decFSPdct'
 
-# 100ep MAE baseline
+# 100/200/400ep MAE baseline
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_165012_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_100ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220702_062025_kmh-tpuvm-v3-256-2_cfg_mae_large_maetf_200ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220702_062042_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_400ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
 
 # explore: layerwise pre-train
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220630_182019_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_16layers'
@@ -71,7 +73,7 @@
 # gs://kmh-gcp/checkpoints/flax/20220701_034151_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed117_17layers/checkpoint_31200
 # gs://kmh-gcp/checkpoints/flax/20220701_051318_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed118_18layers/checkpoint_31200
 # gs://kmh-gcp/checkpoints/flax/20220701_065419_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed119_19layers/checkpoint_31200
-PRETRAIN_DIR="gs://kmh-gcp/checkpoints/flax/20220701_083628_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed120_20layers"
+# PRETRAIN_DIR="gs://kmh-gcp/checkpoints/flax/20220701_083628_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed120_20layers"
 # gs://kmh-gcp/checkpoints/flax/20220701_102256_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed121_21layers/checkpoint_31200
 # gs://kmh-gcp/checkpoints/flax/20220701_121453_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed122_22layers/checkpoint_31200
 # gs://kmh-gcp/checkpoints/flax/20220701_141157_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed123_23layers/checkpoint_31200
