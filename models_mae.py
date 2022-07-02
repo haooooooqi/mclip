@@ -342,6 +342,7 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
   num_ohem: int = 0
+  pred_offset: int = 0
 
   def random_mask(self, x):
     
@@ -403,6 +404,10 @@ class VisionTransformer(nn.Module):
       mean = jnp.mean(target, axis=-1, keepdims=True)
       var = jnp.var(target, axis=-1, keepdims=True)
       target = (target - mean) / (var + 1.e-6)**.5
+
+    if self.pred_offset > 0:
+      target = target[:, self.pred_offset:, :] # remove the head
+      pred = pred[:, :-self.pred_offset, :]  # remove the tail
 
     loss = jnp.square(pred - target)
 
