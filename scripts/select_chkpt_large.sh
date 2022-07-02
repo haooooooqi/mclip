@@ -52,5 +52,27 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220701_081101_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_24layers'
 
 # Lseed
+# gs://kmh-gcp/checkpoints/flax/20220701_102256_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed121_21layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_061006_kmh-tpuvm-v3-256-2_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_wseed100_2layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_143435_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed103_3layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_150406_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed104_4layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_153610_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed105_5layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_161226_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed106_6layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_165255_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed107_7layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_173753_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed108_8layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_182700_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed109_9layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_192044_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed110_10layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_201843_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed111_11layers/checkpoint_31200
+# PRETRAIN_DIR="gs://kmh-gcp/checkpoints/flax/20220630_212104_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed112_12layers"
+# gs://kmh-gcp/checkpoints/flax/20220630_222800_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed113_13layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220630_233922_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed114_14layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220701_005456_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed115_15layers/checkpoint_31200
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220701_021526_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed116_16layers'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220701_161455_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed124_24layers'
+# gs://kmh-gcp/checkpoints/flax/20220701_034151_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed117_17layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220701_051318_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed118_18layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220701_065419_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed119_19layers/checkpoint_31200
+PRETRAIN_DIR="gs://kmh-gcp/checkpoints/flax/20220701_083628_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed120_20layers"
+# gs://kmh-gcp/checkpoints/flax/20220701_102256_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed121_21layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220701_121453_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed122_22layers/checkpoint_31200
+# gs://kmh-gcp/checkpoints/flax/20220701_141157_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed123_23layers/checkpoint_31200
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220701_161455_kmh-tpuvm-v3-256-3_cfg_mae_large_maeLW_100ep_b4096_lr1.0e-4_mask0.75_Lseed124_24layers'
