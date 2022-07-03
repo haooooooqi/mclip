@@ -64,6 +64,10 @@ def get_config():
   
   config.model.transformer.torch_qkv = False  # the torch qkv format (one conv for qkv); JAX default is torch_qkv=False
 
+  config.model.num_ohem = 0
+  config.model.pred_offset = 0
+  config.model.shuffle = False  # fixed shuffle
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()

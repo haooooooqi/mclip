@@ -19,6 +19,7 @@ python3 main.py \
     --config.model.transformer.torch_qkv=False \
     --config.model.num_ohem=64 \
     --config.model.pred_offset=16 \
+    --config.model.shuffle=True \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

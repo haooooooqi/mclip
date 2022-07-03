@@ -139,6 +139,33 @@ class AddPositionEmbs(nn.Module):
     return output
 
 
+class FixedShuffler(nn.Module):
+  """ Perform fixed shuffle
+  """
+  length: int
+
+  def setup(self):
+    rng = self.make_rng('dropout')
+    noise = random.uniform(rng, shape=(self.length,))
+
+    ids_shuffle = jnp.argsort(noise, axis=0)
+    ids_restore = jnp.argsort(ids_shuffle, axis=0)
+
+    self.ids_shuffle = self.variable('ids', 'ids_shuffle',
+      lambda s: ids_shuffle, ids_shuffle.shape)
+
+    self.ids_restore = self.variable('ids', 'ids_restore',
+      lambda s: ids_restore, ids_restore.shape)
+    
+  def __call__(self, inputs):
+    outputs = inputs[:, self.ids_shuffle.value, :]
+    return outputs
+
+  def restore(self, inputs):
+    outputs = inputs[:, self.ids_restore.value, :]
+    return outputs
+
+
 class MlpBlock(nn.Module):
   """Transformer MLP / feed-forward block."""
 
@@ -343,6 +370,7 @@ class VisionTransformer(nn.Module):
   knn: Any = None
   num_ohem: int = 0
   pred_offset: int = 0
+  shuffle: bool = False
 
   def random_mask(self, x):
     
@@ -441,7 +469,6 @@ class VisionTransformer(nn.Module):
     assert not use_cls_token  # kaiming: TODO: support both?
 
     target = self.patchify(inputs)
-    target = target[:, 1:, :]  # shift by one
 
     x = inputs
 
@@ -464,8 +491,15 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
+    # apply fixed shuffle
+    if self.shuffle:
+      shuffler = FixedShuffler(length=h * w)
+      x = shuffler(x)
+      target = shuffler(target)
+
     # shift by one
     x_encode = x[:, :-1, :] # remove the last one
+    target = target[:, 1:, :]  # remove the first one
 
     # apply the encoder
     x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x_encode, train=train)
