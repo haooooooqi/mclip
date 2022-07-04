@@ -489,7 +489,7 @@ class VisionTransformer(nn.Module):
 
     x = jnp.concatenate([x[:, :1, :], x_], axis=1) if use_cls_token else x_
 
-    logging.info('Between.')
+    logging.info('To partial encoder.')
     x = enc(x, train=train, start=self.freeze_layers, end=None)
 
     return x, mask, ids_restore
