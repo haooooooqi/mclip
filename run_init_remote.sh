@@ -38,6 +38,11 @@ sudo mkdir -p /kmh_data
 sudo mount 10.60.38.146:/kmh_data /kmh_data
 sudo chmod go+rw /kmh_data
 ls /kmh_data
+
+sudo mkdir -p /kmh_data2
+sudo mount 10.48.3.170:/kmh_data2 /kmh_data2
+sudo chmod go+rw /kmh_data2
+ls /kmh_data2
 "
 
 # source ~/run_mount_data.sh
