@@ -281,7 +281,27 @@ class Encoder(nn.Module):
   reverse_index: bool = False
   freeze_layers: int = 0
 
-  @nn.compact
+  def setup(self):
+    self.blocks = ()
+    for lyr in range(self.num_layers):
+      if self.reverse_index:
+        name = self.prefix + 'block_rev{:02d}'.format(self.num_layers - 1 - lyr)
+      else:
+        name = self.prefix + 'block_{:02d}'.format(lyr)
+      blk = Encoder1DBlock(
+          mlp_dim=self.mlp_dim,
+          dropout_rate=self.dropout_rate,
+          attention_dropout_rate=self.attention_dropout_rate,
+          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
+          name=name,  # 'encoderblock_'
+          num_heads=self.num_heads,
+          layer_id=lyr,
+          torch_qkv=self.torch_qkv)
+      self.blocks += (blk,)
+
+    self.norm = nn.LayerNorm(name=self.prefix + '_norm')
+
+  # @nn.compact
   def __call__(self, inputs, *, train):
     """Applies Transformer model on the inputs.
 
@@ -297,24 +317,12 @@ class Encoder(nn.Module):
     x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
-      if self.reverse_index:
-        name=self.prefix + 'block_rev{:02d}'.format(self.num_layers - 1 - lyr)
-      else:
-        name=self.prefix + 'block_{:02d}'.format(lyr)
-      x = Encoder1DBlock(
-          mlp_dim=self.mlp_dim,
-          dropout_rate=self.dropout_rate,
-          attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=name,  # 'encoderblock_'
-          num_heads=self.num_heads,
-          layer_id=lyr,
-          torch_qkv=self.torch_qkv)(
-              x, deterministic=not train)
+      blk = self.blocks[lyr]
+      x = blk(x, deterministic=not train)
       if self.freeze_layers == lyr + 1:
-        logging.info('Stop grad after: {}'.format(name))
+        logging.info('Stop grad after: {}'.format(blk.name))
         x = jax.lax.stop_gradient(x)
-    encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
+    encoded = self.norm(x)  # 'encoder_norm'
 
     return encoded
 
@@ -464,6 +472,8 @@ class VisionTransformer(nn.Module):
       cls = self.param('cls', clstoken_init, (1, 1, c))
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
+
+    # now, it it the full length sequence
 
     # apply the encoder
     x = Encoder(name='Transformer', **self.transformer, prefix='encoder', freeze_layers=self.freeze_layers)(x, train=train)
