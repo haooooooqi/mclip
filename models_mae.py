@@ -371,6 +371,7 @@ class VisionTransformer(nn.Module):
   num_ohem: int = 0
   pred_offset: int = 0
   shuffle: bool = False
+  reorder: bool = False
 
   def random_mask(self, x):
     
@@ -464,6 +465,31 @@ class VisionTransformer(nn.Module):
     imgs_vis = jnp.concatenate([imgs, imgs_pred], axis=2)
     return imgs_vis
 
+  def apply_reorder(self, x, target):
+    assert x.shape[:2] == target.shape[:2]
+
+    rng = self.make_rng('dropout')
+
+    id = jax.random.randint(rng, shape=(), minval=0, maxval=4)  # maxval: exclusive
+
+    xt = jnp.concatenate([x, target], axis=-1)
+
+    N, L, C = xt.shape
+    H = W = int(L**.5)
+    assert H * W == L
+
+    # yt = jnp.einsum('nhwc->nwhc', xt.reshape([N, H, W, C])).reshape([N, L, C])  # transpose
+
+    xt_new = jnp.where((id <= 1),
+      jnp.where((id == 0), xt, xt[:, ::-1, :]),
+      jnp.where((id == 2),
+        jnp.einsum('nhwc->nwhc', xt.reshape([N, H, W, C])).reshape([N, L, C]),
+        jnp.einsum('nhwc->nwhc', xt.reshape([N, H, W, C])).reshape([N, L, C])[:, ::-1, :]),
+    )
+
+    x, target = jnp.split(xt_new, (x.shape[-1],), axis=-1)
+    return x, target
+
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert not use_cls_token  # kaiming: TODO: support both?
@@ -496,6 +522,10 @@ class VisionTransformer(nn.Module):
       shuffler = FixedShuffler(length=h * w)
       x = shuffler(x)
       target = shuffler(target)
+
+    if self.reorder:
+      assert not self.shuffle
+      x, target = self.apply_reorder(x, target)
 
     # shift by one
     x_encode = x[:, :-1, :] # remove the last one

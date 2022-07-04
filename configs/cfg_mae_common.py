@@ -67,6 +67,7 @@ def get_config():
   config.model.num_ohem = 0
   config.model.pred_offset = 0
   config.model.shuffle = False  # fixed shuffle
+  config.model.reorder = False  # fixed reorder
 
   # optimizer config
   config.opt_type = 'adamw'
