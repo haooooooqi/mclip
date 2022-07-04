@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import functools
+from re import X
 from typing import Any, Callable, Optional, Tuple
 from absl import logging
 
@@ -302,7 +303,7 @@ class Encoder(nn.Module):
     self.norm = nn.LayerNorm(name=self.prefix + '_norm')
 
   # @nn.compact
-  def __call__(self, inputs, *, train):
+  def __call__(self, inputs, *, train, start=0, end=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -316,15 +317,19 @@ class Encoder(nn.Module):
 
     x = inputs
     # Input Encoder
-    for lyr in range(self.num_layers):
+    end = end if end is not None else self.num_layers
+    for lyr in range(start, end):
+      # logging.info('Running: {}, lyr{}'.format(self.name, lyr))
       blk = self.blocks[lyr]
       x = blk(x, deterministic=not train)
       if self.freeze_layers == lyr + 1:
         logging.info('Stop grad after: {}'.format(blk.name))
         x = jax.lax.stop_gradient(x)
-    encoded = self.norm(x)  # 'encoder_norm'
+    
+    if end == self.num_layers:
+      x = self.norm(x)  # 'encoder_norm'
 
-    return encoded
+    return x
 
 
 def gather(x, ids):
@@ -463,10 +468,6 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
-
     # If we want to add a class token, add it here.
     if use_cls_token:
       cls = self.param('cls', clstoken_init, (1, 1, c))
@@ -474,9 +475,22 @@ class VisionTransformer(nn.Module):
       x = jnp.concatenate([cls, x], axis=1)
 
     # now, it it the full length sequence
+    enc = Encoder(name='Transformer', **self.transformer, prefix='encoder', freeze_layers=self.freeze_layers)
 
-    # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder', freeze_layers=self.freeze_layers)(x, train=train)
+    # apply the encoder ot full length
+    x = enc(x, train=train, start=0, end=self.freeze_layers)
+
+    # now, make the partial
+    x_ = x[:, 1:, :] if use_cls_token else x
+
+    # masking: length -> length * mask_ratio
+    x_, mask, ids_restore = self.random_mask(x_)
+    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+
+    x = jnp.concatenate([x[:, :1, :], x_], axis=1) if use_cls_token else x_
+
+    logging.info('Between.')
+    x = enc(x, train=train, start=self.freeze_layers, end=None)
 
     return x, mask, ids_restore
 
