@@ -42,6 +42,7 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220702_192830_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off10'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_013446_kmh-tpuvm-v3-256-2_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off20'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_034447_kmh-tpuvm-v3-256-3_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_shuffle'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220704_072621_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_reorder'
 
 # explore: FFT
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_011709_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_2dec'
@@ -87,4 +88,4 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_095146_kmh-tpuvm-v3-256-4_cfg_mae_large_maeLW_200ep_b4096_lr1.0e-4_mask0.75_Lseed124_24layers'
 
 # Lseed, 400ep
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220704_005654_kmh-tpuvm-v3-256-6_cfg_mae_large_maeLW_400ep_b4096_lr1.0e-4_mask0.75_Lseed116_16layers'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220704_005654_kmh-tpuvm-v3-256-6_cfg_mae_large_maeLW_400ep_b4096_lr1.0e-4_mask0.75_Lseed116_16layers'
