@@ -1,4 +1,4 @@
-CODEDIR=/checkpoint/xinleic/mae_jax/repo_tune
+CODEDIR=/checkpoint/xinleic/mae_jax/repo_vit
 
 TPU_NAME=xinleic-mae-iv-0
 ZONE=europe-west4-a
@@ -21,7 +21,7 @@ seed=0
 partitions=1
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=large_v2
+JOBNAME=large_lr1e-4_v1
 
 PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 WORKDIR=${PRETRAIN_DIR}/tune
@@ -70,3 +70,12 @@ python3 main.py \
     --config.torchload.data_dir=/datasets/imagenet-1k \
     2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
+
+# kill all the jobs
+gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --worker all \
+  --command "
+sudo pkill python
+sudo lsof -w /dev/accel0 | grep .py | awk '{print \"sudo kill -9 \" \$2}' | sh
+sudo rm -f /tmp/libtpu_lockfile
+mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
+"
