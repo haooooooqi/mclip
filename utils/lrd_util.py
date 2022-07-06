@@ -24,27 +24,32 @@ def _layerwise_lr_decay(
     """Get the layerwise lr decay rate based on name."""
     del val
 
-    layer_name = '.'.join(path)
-
-    if layer_name.startswith('Transformer.encoderblock_'):
-        layer_idx = path[1][len('encoderblock_'):]  # e.g., '01'
-        layer_idx = int(layer_idx)
-    elif layer_name.startswith('embedding.'):  # patch embedding
-        layer_idx = -1  # -1: layer before the zero-th block
-    elif layer_name.startswith('posembed_'):  # position embedding
-        layer_idx = -1
-    elif layer_name.startswith('cls'):  # cls token
-        layer_idx = -1
-    elif layer_name.startswith('Transformer.encoder_norm.'):  # last norm
-        layer_idx = num_layers
-    elif layer_name.startswith('fc_norm.'):
-        layer_idx = num_layers
-    elif layer_name.startswith('head.'):
-        layer_idx = num_layers
+    layer_name = path[1]
+    # print("Layer Name: ", layer_name)
+    if layer_name.startswith("downsample_layers"):
+        stage_id = int((layer_name.split('downsample_layers'))[1][0])
+        # print("Stage ID: ", stage_id)
+        if stage_id == 0:
+            layer_idx = 0
+        elif stage_id == 1 or stage_id == 2:
+            layer_idx = stage_id + 1
+        elif stage_id == 3:
+            layer_idx = 12
+    elif layer_name.startswith("stages"):
+        stage_block_id = (layer_name.split('stages'))[1]
+        stage_id = int(stage_block_id[0])
+        block_id = int(stage_block_id[1:])
+        # print("Stage Block ID: ", stage_id, " : ", block_id)
+        if stage_id == 0 or stage_id == 1:
+            layer_idx = stage_id + 1
+        elif stage_id == 2:
+            layer_idx = 3 + block_id // 3 
+        elif stage_id == 3:
+            layer_idx = 12
     else:
-        raise NotImplementedError('lrd not defined: {}'.format(layer_name))
+        layer_idx = num_layers + 1
 
-    layer_lrd = lr_decay ** (num_layers - layer_idx)
+    layer_lrd = lr_decay ** (num_layers + 1 - layer_idx)
     return layer_lrd
 
 

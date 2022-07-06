@@ -284,7 +284,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
 
   if config.rescale_head_init != 1.:
     params = flax.core.frozen_dict.unfreeze(params)
-    params['head']['kernel'] *= config.rescale_head_init
+    params['ConvNeXt_0']['head']['kernel'] *= config.rescale_head_init
     params = flax.core.frozen_dict.freeze(params)
 
   # stds = jax.tree_util.tree_map(lambda x: np.array(x).std(), params)
@@ -305,7 +305,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   tx = tx(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
 
   if config.learning_rate_decay < 1.:
-    lrd_func = lrd_util.lrd_func(config.model.transformer.num_layers, config.learning_rate_decay)
+    lrd_func = lrd_util.lrd_func(12, config.learning_rate_decay)
     lrd = lrd_util.filter_parameters(params, lrd_func)
     # logging.info('Apply lrd: {}'.format(lrd))
     tx = optax._src.combine.chain(tx, lrd_util.scale_by_lrd(lrd))

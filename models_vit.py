@@ -19,6 +19,7 @@ import flax.linen as nn
 import jax.numpy as jnp
 
 from utils import attention_util
+from models_convnext import ConvNeXt
 
 
 Array = Any
@@ -296,51 +297,18 @@ class VisionTransformer(nn.Module):
 
     # Transformer.
     n, h, w, c = x.shape
-    x = jnp.reshape(x, [n, h * w, c])
+    # x = jnp.reshape(x, [n, h * w, c])
 
-    # If we want to add a class token, add it here.
-    if self.classifier in {'token', 'tgap'}:
-      cls = self.param('cls', clstoken_init, (1, 1, c))
-      cls = jnp.tile(cls, [n, 1, 1])
-      x = jnp.concatenate([cls, x], axis=1)
+    # Reshape
+    p, q = self.patches.size
+    h, w = x.shape[1], x.shape[2]
 
-    # we add posemb here
-    x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    x = jnp.reshape(x, (x.shape[0], h, w, p, q, 4))
+    x = jnp.einsum('nhwpqc->nhpwqc', x)
+    x = jnp.reshape(x, (x.shape[0], h * p, w * q, 4))
+    x = x[:, :, :, :3]
 
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'))
+    # apply the encoder
+    x = ConvNeXt(depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.1)(x, train=train)
 
-    if self.classifier == 'token':
-      x = x[:, 0]
-    elif self.classifier == 'tgap':
-      x = x[:, 1:]
-      x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-      x = nn.LayerNorm(name='fc_norm')(x)
-    elif self.classifier == 'gap':
-      x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-      x = nn.LayerNorm(name='fc_norm')(x)
-    else:
-      raise ValueError(f'Invalid classifier={self.classifier}')
-
-    if self.representation_size is not None:
-      x = nn.Dense(features=self.representation_size, name='pre_logits')(x)
-      x = nn.tanh(x)
-    else:
-      x = IdentityLayer(name='pre_logits')(x)
-    
-    # ------------------------------------------------
-    # debugging BN or state
-    # x = nn.BatchNorm(
-    #   use_running_average=not train,
-    #   momentum=0.9,
-    #   epsilon=1e-5,
-    #   name='bn_debug'
-    # )(x)
-    # ------------------------------------------------
-
-    if self.num_classes:
-      x = nn.Dense(
-        features=self.num_classes,
-        name='head',
-        kernel_init=head_kernel_init
-      )(x)
     return x
