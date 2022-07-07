@@ -1,4 +1,4 @@
-VM_NAME=kmh-tpuvm-v3-256-7
+VM_NAME=kmh-tpuvm-v3-256-6
 
 source ~/run_mount_data.sh
 source ~/run_mount_data.sh
@@ -45,4 +45,13 @@ sudo chmod go+rw /kmh_data2
 ls /kmh_data2
 "
 
+gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
+    --worker=all --command "
+sudo apt-get -y update
+sudo apt-get -y install nfs-common
+sudo mkdir -p /kmh_data
+sudo mount 10.60.38.146:/kmh_data /kmh_data
+sudo chmod go+rw /kmh_data
+ls /kmh_data
+"
 # source ~/run_mount_data.sh
