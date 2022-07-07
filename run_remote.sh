@@ -1,7 +1,7 @@
 # run remote
 
 lr=1.0e-4
-ep=100
+ep=800
 batch=4096
 mask=0.75
 
@@ -11,7 +11,7 @@ dec_layers=4
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeARdec_${ep}ep_b${batch}_lr${lr}_mask${mask}_wseed${seed}_NOnormpix_${dec_layers}dec
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeARdec_${ep}ep_b${batch}_lr${lr}_mask${mask}_wseed${seed}_normpix_maskloss_${dec_layers}dec
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -41,7 +41,7 @@ python3 main.py \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
     --config.save_every_epochs=50 \
-    --config.model.norm_pix_loss=False \
+    --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
     --config.model.mask_ratio=${mask} \
     --config.aug.crop_ver=v2 \

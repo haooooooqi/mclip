@@ -403,8 +403,10 @@ class VisionTransformer(nn.Module):
     loss = jnp.square(pred - target)
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
-    loss = jnp.mean(loss)
-    # loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    # loss = jnp.mean(loss)
+
+    mask = mask[:, 1:]  # remove the first one, (mask is aligned with target)
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
   def visualization(self, imgs, pred, mask):
