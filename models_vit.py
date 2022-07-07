@@ -390,6 +390,7 @@ class VisionTransformer(nn.Module):
   predictor: Any = None
   adapter: Any = None
   sincos: bool = True
+  classifier_input_partition: str = 'embed'
 
   def apply_predictor(self, x, train, img_shape):
 
@@ -486,7 +487,7 @@ class VisionTransformer(nn.Module):
       x = t5x.layers.Dense(
           features=self.num_classes,
           kernel_init=lambda *args: head_kernel_init(*args) * self.rescale_head_init,
-          kernel_axes=('embed', 'classes'),
+          kernel_axes=(self.classifier_input_partition, 'classes'),
           name='head',
       )(x)
 

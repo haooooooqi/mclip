@@ -923,6 +923,8 @@ class PjitPartitioner(BasePjitPartitioner):
 def revise_axes(name, axes, force_partition_states_data_first=False, partition_states_for_encoder_only=False):
   if not name.startswith('state/param_states'):
     return axes
+  if name.endswith('head/kernel'):
+    return axes
   if partition_states_for_encoder_only and 'Transformer/encoderblock' not in name:
     return axes
   if type(axes) is not PartitionSpec:

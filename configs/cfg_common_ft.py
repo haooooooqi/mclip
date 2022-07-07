@@ -87,6 +87,9 @@ def get_config():
   config.model.adapter.mlp_dim_ratio = 1 / 4.
   config.model.adapter.rescale_init = 1e-4
 
+  # the logical axis of the input dimension in the classifier kernel
+  config.model.classifier_input_partition = "embed"
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()
