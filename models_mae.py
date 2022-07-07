@@ -196,6 +196,7 @@ class Encoder1DBlock(nn.Module):
   droppath_rate: float = 0.0
   layer_id: int = None
   torch_qkv: bool = False
+  mask: Any = None
 
   @nn.compact
   def __call__(self, inputs, *, deterministic):
@@ -215,6 +216,7 @@ class Encoder1DBlock(nn.Module):
 
     # ----------------------------------------------------
     if self.torch_qkv:
+      raise NotImplementedError
       # revised, QKV
       MsaBlock = functools.partial(
         attention_util.MultiHeadDotProductAttentionQKV,
@@ -238,7 +240,7 @@ class Encoder1DBlock(nn.Module):
         deterministic=deterministic,
         dropout_rate=self.attention_dropout_rate,
         num_heads=self.num_heads)(
-            x, x)
+            x, x, mask=self.mask)
     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
@@ -276,6 +278,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   torch_qkv: bool = False
+  mask: Any = None
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -301,8 +304,8 @@ class Encoder(nn.Module):
           name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
           num_heads=self.num_heads,
           layer_id=lyr,
-          torch_qkv=self.torch_qkv)(
-              x, deterministic=not train)
+          torch_qkv=self.torch_qkv,
+          mask=self.mask,)(x, deterministic=not train)
     encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
 
     return encoded
@@ -393,10 +396,15 @@ class VisionTransformer(nn.Module):
       var = jnp.var(target, axis=-1, keepdims=True)
       target = (target - mean) / (var + 1.e-6)**.5
 
+    # handle the autoreg case
+    pred = pred[:, :-1, :] # remove the last one
+    target = target[:, 1:, :]  # remove the first one
+
     loss = jnp.square(pred - target)
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
-    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    loss = jnp.mean(loss)
+    # loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
   def visualization(self, imgs, pred, mask):
@@ -405,6 +413,10 @@ class VisionTransformer(nn.Module):
     pred: [N, L, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
+    # handle the autoreg case
+    pred = pred[:, :-1, :] # remove the last one
+    pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero
+
     imgs_pred = self.unpatchify(pred)
 
     mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
@@ -517,8 +529,20 @@ class VisionTransformer(nn.Module):
     start_token = jnp.tile(start_token, [n, 1, 1])
     x = jnp.concatenate([start_token, x], axis=1)
 
+    len = h * w
+    mask = jnp.tril(jnp.ones(shape=(len, len), dtype=jnp.bool_)) # make a lower triangle
+    mask = jnp.reshape(mask, (1, 1, len, len))
+
     # apply the encoder
-    x = Encoder(name='TransformerAutoreg', **self.autoreg.transformer, prefix='autoreg')(x, train=train)
+    x = Encoder(name='TransformerAutoreg', **self.autoreg.transformer, prefix='autoreg', mask=mask)(x, train=train)
+
+    # apply the predictor
+    x = nn.Dense(
+      features=self.patches.size[0] * self.patches.size[1] * 3,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='autoreg_pred')(x)
 
     return x
 
