@@ -58,6 +58,16 @@ def get_config():
   config.model.decoder.transformer.dropout_rate = 0.0
   config.model.decoder.transformer.droppath_rate = 0.0
 
+  config.model.autoreg = ml_collections.ConfigDict()
+  config.model.autoreg.hidden_size = 512
+  config.model.autoreg.transformer = ml_collections.ConfigDict()
+  config.model.autoreg.transformer.mlp_dim = config.model.autoreg.hidden_size * 4
+  config.model.autoreg.transformer.num_heads = 16
+  config.model.autoreg.transformer.num_layers = 8
+  config.model.autoreg.transformer.attention_dropout_rate = 0.0
+  config.model.autoreg.transformer.dropout_rate = 0.0
+  config.model.autoreg.transformer.droppath_rate = 0.0
+
   # opt config
   config.opt_mu_dtype = 'float32'
 

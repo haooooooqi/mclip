@@ -327,6 +327,7 @@ class VisionTransformer(nn.Module):
   classifier: str = 'token'
   dtype: Any = jnp.float32
   decoder: Any = None
+  autoreg: Any = None
   visualize: bool = False
   knn: Any = None
 
@@ -489,7 +490,8 @@ class VisionTransformer(nn.Module):
 
     # apply the predictor
     x = nn.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
+      # features=self.patches.size[0] * self.patches.size[1] * 3,
+      features=self.autoreg.hidden_size,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
@@ -498,6 +500,28 @@ class VisionTransformer(nn.Module):
     # remove cls token
     pred = x[:, num_clstokens:, :]
     return pred
+
+  def apply_autoreg(self, x, train):
+    n = x.shape[0]
+    h = w = int(x.shape[1]**.5)
+    assert h * w == x.shape[1]
+
+    # add decoder posembed (before cls token)
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=False, img_shape=(h, w, self.autoreg.hidden_size), name='posembed_autoreg')(x)
+
+    # shift by one
+    x = x[:, :-1, :] # remove the last one
+
+    # use start_token
+    start_token = self.param('start_token', masktoken_init, (1, 1, self.autoreg.hidden_size))
+    start_token = jnp.tile(start_token, [n, 1, 1])
+    x = jnp.concatenate([start_token, x], axis=1)
+
+    # apply the encoder
+    x = Encoder(name='TransformerAutoreg', **self.autoreg.transformer, prefix='autoreg')(x, train=train)
+
+    return x
+
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -535,6 +559,9 @@ class VisionTransformer(nn.Module):
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
+
+    # apply autoregressive decoder
+    pred = self.apply_autoreg(pred, train=train)
 
     # compute loss
     loss = self.compute_loss(imgs, pred, mask)
