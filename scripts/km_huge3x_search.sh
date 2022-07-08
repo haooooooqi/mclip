@@ -7,25 +7,26 @@ ZONE=europe-west4-a
 # configs
 ################################################################
 
-vitsize=large
+vitsize=huge3x
 batch=1024
 lr=1e-3
 wd=0.05
 lrd=0.75
 ep=50
 warm=5
-dp=0.2
+dp=0.3
 beta2=0.999
 
 seed=0
-partitions=1
+partitions=8
+partition_states=True
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=large_baseline
+JOBNAME=${vitsize}
 
-PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-WORKDIR=${PRETRAIN_DIR}/tune
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}/tune
+PRETRAIN_DIR=gs://kmh-gcp/checkpoints/flax/20220606_070525_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_huge3x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p4_re1.0_normpix_exwd_split_fastsave
+WORKDIR=gs://xinleic/mae_jax/checkpoints/km_tune/${JOBNAME}/default
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/km_tune/${JOBNAME}/default
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
@@ -66,7 +67,7 @@ python3 main.py \
     --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
-    --config.partitioning.partition_states=False \
+    --config.partitioning.partition_states=${partition_states} \
     --config.torchload.data_dir=/datasets/imagenet-1k \
     2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
 " 2>&1 | tee -a $LOGDIR/finetune.log

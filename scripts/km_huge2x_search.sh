@@ -7,25 +7,25 @@ ZONE=europe-west4-a
 # configs
 ################################################################
 
-vitsize=large
+vitsize=huge2x
 batch=1024
 lr=1e-3
-wd=0.05
+wd=0.03
 lrd=0.75
 ep=50
 warm=5
-dp=0.2
+dp=0.3
 beta2=0.999
 
 seed=0
-partitions=1
+partitions=8
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=large_baseline
+JOBNAME=${vitsize}
 
-PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-WORKDIR=${PRETRAIN_DIR}/tune
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}/tune
+PRETRAIN_DIR=gs://kmh-gcp/checkpoints/flax/20220624_234419_maet5x_kmh-tpuvm-v3-256-2_cfg_mae_huge2x_p16_800ep_b4096_lr1e-4_mk0.75_s100_p2_re1.0_normpix_exwd_split_fastsave
+WORKDIR=gs://xinleic/mae_jax/checkpoints/km_tune/${JOBNAME}/wd@${wd}
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/km_tune/${JOBNAME}/wd@${wd}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
