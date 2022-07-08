@@ -914,7 +914,9 @@ def revise_axes(name, axes):
   if type(axes) is not PartitionSpec:
     return axes
   if len(axes) == 2:
-    if axes[0] == None and axes[1] == 'model':
+    if 'head/kernel' in name:
+      axes = PartitionSpec('model', None)  # head classes may not be divisible
+    elif axes[0] == None and axes[1] == 'model':
       axes = PartitionSpec('data', 'model')
     elif axes[0] == 'model' and axes[1] == None:
       axes = PartitionSpec('model', 'data')

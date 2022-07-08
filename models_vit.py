@@ -471,7 +471,8 @@ class VisionTransformer(nn.Module):
       x = t5x.layers.Dense(
           features=self.num_classes,
           kernel_init=lambda *args: head_kernel_init(*args) * self.rescale_head_init,
-          kernel_axes=('embed', 'classes'),
+          # kernel_axes=('embed', 'classes'),
+          kernel_axes=('mlp', 'classes'),  # rename axis to force partition
           name='head',
       )(x)
 

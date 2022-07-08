@@ -29,12 +29,12 @@ python3 main.py \
     --config.model.adapter.on_use=True \
     --config.partitioning.partition_states=True \
     --config.model.stopgrad_blocks=0 \
-    --config.torchload.data_dir='/datasets/imagenet-1k' \
+    --config.torchload.data_dir='/datasets/imagenet-22k' \
+    --config.model.num_classes=21841 \
 
     # --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220527_064059_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_1600ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adamw32_finetune/20220622_010421_kmh-tpuvm-v3-256-3_cfg_vit_large_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s0_beta0.999_p1st_stop0_helloworld' \
     # --config.pretrain_fmt=t5x \
 
-    # --config.model.num_classes=21841 \
 
     # --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220526_052256_maet5x_kmh-tpuvm-v3-256-1_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1_vis' \
     # --config.pretrain_fmt='t5x' \
