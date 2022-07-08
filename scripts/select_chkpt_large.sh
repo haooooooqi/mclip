@@ -40,9 +40,13 @@
 # explore: autoreg
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220626_063055_kmh-tpuvm-v3-256-4_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220702_192830_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off10'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_013446_kmh-tpuvm-v3-256-2_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off20'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_013446_kmh-tpuvm-v3-256-2_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off20'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220703_034447_kmh-tpuvm-v3-256-3_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_shuffle'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220704_072621_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_reorder'
+
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220707_053220_kmh-tpuvm-v3-256-2_cfg_mae_large_maeARdec_800ep_b4096_lr1.0e-4_mask0.75_wseed100_NOnormpix_4dec'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220707_053352_kmh-tpuvm-v3-256-3_cfg_mae_large_maeARdec_800ep_b4096_lr1.0e-4_mask0.75_wseed100_normpix_4dec'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220707_061028_kmh-tpuvm-v3-256-4_cfg_mae_large_maeARdec_800ep_b4096_lr1.0e-4_mask0.75_wseed100_normpix_maskloss_4dec'
 
 # explore: FFT
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220628_011709_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_FFT_2dec'

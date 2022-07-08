@@ -1,14 +1,14 @@
 echo 'code dir: '$STAGEDIR
 
-seed=0
+# seed=0
 batch=1024
-# lr=1e-3
-lrd=1.0  # 0.75
+lr=1e-3
+lrd=0.75  # 0.75
 ep=50
-dp=0.3
+dp=0.2
 ema=0.9999
 
-vitsize=huge1x_p16
+vitsize=large
 CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 
@@ -63,7 +63,7 @@ python3 main.py \
     --config.ema=True \
     --config.ema_eval=True \
     --config.ema_decay=${ema} \
-    --config.model.classifier=gap \
+    --config.model.classifier=tgap \
 2>&1 | tee $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/finetune.log
 
