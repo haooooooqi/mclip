@@ -255,6 +255,7 @@ class Encoder(nn.Module):
   prefix: str = 'encoder'
   rescale_init: float = 1.0
   remat_policy: str = 'none'
+  use_bfloat16: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -293,6 +294,7 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           rescale_init=self.rescale_init,
+          dtype=(jnp.bfloat16 if self.use_bfloat16 else jnp.float32)
         )(x, deterministic)
     encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
 
