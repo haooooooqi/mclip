@@ -369,6 +369,7 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
   num_ohem: int = 0
+  num_pred: int = 1
   pred_offset: int = 0
   shuffle: bool = False
   reorder: bool = False
@@ -422,7 +423,7 @@ class VisionTransformer(nn.Module):
       imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
       return imgs
 
-  def compute_loss(self, pred, target):
+  def compute_loss(self, pred, target, offset=0):
     """
     pred: [N, L-1, p*p*3]
     target: [N, L-1, p*p*3]
@@ -434,9 +435,11 @@ class VisionTransformer(nn.Module):
       var = jnp.var(target, axis=-1, keepdims=True)
       target = (target - mean) / (var + 1.e-6)**.5
 
-    if self.pred_offset > 0:
-      target = target[:, self.pred_offset:, :] # remove the head
-      pred = pred[:, :-self.pred_offset, :]  # remove the tail
+    offset += self.pred_offset
+
+    if offset > 0:
+      target = target[:, offset:, :] # remove the head
+      pred = pred[:, :-offset, :]  # remove the tail
 
     loss = jnp.square(pred - target)
 
@@ -565,7 +568,7 @@ class VisionTransformer(nn.Module):
 
     # apply the predictor
     x = nn.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
+      features=self.patches.size[0] * self.patches.size[1] * 3 * self.num_pred,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
@@ -599,6 +602,16 @@ class VisionTransformer(nn.Module):
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
     return knn_accuracy
 
+  def compute_multi_loss(self, pred, target):
+    preds = jnp.split(pred, self.num_pred, axis=-1)
+
+    pred = preds[0]  # for visualization
+
+    sum_loss = 0
+    for i in range(self.num_pred):
+      sum_loss += self.compute_loss(preds[i], target, offset=i)
+    loss = sum_loss / self.num_pred
+    return loss, pred
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -615,7 +628,8 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, train=train)
 
     # compute loss
-    loss = self.compute_loss(pred, target)
+    loss, pred = self.compute_multi_loss(pred, target)
+    # loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
       outcome = self.visualization(imgs, pred)

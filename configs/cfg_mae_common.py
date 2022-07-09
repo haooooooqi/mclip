@@ -69,6 +69,8 @@ def get_config():
   config.model.shuffle = False  # fixed shuffle
   config.model.reorder = False  # fixed reorder
 
+  config.model.num_pred = 0
+
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()
