@@ -282,33 +282,8 @@ class VisionTransformer(nn.Module):
     assert self.resnet == None
 
     n, h, w, c = x.shape
-    # We can merge s2d+emb into a single conv; it's the same.
-    x = nn.Conv(
-        features=self.hidden_size,
-        kernel_size=self.patches.size,
-        strides=self.patches.size,
-        padding='VALID',
-        name='embedding',
-        kernel_init=patch_kernel_init,
-        bias_init=patch_bias_init,
-        )(x)
-
-    # Here, x is a grid of embeddings.
-
-    # Transformer.
-    n, h, w, c = x.shape
-    # x = jnp.reshape(x, [n, h * w, c])
-
-    # Reshape
-    p, q = self.patches.size
-    h, w = x.shape[1], x.shape[2]
-
-    x = jnp.reshape(x, (x.shape[0], h, w, p, q, 4))
-    x = jnp.einsum('nhwpqc->nhpwqc', x)
-    x = jnp.reshape(x, (x.shape[0], h * p, w * q, 4))
-    x = x[:, :, :, :3]
 
     # apply the encoder
-    x = ConvNeXt(depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.1)(x, train=train)
+    x = ConvNeXt(depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.2)(x, train=train)
 
     return x
