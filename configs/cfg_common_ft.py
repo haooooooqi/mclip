@@ -70,7 +70,7 @@ def get_config():
   # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
   # stopgrad_blocks=0 is for sanity check
   config.model.stopgrad_blocks = -1
-  config.model.sincos = False
+  config.model.sincos = True
 
   config.model.predictor = ml_collections.ConfigDict()
   config.model.predictor.hidden_size = 768
