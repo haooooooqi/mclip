@@ -51,4 +51,7 @@ def get_config():
   # opt config
   config.opt_mu_dtype = 'float32'  # bfloat16, float32
 
+  # partition
+  config.partitioning.partition_states = True
+
   return config

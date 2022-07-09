@@ -12,17 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import logging
 import functools
 from typing import Any, Callable, Optional, Tuple
 
 import flax.linen as nn
+from flax.linen.partitioning import remat
 import jax
 import jax.numpy as jnp
-from flax.linen.partitioning import remat
+import jax.random as random
 
 import t5x.layers
 
-from utils import attention_util
+from utils import posembed_util
+from utils import initializers_util
 
 
 Array = Any
@@ -66,16 +69,74 @@ class IdentityLayer(nn.Module):
     return x
 
 
+# class AddPositionEmbs(nn.Module):
+#   """Adds (optionally learned) positional embeddings to the inputs.
+
+#   Attributes:
+#     posemb_init: positional embedding initializer.
+#   """
+
+#   posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+
+#   @nn.compact
+#   def __call__(self, inputs):
+#     """Applies AddPositionEmbs module.
+
+#     By default this layer uses a fixed sinusoidal embedding table. If a
+#     learned position embedding is desired, pass an initializer to
+#     posemb_init.
+
+#     Args:
+#       inputs: Inputs to the layer.
+
+#     Returns:
+#       Output tensor with shape `(bs, timesteps, in_dim)`.
+#     """
+#     # inputs.shape is (batch_size, seq_len, emb_dim).
+#     assert inputs.ndim == 3, ('Number of dimensions should be 3,'
+#                               ' but it is: %d' % inputs.ndim)
+#     pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
+#     pe = t5x.layers.param_with_axes(
+#         'pos_embedding',
+#         self.posemb_init,
+#         pos_emb_shape,
+#         jnp.float32,
+#         axes=('_null0', 'length', 'embed'))
+#     return inputs + pe
+
+
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
-
-  Attributes:
-    posemb_init: positional embedding initializer.
   """
+  sincos: bool
+  use_cls_token: bool
+  img_shape: Shape  # [h, w, c]
+  dtype: Any = jnp.float32
 
-  posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+  def setup(self):
+    h, w, c = self.img_shape
 
-  @nn.compact
+    num_clstokens = 1 if self.use_cls_token else 0
+    pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
+
+    if not self.sincos:
+      raise NotImplementedError
+      init_fn = posemb_init
+    else:
+      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
+      init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
+
+    self.pe = t5x.layers.param_with_axes(
+        'pos_embedding',
+        init_fn,
+        pos_emb_shape,
+        jnp.float32,
+        axes=('_null0', 'length', 'embed'))
+
+    # kaiming: in MAE, we should always set posembed for cls_token as zero.
+    # when loading for finetuning, this zero posembed can be tuned.
+    # but this is not addressed here if sincos=False
+
   def __call__(self, inputs):
     """Applies AddPositionEmbs module.
 
@@ -89,17 +150,16 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    # inputs.shape is (batch_size, seq_len, emb_dim).
-    assert inputs.ndim == 3, ('Number of dimensions should be 3,'
-                              ' but it is: %d' % inputs.ndim)
-    pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
-    pe = t5x.layers.param_with_axes(
-        'pos_embedding',
-        self.posemb_init,
-        pos_emb_shape,
-        jnp.float32,
-        axes=('_null0', 'length', 'embed'))
-    return inputs + pe
+    
+    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
+
+    if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
+      output = inputs + pe[:, 1:, :]
+    else:
+      assert inputs.shape[1] == pe.shape[1]
+      output = inputs + pe
+
+    return output
 
 
 class MlpBlock(nn.Module):
@@ -163,6 +223,21 @@ class Encoder1DBlock(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   layer_id: int = None
+  adapter: Any = None
+
+  def apply_adapter(self, x, deterministic, name):
+    adater_mlp_dim = round(self.adapter.mlp_dim_ratio * x.shape[-1])
+    z = MlpBlock(
+        mlp_dim=adater_mlp_dim,
+        dtype=self.dtype,
+        dropout_rate=0.,
+        kernel_init=lambda *args: mlp_kernel_init(*args) * self.adapter.rescale_init,
+        bias_init=mlp_bias_init,
+        name=name,
+        )(x, deterministic=deterministic)
+    x = z + x
+    return x
+
 
   @nn.compact
   def __call__(self, inputs, deterministic):
@@ -200,7 +275,13 @@ class Encoder1DBlock(nn.Module):
         dropout_rate=self.attention_dropout_rate,
         num_heads=self.num_heads,
     )(x, x)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+    assert self.dropout_rate == 0.
+    # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)  # not used
+
+    # adapter
+    if self.adapter and self.adapter.on_use:
+      x = self.apply_adapter(x, deterministic, name='adapter_msa')
+
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
     x = x + inputs
@@ -212,6 +293,11 @@ class Encoder1DBlock(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         )(y, deterministic=deterministic)
+
+    # adapter
+    if self.adapter and self.adapter.on_use:
+      y = self.apply_adapter(y, deterministic, name='adapter_mlp')
+
     # droppath
     y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
 
@@ -240,7 +326,7 @@ class Encoder(nn.Module):
   remat_policy: str = 'none'
 
   @nn.compact
-  def __call__(self, inputs, *, train, encoder_norm=True):
+  def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -265,12 +351,7 @@ class Encoder(nn.Module):
           static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
 
     x = inputs
-    # x = AddPositionEmbs(
-    #     posemb_init=posemb_init,  # from BERT.
-    #     name='posembed_input')(
-    #         inputs)
-    # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
-
+    
     # Input Encoder
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
@@ -281,8 +362,8 @@ class Encoder(nn.Module):
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1),
-          name='encoderblock_{:02d}'.format(lyr),
+          droppath_rate=dp,
+          name=name,
           num_heads=self.num_heads,
           layer_id=lyr,
           adapter=self.adapter,
@@ -295,6 +376,18 @@ class Encoder(nn.Module):
     return encoded
 
 
+# the implemention for pjit
+def gather_by_einsum(x, ids):
+  """kaiming: vmap + gather is slow with pjit; use einsum instead
+  Args:
+    x: [N, L, ...]
+    ids: [N, K]
+  """
+  mat = jax.nn.one_hot(ids, x.shape[1])  # [N, K, L]
+  x = jnp.einsum('nl...,nkl->nk...', x, mat)
+  return x
+
+
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
@@ -303,10 +396,62 @@ class VisionTransformer(nn.Module):
   transformer: Any
   hidden_size: int
   resnet: Optional[Any] = None
-  representation_size: Optional[int] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
   rescale_head_init: float = 1.
+  stopgrad_blocks: int = -1
+  predictor: Any = None
+  adapter: Any = None
+  sincos: bool = True
+  split: Any = None
+
+  def apply_predictor(self, x, train, img_shape):
+
+    # apply the encoder-predictor bottleneck
+    x = t5x.layers.Dense(
+      features=self.predictor.hidden_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
+      name='pred_bottleneck')(x)
+
+    # add predictor pos emb
+    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_cls_token = (self.classifier in {'token', 'tgap'})
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
+
+    # apply the predictor
+    x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
+
+    return x
+
+  def apply_split(self, x):
+    """ x: [N, L, C] -> [N * 4, L // 4, C] """
+    N, L, C = x.shape
+
+    rng = self.make_rng('dropout')
+    noise = random.uniform(rng, shape=x.shape[:2])
+
+    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
+    # ids_restore = jnp.argsort(ids_shuffle, axis=1)
+
+    x_shuffled = gather_by_einsum(x, ids_shuffle)
+    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
+
+    splits = self.split.splits
+    x_shuffled = jnp.reshape(x_shuffled, [N * splits, L // splits, C])
+    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
+
+    return x_shuffled
+
+  def undo_split(self, x):
+    """ x: [N * 4, C] -> [N, C] """
+    N, C = x.shape
+    splits = self.split.splits
+    x = jnp.reshape(x, [N // splits, splits, C])
+    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'embed'))
+    x = jnp.mean(x, axis=1)  # average pool
+    return x
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -342,62 +487,51 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
+    # we add posemb here
+    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_cls_token = (self.classifier in {'token', 'tgap'})
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
+
+    if self.split and self.split.on_use:
+      x = self.apply_split(x)
+      n = x.shape[0]
+
     # If we want to add a class token, add it here.
     if self.classifier in {'token', 'tgap'}:
       cls = t5x.layers.param_with_axes('cls', clstoken_init, (1, 1, c), jnp.float32, axes=('_null0', '_null1', 'embed'))
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
 
-    # we add posemb here
-    x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
+    use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
+    x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
+      x, train=train, encoder_norm=use_encoder_norm, stopgrad_blocks=self.stopgrad_blocks)
 
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'))
+    if not self.adapter.on_use and self.stopgrad_blocks == self.transformer.num_layers + 1:
+      x = jax.lax.stop_gradient(x)
+      logging.info('Stop gradient.')
+
+    # apply the predictor
+    if self.predictor.transformer.num_layers > 0:
+      x = self.apply_predictor(x, train, img_shape=(h, w,))
 
     if self.classifier == 'token':
       x = x[:, 0]
     elif self.classifier == 'tgap':
       x = x[:, 1:]
       x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-      # x = nn.LayerNorm(name='fc_norm')(x)
       x = t5x.layers.LayerNorm(name='fc_norm', axes=('embed',))(x)
     elif self.classifier == 'gap':
       x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-      # x = nn.LayerNorm(name='fc_norm')(x)
       x = t5x.layers.LayerNorm(name='fc_norm', axes=('embed',))(x)
     else:
       raise ValueError(f'Invalid classifier={self.classifier}')
 
-    if self.representation_size is not None:
-      raise NotImplementedError 
-      # x = nn.Dense(features=self.representation_size, name='pre_logits')(x)
-      # x = nn.tanh(x)
-    else:
-      x = IdentityLayer(name='pre_logits')(x)
+    x = IdentityLayer(name='pre_logits')(x)
     
-    # ------------------------------------------------
-    # debugging BN or state
-    # x = nn.BatchNorm(
-    #   use_running_average=not train,
-    #   momentum=0.9,
-    #   epsilon=1e-5,
-    #   name='bn_debug'
-    # )(x)
-    # var_bias = t5x.layers.variable_with_axes(
-    #   'debug_vars', 'var_bias',
-    #   lambda s: jnp.zeros(s, jnp.float32),
-    #   (x.shape[-1],),
-    #   axes=('embed',))
-    # x += var_bias.value
-    # if train:
-    #   var_bias.value += 1.
-    # ------------------------------------------------
+    if self.split and self.split.on_use:
+      x = self.undo_split(x)
 
     if self.num_classes:
-      # x = nn.Dense(
-      #   features=self.num_classes,
-      #   name='head',
-      #   kernel_init=head_kernel_init
-      # )(x)      
       x = t5x.layers.Dense(
           features=self.num_classes,
           kernel_init=lambda *args: head_kernel_init(*args) * self.rescale_head_init,

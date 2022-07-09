@@ -67,6 +67,29 @@ def get_config():
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.1
   config.model.num_classes = 1000
+  # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)
+  # stopgrad_blocks=0 is for sanity check
+  config.model.stopgrad_blocks = -1
+  config.model.sincos = False
+
+  config.model.predictor = ml_collections.ConfigDict()
+  config.model.predictor.hidden_size = 768
+  config.model.predictor.transformer = ml_collections.ConfigDict()
+  config.model.predictor.transformer.mlp_dim = config.model.predictor.hidden_size * 4
+  config.model.predictor.transformer.num_heads = 16
+  config.model.predictor.transformer.num_layers = 2
+  config.model.predictor.transformer.attention_dropout_rate = 0.0
+  config.model.predictor.transformer.dropout_rate = 0.0
+  config.model.predictor.transformer.droppath_rate = 0.0
+
+  config.model.adapter = ml_collections.ConfigDict()
+  config.model.adapter.on_use = False
+  config.model.adapter.mlp_dim_ratio = 1 / 4.
+  config.model.adapter.rescale_init = 1e-4
+
+  config.model.split = ml_collections.ConfigDict()
+  config.model.split.on_use = False
+  config.model.split.splits = 4
 
   # optimizer config
   config.opt_type = 'adamw'
@@ -78,6 +101,7 @@ def get_config():
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm, cls, posembed)
+  config.exclude_wd_adapter = False
 
   # config.ema = False
   # config.ema_decay = 0.9999
@@ -146,6 +170,5 @@ def get_config():
   config.partitioning.partition_states_for_encoder_only = False
   config.partitioning.activation_partitioning_dims = 1
   config.partitioning.parameter_partitioning_dims = 1
-
 
   return config

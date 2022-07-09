@@ -106,7 +106,7 @@ def merge_state(state_dict: Mapping[str, Any],
 
   for k in from_scratch_state_flat:
     if k not in state_dict_flat:
-      logging.warning("Initializing param=%s from scratch", k)
+      # logging.warning("Initializing param=%s from scratch", k)
       state_dict_flat[k] = from_scratch_state_flat[k]
 
   state_dict = traverse_util.unflatten_dict(state_dict_flat, sep="/")
@@ -213,3 +213,7 @@ def apply_assignment_map(ckpt_optimizer_state,
                      unused_patterns_str + "}")
 
   return traverse_util.unflatten_dict(result, sep="/")
+
+
+def str_flatten_dict(state_dict):
+  return '{\n' + ',\n'.join(['{}: {}'.format(k, v) for k, v in flatten_state_dict(state_dict).items()]) + '\n}'

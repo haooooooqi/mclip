@@ -7,6 +7,7 @@ import functools
 
 import t5x.train_state as train_state_lib
 import t5x.optimizers
+import t5x.state_utils
 
 from utils import opt_util
 from utils import lrd_util
@@ -15,14 +16,14 @@ from utils import adamw
 
 def init_fn(rng, image_size, model):
   input_shape = (1, image_size, image_size, 3)
-  variables = model.init({'params': rng}, jnp.ones(input_shape, model.dtype), train=False)
+  variables = model.init({'params': rng, 'dropout': jax.random.PRNGKey(0)}, jnp.ones(input_shape, model.dtype), train=False)
   return variables
 
 
 def init_shapes(rng, image_size, model):
   input_shape = (1, image_size, image_size, 3)
   init = functools.partial(model.init, train=False) 
-  variables_shape = jax.eval_shape(init, {'params': rng}, jnp.ones(input_shape, model.dtype))
+  variables_shape = jax.eval_shape(init, {'params': rng, 'dropout': jax.random.PRNGKey(0)}, jnp.ones(input_shape, model.dtype))
   return variables_shape
 
 
@@ -53,17 +54,45 @@ def create_optimizer(config, params_names, steps_per_epoch):
 
   if config.opt_type in {'adamw', 'adarows'}:
     # optional: exclude some wd
-    mask = None
+    mask_wd = None
     if config.exclude_wd:
-      mask = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
+      # True: apply wd; False: not apply wd
+      mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
-        opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed)
+        opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed),
       )
-    # logging.info('Apply wd: {}'.format(mask))
+      if config.exclude_wd_adapter:
+        mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and not y), mask_wd,
+          opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+        )
 
-    opt = getattr(adamw, config.opt_type)  # optax.adamw
+    # logging.info('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)))
+
+    if config.model.stopgrad_blocks >= 0 or config.model.adapter.on_use:
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+
+      # True: trainable; False: frozen
+      mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
+
+      if config.model.stopgrad_blocks >= 0:
+        mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
+
+      if config.model.adapter.on_use:  # if adapter is on, we freeze the pre-trained backbone by default
+        mask_adapter_trainable = jax.tree_map(lambda x, y: bool(x or y),  # OR, not AND
+          opt_util.filter_parameters(params_names, opt_util.filter_head),
+          opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+        )
+        mask_trainable = jax.tree_map(lambda x, y: (x and y), mask_adapter_trainable, mask_trainable)
+
+      logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
+
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    else:
+      opt = getattr(adamw, config.opt_type)
+
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
-    opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+    opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask_wd, mu_dtype=getattr(jnp, config.opt_mu_dtype))
     opt.metric_learning_rate_fn = learning_rate_fn  # hack for metric
 
     if config.learning_rate_decay < 1.:
@@ -71,10 +100,9 @@ def create_optimizer(config, params_names, steps_per_epoch):
       lrd = lrd_util.filter_parameters(params_names, lrd_func)
       # logging.info('Apply lrd: {}'.format(lrd))
       opt.optax_optimizer = optax._src.combine.chain(opt.optax_optimizer, lrd_util.scale_by_lrd(lrd))
+    return opt
   else:
     raise NotImplementedError
-
-  return opt
 
 
 def create_train_state(config, model, image_size, steps_per_epoch, partitioner):

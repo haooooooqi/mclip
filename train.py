@@ -69,10 +69,10 @@ def build_dataloaders(config, partitioner, rng_torch):
   num_shards = data_layout.num_shards
 
   # ----------------------------------------
-  logging_util.verbose_on()
-  logging_util.sync_and_delay()
-  logging.info(data_layout)
-  logging_util.verbose_off()
+  # logging_util.verbose_on()
+  # logging_util.sync_and_delay()
+  # logging.info(data_layout)
+  # logging_util.verbose_off()
   # ----------------------------------------
 
   if config.batch_size % num_shards > 0:
@@ -205,7 +205,7 @@ def train_step(state, batch, model, rng):
 
 def eval_step(state, batch, model):
   variables = {'params': state.params, **state.flax_mutables}
-  logits = model.apply(variables, batch['image'], train=False, mutable=False)
+  logits = model.apply(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=jax.random.PRNGKey(0)))
   metrics = compute_eval_metrics(logits, batch['label'], batch['label_one_hot'])
   metrics['test_acc1'] = metrics.pop('accuracy') * 100  # rename
   metrics['perf/test_acc1'] = metrics['test_acc1']  # for comparing with pytorch
@@ -429,6 +429,10 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         if (step + 1) % config.log_every_steps == 0:
           # Wait until computations are done before exiting
           jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+
+          # x = state.params['Transformer']['encoderblock_01']['MlpBlock_0']['Dense_0']['kernel'][:5, 0]
+          # logging.info(x)
+
           train_metrics = common_utils.get_metrics(jax.tree_map(lambda x: jnp.reshape(x, (-1,)), train_metrics))
           summary = {
               f'train_{k}': float(v)

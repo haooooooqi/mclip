@@ -45,6 +45,80 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
+# freeze backbone
+# ---------------------------------------------------------
+def filter_head(path: Tuple[Any], val: jnp.ndarray):
+    """Filter to exclude cls token and pos emb."""
+    del val
+
+    # hack: sanity check
+    all_keys = [
+        'Transformer', 'cls', 'embedding', 'posembed_encoder',
+        'head', 'pred_posembed', 'pred', 'pred_bottleneck']
+    assert path[0] in all_keys
+
+    pretrained_keys = ['Transformer', 'cls', 'embedding', 'posembed_encoder']
+    trainable_keys = ['head', 'pred_posembed', 'pred', 'pred_bottleneck']
+
+    if path[0] in trainable_keys:
+        return True
+    elif path[0] in pretrained_keys:
+        return False
+    else:
+        assert False, 'key not valid: {}'.format(path[0])
+        raise NotImplementedError
+
+
+def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
+    """Filter to exclude cls token and pos emb."""
+    del val
+    name = '.'.join(path)
+    if 'adapter' in name:
+        return True
+    else:
+        return False
+
+
+def filter_block(path: Tuple[Any], val: jnp.ndarray, config: Any):
+    """Freeze/train blocks by layer_id."""
+    del val
+    
+    layer_idx = _layerwise_index(path, config.model.transformer.num_layers)
+
+    return layer_idx >= config.model.stopgrad_blocks
+    
+
+def _layerwise_index(path: Tuple[Any], num_layers: int):
+    """Get the layerwise index based on name."""
+
+    layer_name = '.'.join(path)
+
+    if layer_name.startswith('Transformer.encoderblock_'):
+        layer_idx = path[1][len('encoderblock_'):]  # e.g., '01'
+        layer_idx = int(layer_idx)
+    elif layer_name.startswith('embedding.'):  # patch embedding
+        layer_idx = 0
+    elif layer_name.startswith('posembed_'):  # position embedding
+        layer_idx = 0
+    elif layer_name.startswith('cls'):  # cls token
+        layer_idx = 0
+    elif layer_name.startswith('Transformer.encoder_norm.'):  # last norm
+        layer_idx = num_layers
+    elif layer_name.startswith('fc_norm.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('head.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('bn_debug.'):
+        layer_idx = num_layers
+    elif layer_name.startswith('pred'):
+        layer_idx = num_layers
+    else:
+        raise NotImplementedError('lrd not defined: {}'.format(layer_name))
+
+    return layer_idx
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):
