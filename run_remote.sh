@@ -13,7 +13,7 @@ dec_layers=12
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_autoreg_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed${seed}_normpix_ohem${ohem}_off${offset}_dec${dec_layers}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_autoreg_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed${seed}_normpix_ohem${ohem}_off${offset}_dec${dec_layers}_start
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -55,6 +55,7 @@ python3 main.py \
     --config.model.shuffle=False \
     --config.model.reorder=False \
     --config.model.decoder.transformer.num_layers=${dec_layers} \
+    --config.model.use_start_token=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 

@@ -21,6 +21,7 @@ python3 main.py \
     --config.model.pred_offset=16 \
     --config.model.shuffle=False \
     --config.model.reorder=True \
+    --config.model.use_start_token=True \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

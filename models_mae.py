@@ -372,6 +372,7 @@ class VisionTransformer(nn.Module):
   pred_offset: int = 0
   shuffle: bool = False
   reorder: bool = False
+  use_start_token: bool = False
 
   def random_mask(self, x):
     
@@ -531,6 +532,12 @@ class VisionTransformer(nn.Module):
     x_encode = x[:, :-1, :] # remove the last one
     target = target[:, 1:, :]  # remove the first one
 
+    if self.use_start_token:
+      # use start_token
+      start_token = self.param('start_token', masktoken_init, (1, 1, c))
+      start_token = jnp.tile(start_token, [n, 1, 1])
+      x_encode = jnp.concatenate([start_token, x_encode], axis=1)
+
     # apply the encoder
     x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x_encode, train=train)
 
@@ -573,6 +580,9 @@ class VisionTransformer(nn.Module):
 
     # remove cls token
     # pred = x[:, num_clstokens:, :]
+
+    if self.use_start_token:
+      x = x[:, 1:, :]  # remove the output at the start token
 
     pred = x
     return pred
