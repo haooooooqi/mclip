@@ -70,6 +70,7 @@ def get_config():
   config.model.reorder = False  # fixed reorder
 
   config.model.use_start_token = False  # use start_token
+  config.model.use_decoder_pos = False  # use decoder pos embed
 
   # optimizer config
   config.opt_type = 'adamw'

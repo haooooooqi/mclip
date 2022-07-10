@@ -373,6 +373,7 @@ class VisionTransformer(nn.Module):
   shuffle: bool = False
   reorder: bool = False
   use_start_token: bool = False
+  use_decoder_pos: bool = False
 
   def random_mask(self, x):
     
@@ -561,6 +562,20 @@ class VisionTransformer(nn.Module):
     # mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
     # x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
     # x_ = vmapped_gather(x_, ids_restore)
+
+    if self.use_decoder_pos:
+      assert not self.use_start_token
+      N, L, C = x.shape
+      L = x.shape[1] + 1
+      h = w = int(L**.5)
+      assert L == h * w
+      zeros = jnp.zeros(shape=[N, L, C])
+
+      posemb = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(zeros)
+
+      # use the input position?
+      posemb = posemb[:, :-1, :]
+      x += posemb
 
     # add decoder posembed (before cls token)
     # x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
