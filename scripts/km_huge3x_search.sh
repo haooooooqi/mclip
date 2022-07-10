@@ -10,7 +10,7 @@ ZONE=europe-west4-a
 vitsize=huge3x
 batch=1024
 lr=1e-3
-wd=0.05
+wd=0.03
 lrd=0.75
 ep=50
 warm=5
@@ -25,8 +25,8 @@ CONFIG=cfg_vit_${vitsize}
 JOBNAME=${vitsize}
 
 PRETRAIN_DIR=gs://kmh-gcp/checkpoints/flax/20220606_070525_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_huge3x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p4_re1.0_normpix_exwd_split_fastsave
-WORKDIR=gs://xinleic/mae_jax/checkpoints/km_tune/${JOBNAME}/default
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/km_tune/${JOBNAME}/default
+WORKDIR=gs://xinleic/mae_jax/checkpoints/km_tune/${JOBNAME}/wd@${wd}
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/km_tune/${JOBNAME}/wd@${wd}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
@@ -67,6 +67,7 @@ python3 main.py \
     --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
     --config.pretrain_fmt=t5x \
+    --config.partitioning.force_partition_states_data_first=${partition_states} \
     --config.partitioning.partition_states=${partition_states} \
     --config.torchload.data_dir=/datasets/imagenet-1k \
     2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
