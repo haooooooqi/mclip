@@ -29,6 +29,8 @@ python3 main.py \
     --config.model.adapter.on_use=True \
     --config.partitioning.partition_states=True \
     --config.model.stopgrad_blocks=0 \
+    --config.partitioning.activation_partitioning_dims=2 \
+    --config.partitioning.parameter_partitioning_dims=2 \
     --config.torchload.data_dir='/datasets/imagenet-22k' \
     --config.model.num_classes=21841 \
 

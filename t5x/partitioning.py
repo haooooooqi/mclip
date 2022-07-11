@@ -807,7 +807,10 @@ class PjitPartitioner(BasePjitPartitioner):
                params_on_devices: bool = True,
                backend: Optional[str] = None,
                logical_axis_rules: Optional[LogicalAxisRules] = None,
-               partition_states: bool = False,):
+               partition_states: bool = False,
+               activation_partitioning_dims: int = 1,
+               parameter_partitioning_dims: int = 1,
+              ):
     """PjitPartitioner constructor.
 
     See https://github.com/google-research/text-to-text-transfer-transformer/blob/main/README.mdx/user/partitioning for details.
@@ -848,7 +851,10 @@ class PjitPartitioner(BasePjitPartitioner):
         params_on_devices=params_on_devices,
         backend=backend)
     if logical_axis_rules is None:
-      logical_axis_rules = standard_logical_axis_rules()
+      logical_axis_rules = standard_logical_axis_rules(
+        activation_partitioning_dims=activation_partitioning_dims,
+        parameter_partitioning_dims=parameter_partitioning_dims
+      )
     self._logical_axis_rules = tuple(logical_axis_rules)
     self._data_axis, = flax_partitioning.logical_to_mesh_axes(
         ['batch'], logical_axis_rules)
@@ -860,7 +866,7 @@ class PjitPartitioner(BasePjitPartitioner):
       in_axis_resources,
       out_axis_resources,
       static_argnums: Union[int, Sequence[int]] = (),
-      donate_argnums: Union[int, Sequence[int]] = ()
+      donate_argnums: Union[int, Sequence[int]] = (),
   ) -> PjittedFnWithContext:
     """Partitions the function using jax.pjit."""
     pjitted = pjit(

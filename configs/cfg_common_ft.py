@@ -164,4 +164,7 @@ def get_config():
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False
 
+  config.partitioning.activation_partitioning_dims = 1
+  config.partitioning.parameter_partitioning_dims = 1
+
   return config
