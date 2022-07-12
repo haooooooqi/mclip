@@ -11,12 +11,12 @@ dp=0.2
 pdp=0.0
 beta2=0.999
 
-partitions=8
+partitions=2
 
 pft=0  # predictor layers for ft
 stopg=16  # number of stopgrad blocks
 
-vitsize=huge4x_p16 # large
+vitsize=huge3x_p16 # large
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
@@ -30,7 +30,8 @@ JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}e
 # RESUME=''
 # RESUME='gs://kmh-gcp/checkpoints/flax/20220606_004214_maet5x_kmh-tpuvm-v3-512-2_cfg_mae_huge4x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p8_re0.5_normpix_exwd_split_fastsave_finetune/20220629_164557_kmh-tpuvm-v3-512-2_cfg_vit_huge4x_p16_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s0_beta0.999_p8st_stop16_helloworld_resume2'
 # RESUME='gs://kmh-gcp/checkpoints/flax/20220606_004214_maet5x_kmh-tpuvm-v3-512-2_cfg_mae_huge4x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p8_re0.5_normpix_exwd_split_fastsave_finetune/20220701_024255_kmh-tpuvm-v3-512-2_cfg_vit_huge4x_p16_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s0_beta0.999_p8st_stop16_saveDBG'
-RESUME='gs://kmh-gcp/checkpoints/flax/20220606_004214_maet5x_kmh-tpuvm-v3-512-2_cfg_mae_huge4x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p8_re0.5_normpix_exwd_split_fastsave_finetune/20220711_162711_kmh-tpuvm-v3-256-7_cfg_vit_huge4x_p16_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s3_beta0.999_p8st_stop16_sphead'
+# RESUME='gs://kmh-gcp/checkpoints/flax/20220606_004214_maet5x_kmh-tpuvm-v3-512-2_cfg_mae_huge4x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p8_re0.5_normpix_exwd_split_fastsave_finetune/20220701_184553_kmh-tpuvm-v3-256-7_cfg_vit_huge4x_p16_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s0_beta0.999_p8st_stop16_reduce'
+RESUME='gs://kmh-gcp/checkpoints/flax/20220606_070525_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_huge3x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p4_re1.0_normpix_exwd_split_fastsave_finetune/20220705_051632_kmh-tpuvm-v3-256-6_cfg_vit_huge3x_p16_50ep_fttl_IN22K_b1024_wd0.05_lr1e-3_lrd0.75_pdp0.0_dp0.2_warm5_s0_beta0.999_p8st_stop16_saveDBG2'
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -66,7 +67,7 @@ python3 main.py \
     --config.warmup_epochs=${warm} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
-    --config.save_every_epochs=2 \
+    --config.save_every_epochs=1 \
     --config.profile_memory=True \
     --config.donate=True \
     --config.init_backend=tpu \

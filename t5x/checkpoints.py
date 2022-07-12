@@ -720,7 +720,7 @@ class Checkpointer(object):
           return await maybe_arr.get_async()
         return maybe_arr
 
-      logging.info('Writing: {}, {}'.format(param_info.name, param_info.shape))
+      # logging.info('Writing: {}, {}'.format(param_info.name, param_info.shape))
 
       # Only write each chunk of a parameter from one host
       if self._use_gda or param_info.local_chunk_info.replica_id == 0:
