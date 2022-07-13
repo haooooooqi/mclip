@@ -112,6 +112,8 @@ class LazyAwaitableArray(LazyArray):
       # wrapping it in an Awaitable. Related to this bug
       # https://github.com/google/pytype/issues/527
       arr = await self._get_fn()  # pytype: disable=bad-return-type
+      if isinstance(arr, dict) and arr == {}:
+        return arr
       if arr.dtype != self.dtype:
         arr = arr.astype(self.dtype)
       return arr
@@ -152,6 +154,8 @@ class LazyAwaitableArray(LazyArray):
                  get_fn: Callable[[], np.ndarray],
                  dtype: Optional[jnp.dtype] = None) -> 'LazyAwaitableArray':
     """Create a LazyAwaitableArray based on an array or python number."""
+    if isinstance(array, dict) and array == {}:
+      array = np.zeros(0, dtype=np.float32)
     if dtype is None:
       dtype = array.dtype
     else:
