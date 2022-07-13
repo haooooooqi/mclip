@@ -23,16 +23,15 @@ def flatten_dict(x, prefix="", out=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jax_t5x_dir", type=str, required=True)
-    parser.add_argument("--out_npz_dir", type=str, required=True)
+    parser.add_argument("--out_npz_file", type=str, required=True)
     args = parser.parse_args()
 
     states = load_t5x_checkpoint(args.jax_t5x_dir)
     states = flatten_dict(states)
 
-    os.makedirs(args.out_npz_dir, exist_ok=True)
-    out_npz_path = os.path.join(args.out_npz_dir, "jax_t5x_ckpt.npz")
-    np.savez(out_npz_path, **states)
-    print(f"saved JAX checkpoint to {out_npz_path}")
+    os.makedirs(os.path.dirname(args.out_npz_file), exist_ok=True)
+    np.savez(args.out_npz_file, **states)
+    print(f"saved JAX checkpoint to {args.out_npz_file}")
 
 
 if __name__ == "__main__":

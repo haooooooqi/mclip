@@ -115,7 +115,7 @@ def main():
 
     t5x_np_ckpt = np.load(args.raw_npz_file)
     out_pt_ckpt = convert_jax_t5x_to_pt(t5x_np_ckpt, remove_k_bias=args.remove_k_bias)
-    os.makedirs(os.dirname(args.out_mae_pt_file), exist_ok=True)
+    os.makedirs(os.path.dirname(args.out_mae_pt_file), exist_ok=True)
     torch.save({"model": out_pt_ckpt}, args.out_mae_pt_file)
     print(f"saved MAE GitHub-fomat PyTorch checkpoint to {args.out_mae_pt_file}")
 
