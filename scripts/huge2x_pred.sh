@@ -61,6 +61,7 @@ python3 main.py \
     --config.aug.randerase.on=True \
     --config.aug.autoaug=randaugv2 \
     --config.model.transformer.droppath_rate=0. \
+    --config.model.sincos=False \
     --config.seed_tf=${seed} \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
@@ -72,6 +73,7 @@ python3 main.py \
     --config.model.predictor.transformer.num_layers=12 \
     --config.model.predictor.transformer.droppath_rate=${dp} \
     --config.model.load_bottleneck=${load_bottleneck} \
+    --config.model.stopgrad_blocks=${stopgrad_blocks} \
     2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

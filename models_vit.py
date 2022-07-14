@@ -69,42 +69,6 @@ class IdentityLayer(nn.Module):
     return x
 
 
-# class AddPositionEmbs(nn.Module):
-#   """Adds (optionally learned) positional embeddings to the inputs.
-
-#   Attributes:
-#     posemb_init: positional embedding initializer.
-#   """
-
-#   posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
-
-#   @nn.compact
-#   def __call__(self, inputs):
-#     """Applies AddPositionEmbs module.
-
-#     By default this layer uses a fixed sinusoidal embedding table. If a
-#     learned position embedding is desired, pass an initializer to
-#     posemb_init.
-
-#     Args:
-#       inputs: Inputs to the layer.
-
-#     Returns:
-#       Output tensor with shape `(bs, timesteps, in_dim)`.
-#     """
-#     # inputs.shape is (batch_size, seq_len, emb_dim).
-#     assert inputs.ndim == 3, ('Number of dimensions should be 3,'
-#                               ' but it is: %d' % inputs.ndim)
-#     pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
-#     pe = t5x.layers.param_with_axes(
-#         'pos_embedding',
-#         self.posemb_init,
-#         pos_emb_shape,
-#         jnp.float32,
-#         axes=('_null0', 'length', 'embed'))
-#     return inputs + pe
-
-
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
   """
@@ -120,7 +84,6 @@ class AddPositionEmbs(nn.Module):
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
     if not self.sincos:
-      raise NotImplementedError
       init_fn = posemb_init
     else:
       pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
@@ -150,7 +113,6 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    
     pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
 
     if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
@@ -261,13 +223,6 @@ class Encoder1DBlock(nn.Module):
       t5x.layers.MultiHeadDotProductAttention,
       kernel_init=msa_kernel_init,
     )
-    # original
-    # MsaBlock = functools.partial(
-    #   nn.MultiHeadDotProductAttention,
-    #   kernel_init=msa_kernel_init,
-    #   broadcast_dropout=False,
-    #   deterministic=deterministic,
-    # )
     # ----------------------------------------------------
 
     x = MsaBlock(
@@ -351,7 +306,7 @@ class Encoder(nn.Module):
           static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
 
     x = inputs
-    
+
     # Input Encoder
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
@@ -530,7 +485,7 @@ class VisionTransformer(nn.Module):
       raise ValueError(f'Invalid classifier={self.classifier}')
 
     x = IdentityLayer(name='pre_logits')(x)
-    
+
     if self.split and self.split.on_use:
       x = self.undo_split(x)
 
