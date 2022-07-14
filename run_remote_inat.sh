@@ -93,6 +93,7 @@ python3 main.py \
     --config.partitioning.partition_states=False \
     --config.partitioning.activation_partitioning_dims=1 \
     --config.partitioning.parameter_partitioning_dims=1 \
+    --config.model.canonical_grid=14 \
     --config.resume_dir=$RESUME \
     --config.torchload.data_dir='/datasets03/inaturalist/20${version}' \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log

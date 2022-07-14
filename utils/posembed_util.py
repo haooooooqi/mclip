@@ -9,6 +9,7 @@
 
 import numpy as np
 
+from absl import logging
 
 # --------------------------------------------------------
 # 2D sine-cosine position embedding
@@ -16,7 +17,7 @@ import numpy as np
 # Transformer: https://github.com/tensorflow/models/blob/master/official/nlp/transformer/model_utils.py
 # MoCo v3: https://github.com/facebookresearch/moco-v3
 # --------------------------------------------------------
-def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
+def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False, canonical_grid=None):
     """
     grid_size: int tuple of the grid, (height, width)
     return:
@@ -26,6 +27,15 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
 
     grid_h = np.arange(h, dtype=np.float32)
     grid_w = np.arange(w, dtype=np.float32)
+    
+    if canonical_grid is not None:
+        assert canonical_grid > 1
+        grid_h *= (canonical_grid - 1) / grid_h[-1]
+        grid_w *= (canonical_grid - 1) / grid_w[-1]
+
+        logging.info('Rescale grid_h to: {}'.format(grid_h))
+        logging.info('Rescale grid_w to: {}'.format(grid_w))
+
     grid = np.meshgrid(grid_w, grid_h)  # here w goes first
     grid = np.stack(grid, axis=0)
 

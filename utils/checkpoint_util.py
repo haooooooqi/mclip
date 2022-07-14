@@ -49,7 +49,7 @@ def load_from_t5x_pretrain(state, checkpointer, path):
   new_state = checkpointer.restore(
     path=path_chkpt,
     fallback_state=state.state_dict(),
-    state_transformation_fns=[remove_optimizer_state, remove_head_state])
+    state_transformation_fns=[remove_optimizer_state, remove_head_state, remove_pos_embed])
   return new_state
 
 
@@ -63,6 +63,17 @@ def remove_head_state(ckpt_optimizer_state, optimizer_state):
   if 'head' in ckpt_optimizer_state['target']:
     logging.info('Removing pre-trained head.')
     ckpt_optimizer_state['target'].pop('head')
+  return ckpt_optimizer_state
+
+
+def remove_pos_embed(ckpt_optimizer_state, optimizer_state):
+  if 'posembed_encoder' in ckpt_optimizer_state['target'] and \
+    'posembed_encoder' in optimizer_state['target']:
+    shape_ckpt = ckpt_optimizer_state['target']['posembed_encoder']['pos_embedding']['metadata']['shape']
+    shape_opt = list(optimizer_state['target']['posembed_encoder']['pos_embedding'].shape)
+    if not(shape_ckpt == shape_opt):
+      logging.info('Removing pre-trained posembed_encoder.')
+      ckpt_optimizer_state['target'].pop('posembed_encoder')
   return ckpt_optimizer_state
 
 

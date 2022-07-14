@@ -110,9 +110,12 @@ class AddPositionEmbs(nn.Module):
   use_cls_token: bool
   img_shape: Shape  # [h, w, c]
   dtype: Any = jnp.float32
+  canonical_grid: int = 0
 
   def setup(self):
     h, w, c = self.img_shape
+
+    canonical_grid = None if self.canonical_grid == 0 else self.canonical_grid
 
     num_clstokens = 1 if self.use_cls_token else 0
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
@@ -121,7 +124,7 @@ class AddPositionEmbs(nn.Module):
       raise NotImplementedError
       init_fn = posemb_init
     else:
-      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
+      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token, canonical_grid=canonical_grid)  # in numpy array
       init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
 
     self.pe = t5x.layers.param_with_axes(
@@ -375,6 +378,7 @@ class VisionTransformer(nn.Module):
   predictor: Any = None
   adapter: Any = None
   sincos: bool = True
+  canonical_grid: int = 0
 
   def apply_predictor(self, x, train, img_shape):
 
@@ -389,7 +393,7 @@ class VisionTransformer(nn.Module):
     # add predictor pos emb
     # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
     use_cls_token = (self.classifier in {'token', 'tgap'})
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed', canonical_grid=self.canonical_grid)(x)
 
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
@@ -439,7 +443,7 @@ class VisionTransformer(nn.Module):
     # we add posemb here
     # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
     use_cls_token = (self.classifier in {'token', 'tgap'})
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
+    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder', canonical_grid=self.canonical_grid)(x)
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
     x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
