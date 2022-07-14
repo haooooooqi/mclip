@@ -386,7 +386,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   # ------------------------------------------
   # debug
-  batch = next(iter(data_loader_val))
+  # batch = next(iter(data_loader_val))
   # batch = parse_batch(batch, local_batch_size, mixup_fn)
   # metrics = partitioned_eval_step(state, batch)
   # ------------------------------------------

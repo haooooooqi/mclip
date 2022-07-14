@@ -58,3 +58,17 @@ class iNaturalist(datasets.VisionDataset):
 
     def __len__(self) -> int:
         return self.len
+
+    def __repr__(self) -> str:
+        head = "Dataset " + self.__class__.__name__
+        body = ["Number of datapoints: {}".format(self.__len__())]
+        body.append("Number of classes: {}".format(self.num_classes))
+        if self.root is not None:
+            body.append("Root location: {}".format(self.root))
+        if self.target_transform is not None:
+            body.append("Target transform: {}".format(self.target_transform))
+        body += self.extra_repr().splitlines()
+        if hasattr(self, "transforms") and self.transforms is not None:
+            body += [repr(self.transforms)]
+        lines = [head] + [" " * self._repr_indent + line for line in body]
+        return '\n'.join(lines)
