@@ -82,11 +82,11 @@ def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
 def filter_block(path: Tuple[Any], val: jnp.ndarray, config: Any):
     """Freeze/train blocks by layer_id."""
     del val
-    
+
     layer_idx = _layerwise_index(path, config.model.transformer.num_layers)
 
     return layer_idx >= config.model.stopgrad_blocks
-    
+
 
 def _layerwise_index(path: Tuple[Any], num_layers: int):
     """Get the layerwise index based on name."""

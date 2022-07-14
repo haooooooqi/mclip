@@ -57,7 +57,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
     mask_wd = None
     if config.exclude_wd:
       # True: apply wd; False: not apply wd
-      mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
+      mask_wd = jax.tree_util.tree_map(lambda x, y: bool(x and y),
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
         opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed),
       )
@@ -68,28 +68,28 @@ def create_optimizer(config, params_names, steps_per_epoch):
 
     # logging.info('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)))
 
-    if config.model.stopgrad_blocks >= 0 or config.model.adapter.on_use:
-      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+    # if config.model.stopgrad_blocks >= 0 or config.model.adapter.on_use:
+    #   opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
 
-      # True: trainable; False: frozen
-      mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
+    #   # True: trainable; False: frozen
+    #   mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
 
-      if config.model.stopgrad_blocks >= 0:
-        mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
+    #   if config.model.stopgrad_blocks >= 0:
+    #     mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
 
-      if config.model.adapter.on_use:  # if adapter is on, we freeze the pre-trained backbone by default
-        mask_adapter_trainable = jax.tree_map(lambda x, y: bool(x or y),  # OR, not AND
-          opt_util.filter_parameters(params_names, opt_util.filter_head),
-          opt_util.filter_parameters(params_names, opt_util.filter_adapter),
-        )
-        mask_trainable = jax.tree_map(lambda x, y: (x and y), mask_adapter_trainable, mask_trainable)
+    #   if config.model.adapter.on_use:  # if adapter is on, we freeze the pre-trained backbone by default
+    #     mask_adapter_trainable = jax.tree_map(lambda x, y: bool(x or y),  # OR, not AND
+    #       opt_util.filter_parameters(params_names, opt_util.filter_head),
+    #       opt_util.filter_parameters(params_names, opt_util.filter_adapter),
+    #     )
+    #     mask_trainable = jax.tree_map(lambda x, y: (x and y), mask_adapter_trainable, mask_trainable)
 
-      logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
+    #   logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
 
-      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
-        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
-    else:
-      opt = getattr(adamw, config.opt_type)
+    #   def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+    #     return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    # else:
+    opt = getattr(adamw, config.opt_type)
 
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
     opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask_wd, mu_dtype=getattr(jnp, config.opt_mu_dtype))
@@ -131,5 +131,3 @@ def create_train_state(config, model, image_size, steps_per_epoch, partitioner):
       out_axis_resources=train_state_axes)
 
   return p_init_fn, train_state_axes, train_state_shape
-  
-
