@@ -82,7 +82,7 @@ def build_dataloaders(config, partitioner, rng_torch):
   dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
   dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
 
-  assert dataset_train.num_classes == config.model.num_classes
+  # assert dataset_train.num_classes == config.model.num_classes
 
   if dataset_train.num_classes == 21841:  # IN-22k
     dataset_val.target_transform = torchloader_util.get_target_transform_1k_to_22k(dataset_train, dataset_val)
@@ -95,6 +95,7 @@ def build_dataloaders(config, partitioner, rng_torch):
     rank=shard_id, # jax.process_index(),
     shuffle=True,
     seed=config.seed_pt,
+    drop_last=True,
   )
   sampler_val = torch.utils.data.DistributedSampler(
     dataset_val,
@@ -117,14 +118,15 @@ def build_dataloaders(config, partitioner, rng_torch):
   data_loader_val = torch.utils.data.DataLoader(
     dataset_val, sampler=sampler_val,
     batch_size=local_batch_size,
-    num_workers=0, # config.torchload.num_workers,
+    num_workers=config.torchload.num_workers,
     pin_memory=True,
     drop_last=False,
-    # persistent_workers=True,
-    # timeout=60.,
+    persistent_workers=True,
+    timeout=60.,
   )
 
-  assert len(data_loader_train) == len(dataset_train) // config.batch_size
+  assert len(data_loader_train) == len(dataset_train) // config.batch_size, \
+    '{}, {}, {}'.format(len(data_loader_train), len(dataset_train), config.batch_size)
   return data_loader_train, data_loader_val, local_batch_size
 
 
@@ -319,13 +321,16 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # ------------------------------------
   data_loader_train, data_loader_val, local_batch_size = build_dataloaders(config, partitioner, rng_torch)
 
-  mixup_fn = torchloader_util.get_mixup_fn(config.aug, num_classes=config.model.num_classes)
+  mixup_fn = torchloader_util.get_mixup_fn(config.aug, num_classes=data_loader_train.dataset.num_classes)
 
   steps_per_epoch = len(data_loader_train)
   
   # ------------------------------------
   # Create model
   # ------------------------------------
+  # hack: revise number of classes
+  config.model.num_classes = data_loader_train.dataset.num_classes
+  logging.info('Setting config.model.num_classe: {}'.format(config.model.num_classes))
   model = models_vit.VisionTransformer(**config.model)
   
   p_init_fn, state_axes, state_shape = create_train_state(config, model, image_size, steps_per_epoch, partitioner)

@@ -31,8 +31,7 @@ python3 main.py \
     --config.model.stopgrad_blocks=0 \
     --config.partitioning.activation_partitioning_dims=2 \
     --config.partitioning.parameter_partitioning_dims=2 \
-    --config.torchload.data_dir='/datasets03/inaturalist/2018' \
-    --config.model.num_classes=8142 \
+    --config.torchload.data_dir='/datasets03/inaturalist/2019' \
 
     # --config.torchload.data_dir='/datasets/imagenet-22k' \
     # --config.model.num_classes=21841 \
