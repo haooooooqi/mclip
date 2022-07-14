@@ -404,19 +404,22 @@ class VisionTransformer(nn.Module):
   adapter: Any = None
   sincos: bool = True
   split: Any = None
+  load_bottleneck: bool = False
 
   def apply_predictor(self, x, train, img_shape):
-
     # apply the encoder-predictor bottleneck
+    bottleneck_name = 'bottleneck' if self.load_bottleneck else 'pred_bottleneck'
     x = t5x.layers.Dense(
       features=self.predictor.hidden_size,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
-      name='pred_bottleneck')(x)
+      name=bottleneck_name)(x)
+    if self.load_bottleneck and self.stopgrad_blocks == self.transformer.num_layers + 1:
+      x = jax.lax.stop_gradient(x)
+      logging.info('Stop gradient after bottleneck.')
 
     # add predictor pos emb
-    # x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
     use_cls_token = (self.classifier in {'token', 'tgap'})
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
 
@@ -517,7 +520,7 @@ class VisionTransformer(nn.Module):
     if self.classifier == 'token':
       x = x[:, 0]
     elif self.classifier == 'tgap':
-      x = x[:, 1:]
+      x = x[:, 1:] # first removed the class token
       x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
       x = t5x.layers.LayerNorm(name='fc_norm', axes=('embed',))(x)
     elif self.classifier == 'gap':

@@ -73,14 +73,15 @@ def get_config():
   config.model.sincos = True
 
   config.model.predictor = ml_collections.ConfigDict()
-  config.model.predictor.hidden_size = 768
+  config.model.predictor.hidden_size = 512
   config.model.predictor.transformer = ml_collections.ConfigDict()
   config.model.predictor.transformer.mlp_dim = config.model.predictor.hidden_size * 4
   config.model.predictor.transformer.num_heads = 16
-  config.model.predictor.transformer.num_layers = 2
+  config.model.predictor.transformer.num_layers = 0
   config.model.predictor.transformer.attention_dropout_rate = 0.0
   config.model.predictor.transformer.dropout_rate = 0.0
   config.model.predictor.transformer.droppath_rate = 0.0
+  config.model.load_bottleneck = False
 
   config.model.adapter = ml_collections.ConfigDict()
   config.model.adapter.on_use = False
