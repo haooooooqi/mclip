@@ -26,8 +26,6 @@ from timm.data.mixup import Mixup
 
 from absl import logging
 
-IMAGE_SIZE = 224
-
 AUTOAUGS = {'autoaug': 'v0', 'randaugv2': 'rand-m9-mstd0.5-inc1'}
 
 
@@ -91,7 +89,7 @@ def build_dataset(is_train, data_dir, aug):
 
 
 def build_transform(is_train, aug):
-    input_size = IMAGE_SIZE
+    input_size = aug.image_size
 
     mean = IMAGENET_DEFAULT_MEAN
     std = IMAGENET_DEFAULT_STD
@@ -102,7 +100,7 @@ def build_transform(is_train, aug):
         re_prob = aug.randerase.prob if aug.randerase.on else 0.0
         # this should always dispatch to transforms_imagenet_train
         transform = create_transform(
-            input_size=IMAGE_SIZE,
+            input_size=aug.image_size,
             is_training=True,
             scale=aug.area_range,
             ratio=aug.aspect_ratio_range,

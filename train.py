@@ -305,7 +305,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0)
 
-  image_size = 224  # TODO: move to config and model
+  image_size = config.aug.image_size  # e.g., 224
 
   # ------------------------------------
   # Create partitioner

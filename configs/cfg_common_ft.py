@@ -131,6 +131,9 @@ def get_config():
   config.aug.randerase.on = False
   config.aug.randerase.prob = 0.25
 
+  # image size
+  config.aug.image_size = 224
+
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id
   config.model.rescale_head_init = 0.001  # rescale the head initialized weights
