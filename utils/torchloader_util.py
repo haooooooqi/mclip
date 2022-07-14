@@ -17,6 +17,8 @@ import jax
 import torch
 from torchvision import datasets, transforms
 
+import utils.datasets.inat
+
 import timm
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
@@ -69,13 +71,19 @@ def build_dataset(is_train, data_dir, aug):
 
     if 'imagenet-1k' in data_dir or 'imagenet_full_size/061417' in data_dir:  # IN-1K
         root = os.path.join(data_dir, 'train' if is_train else 'val')
+        dataset = ImageFolder(root=root, transform=transform, label_smoothing=label_smoothing)
     elif 'imagenet-22k' in data_dir:  # IN-22K
         root = os.path.join(data_dir, '062717') if is_train \
             else '/datasets/imagenet-1k/val'
+        dataset = ImageFolder(root=root, transform=transform, label_smoothing=label_smoothing)
+    elif 'inaturalist' in data_dir:  # iNat
+        dataset = utils.datasets.inat.iNaturalist(
+            root=data_dir, transform=transform,
+            label_smoothing=label_smoothing, split='train' if is_train else 'val')
+        
     else:
         raise NotImplementedError
 
-    dataset = ImageFolder(root=root, transform=transform, label_smoothing=label_smoothing)
 
     logging.info(dataset)
 

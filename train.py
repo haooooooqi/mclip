@@ -117,11 +117,11 @@ def build_dataloaders(config, partitioner, rng_torch):
   data_loader_val = torch.utils.data.DataLoader(
     dataset_val, sampler=sampler_val,
     batch_size=local_batch_size,
-    num_workers=config.torchload.num_workers,
+    num_workers=0, # config.torchload.num_workers,
     pin_memory=True,
     drop_last=False,
-    persistent_workers=True,
-    timeout=60.,
+    # persistent_workers=True,
+    # timeout=60.,
   )
 
   assert len(data_loader_train) == len(dataset_train) // config.batch_size
@@ -386,7 +386,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   # ------------------------------------------
   # debug
-  # batch = next(iter(data_loader_train))
+  batch = next(iter(data_loader_val))
   # batch = parse_batch(batch, local_batch_size, mixup_fn)
   # metrics = partitioned_eval_step(state, batch)
   # ------------------------------------------
