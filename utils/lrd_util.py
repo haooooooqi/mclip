@@ -26,7 +26,10 @@ def _layerwise_lr_decay(
 
     layer_name = '.'.join(path)
 
-    if layer_name.startswith('Transformer.encoderblock_'):
+    if layer_name.startswith('Transformer.encoderblock_renew_'):
+        layer_idx = path[1][len('encoderblock_renew_'):]  # e.g., '01'
+        layer_idx = int(layer_idx)
+    elif layer_name.startswith('Transformer.encoderblock_'):
         layer_idx = path[1][len('encoderblock_'):]  # e.g., '01'
         layer_idx = int(layer_idx)
     elif layer_name.startswith('embedding.'):  # patch embedding

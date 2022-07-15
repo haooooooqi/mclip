@@ -944,8 +944,8 @@ class Checkpointer(object):
 
     restore_parameter_infos_flat = state_utils.flatten_state_dict(
         restore_parameter_infos)
-    # for key in restore_parameter_infos_flat.keys():
-    #   logging.info('Restoring key from ckpt: %s', key)
+    for key in restore_parameter_infos_flat.keys():
+      logging.info('Restoring key from ckpt: %s', key)
 
     # NB: `serialization.from_state_dict` doesn't check whether the shapes match
     # at the leaf level. Non-partitioned leaves (e.g., optimizer states) can

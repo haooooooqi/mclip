@@ -11,12 +11,14 @@ dp=0.2
 pdp=0.0
 beta2=0.999
 
-partitions=1
+partitions=4
 
 pft=0  # predictor layers for ft
-stopg=0  # number of stopgrad blocks
+stopg=16  # number of stopgrad blocks
 
-vitsize=large
+renew=4
+
+vitsize=huge3x_p16
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
@@ -26,7 +28,7 @@ name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_pdp${pdp}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}st_stop${stopg}_orgsanity # _pft768x${pft} # _token_pred_posemb
+JOBNAME=flax/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_wd${wd}_lr${lr}_lrd${lrd}_pdp${pdp}_dp${dp}_warm${warm}_s${seed}_beta${beta2}_p${partitions}st_stop${stopg}_act1_para1_new${renew} # _pft768x${pft} # _token_pred_posemb
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
 LOGDIR=/kmh_data/logs/${JOBNAME}
@@ -82,7 +84,10 @@ python3 main.py \
     --config.model.sincos=True \
     --config.model.adapter.on_use=False \
     --config.model.stopgrad_blocks=${stopg} \
+    --config.model.transformer.renew_layers=${renew} \
     --config.partitioning.partition_states=True \
+    --config.partitioning.activation_partitioning_dims=1 \
+    --config.partitioning.parameter_partitioning_dims=1 \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

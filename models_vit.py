@@ -324,6 +324,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   adapter: Any = None
+  renew_layers: int = 0
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
@@ -344,6 +345,8 @@ class Encoder(nn.Module):
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
       name = self.prefix + 'block_{:02d}'.format(lyr)
+      if lyr >= self.num_layers - self.renew_layers:
+        name = self.prefix + 'block_renew_{:02d}'.format(lyr)
       # logging.info('layer: {}, dp: {}'.format(name, dp))
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
