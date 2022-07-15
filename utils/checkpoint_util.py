@@ -61,8 +61,11 @@ def remove_optimizer_state(ckpt_optimizer_state, optimizer_state):
 def remove_head_state(ckpt_optimizer_state, optimizer_state):
   # remove the pre-trained head if any
   if 'head' in ckpt_optimizer_state['target']:
-    logging.info('Removing pre-trained head.')
-    ckpt_optimizer_state['target'].pop('head')
+    shape_ckpt = ckpt_optimizer_state['target']['head']['kernel']['metadata']['shape']
+    shape_opt = list(optimizer_state['target']['head']['kernel'].shape)
+    if not(shape_ckpt == shape_opt):
+      logging.info('Removing pre-trained head.')
+      ckpt_optimizer_state['target'].pop('head')
   return ckpt_optimizer_state
 
 

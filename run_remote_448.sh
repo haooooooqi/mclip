@@ -2,12 +2,12 @@ echo 'code dir: '$STAGEDIR
 
 # seed=0
 batch=1024
-lr=1e-5
+lr=2e-5
 wd=1e-8
 lrd=0.9
 ep=10
-warm=5
-dp=0.2
+warm=1
+dp=0.3
 pdp=0.0
 beta2=0.999
 
