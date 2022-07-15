@@ -28,7 +28,7 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False, canonical_gri
     grid_h = np.arange(h, dtype=np.float32)
     grid_w = np.arange(w, dtype=np.float32)
     
-    if canonical_grid is not None:
+    if canonical_grid is not None and (canonical_grid != h or canonical_grid != w):
         assert canonical_grid > 1
         grid_h *= (canonical_grid - 1) / grid_h[-1]
         grid_w *= (canonical_grid - 1) / grid_w[-1]
