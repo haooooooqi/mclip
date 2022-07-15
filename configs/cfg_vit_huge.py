@@ -42,7 +42,16 @@ def get_config():
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.2
 
+  config.model.hidden_size = 1280 * 1
+  config.model.transformer.mlp_dim = config.model.hidden_size * 4
+  config.model.transformer.num_heads = 16
+  config.model.transformer.num_layers = 32
+
+
   # opt config
   config.opt_mu_dtype = 'float32'  # bfloat16, float32
+
+  # partition
+  config.partitioning.partition_states = True
 
   return config
