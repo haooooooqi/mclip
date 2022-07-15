@@ -1,3 +1,4 @@
+from termcolor import colored
 
 from absl import logging
 import jax
@@ -61,19 +62,26 @@ def create_optimizer(config, params_names, steps_per_epoch):
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
         opt_util.filter_parameters(params_names, opt_util.filter_cls_and_posembed),
       )
+    # logging.info(colored('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)), "blue"))
 
-    logging.info('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)))
-
-    if config.model.stopgrad_blocks >= 0:
+    if config.model.predictor.transformer.num_layers > 0: # predictor mode
+      assert config.model.stopgrad_blocks < 0
       opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
 
       # True: trainable; False: frozen
-      mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
+      mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_predictor, config=config))
 
-      if config.model.stopgrad_blocks >= 0:
-        mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
+      logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
-      logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    elif config.model.stopgrad_blocks >= 0: # partial fine-tuning mode
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+
+      # True: trainable; False: frozen
+      mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.filter_block, config=config))
+
+      logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)

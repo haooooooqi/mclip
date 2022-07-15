@@ -45,20 +45,29 @@ def filter_cls_and_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
-# freeze backbone
+# freeze for the predictor
 # ---------------------------------------------------------
-def filter_head(path: Tuple[Any], val: jnp.ndarray):
-    """Filter to exclude cls token and pos emb."""
+def filter_predictor(path: Tuple[Any], val: jnp.ndarray, config: Any):
+    """Filter for predictor"""
     del val
 
     # hack: sanity check
     all_keys = [
         'Transformer', 'cls', 'embedding', 'posembed_encoder',
-        'head', 'pred_posembed', 'pred', 'pred_bottleneck']
-    assert path[0] in all_keys
+        'head', 'pred_posembed', 'pred', 'pred_bottleneck', 'bottleneck', 'fc_norm']
+    assert path[0] in all_keys, 'key not valid: {}'.format(path[0])
 
     pretrained_keys = ['Transformer', 'cls', 'embedding', 'posembed_encoder']
-    trainable_keys = ['head', 'pred_posembed', 'pred', 'pred_bottleneck']
+    trainable_keys = ['pred', 'fc_norm', 'head']
+    if config.model.predictor.sincos:
+        pretrained_keys += ['pred_posembed']
+    else:
+        trainable_keys += ['pred_posembed']
+
+    if config.model.load_bottleneck:
+        pretrained_keys += ['bottleneck']
+    else:
+        trainable_keys += ['pred_bottleneck']
 
     if path[0] in trainable_keys:
         return True
@@ -66,9 +75,11 @@ def filter_head(path: Tuple[Any], val: jnp.ndarray):
         return False
     else:
         assert False, 'key not valid: {}'.format(path[0])
-        raise NotImplementedError
 
 
+# ---------------------------------------------------------
+# freeze layers in the backbone
+# ---------------------------------------------------------
 def filter_block(path: Tuple[Any], val: jnp.ndarray, config: Any):
     """Freeze/train blocks by layer_id."""
     del val

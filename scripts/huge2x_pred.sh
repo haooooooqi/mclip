@@ -9,13 +9,13 @@ ZONE=europe-west4-a
 
 vitsize=huge2x
 batch=1024
-lr=1e-4
+lr=2.5e-4
 wd=0.3
 ep=100
 warm=20
 dp=0.1
 beta2=0.999
-stopgrad_blocks=33
+stopgrad_blocks=-1
 load_bottleneck=False
 
 seed=0
@@ -25,8 +25,8 @@ CONFIG=cfg_vit_${vitsize}
 JOBNAME=huge2x_1600
 
 PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-WORKDIR=gs://xinleic/mae_jax/checkpoints/pred/${JOBNAME}/lr@${lr}
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/pred/${JOBNAME}/lr@${lr}
+WORKDIR=gs://xinleic/mae_jax/checkpoints/pred/${JOBNAME}/default
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/pred/${JOBNAME}/default
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################

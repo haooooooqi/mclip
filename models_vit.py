@@ -69,42 +69,6 @@ class IdentityLayer(nn.Module):
     return x
 
 
-# class AddPositionEmbs(nn.Module):
-#   """Adds (optionally learned) positional embeddings to the inputs.
-
-#   Attributes:
-#     posemb_init: positional embedding initializer.
-#   """
-
-#   posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
-
-#   @nn.compact
-#   def __call__(self, inputs):
-#     """Applies AddPositionEmbs module.
-
-#     By default this layer uses a fixed sinusoidal embedding table. If a
-#     learned position embedding is desired, pass an initializer to
-#     posemb_init.
-
-#     Args:
-#       inputs: Inputs to the layer.
-
-#     Returns:
-#       Output tensor with shape `(bs, timesteps, in_dim)`.
-#     """
-#     # inputs.shape is (batch_size, seq_len, emb_dim).
-#     assert inputs.ndim == 3, ('Number of dimensions should be 3,'
-#                               ' but it is: %d' % inputs.ndim)
-#     pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
-#     pe = t5x.layers.param_with_axes(
-#         'pos_embedding',
-#         self.posemb_init,
-#         pos_emb_shape,
-#         jnp.float32,
-#         axes=('_null0', 'length', 'embed'))
-#     return inputs + pe
-
-
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
   """
@@ -120,7 +84,6 @@ class AddPositionEmbs(nn.Module):
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
     if not self.sincos:
-      raise NotImplementedError
       init_fn = posemb_init
     else:
       pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
@@ -391,7 +354,7 @@ class VisionTransformer(nn.Module):
 
     # add predictor pos emb
     use_cls_token = (self.classifier in {'token', 'tgap'})
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
+    x = AddPositionEmbs(sincos=self.predictor.sincos, use_cls_token=use_cls_token, img_shape=img_shape + (x.shape[-1],), name='pred_posembed')(x)
 
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)

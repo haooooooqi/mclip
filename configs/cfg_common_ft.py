@@ -74,6 +74,7 @@ def get_config():
 
   config.model.predictor = ml_collections.ConfigDict()
   config.model.predictor.hidden_size = 512
+  config.model.predictor.sincos = True
   config.model.predictor.transformer = ml_collections.ConfigDict()
   config.model.predictor.transformer.mlp_dim = config.model.predictor.hidden_size * 4
   config.model.predictor.transformer.num_heads = 16
