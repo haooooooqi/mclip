@@ -10,7 +10,7 @@ from optax._src import numerics
 from optax._src import utils
 
 from optax._src import transform
-from optax._src.transform import _update_moment, _bias_correction, ScaleByAdamState
+from optax._src.transform import update_moment, bias_correction, ScaleByAdamState
 
 
 
