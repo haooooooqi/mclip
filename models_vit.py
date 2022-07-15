@@ -69,6 +69,42 @@ class IdentityLayer(nn.Module):
     return x
 
 
+# class AddPositionEmbs(nn.Module):
+#   """Adds (optionally learned) positional embeddings to the inputs.
+
+#   Attributes:
+#     posemb_init: positional embedding initializer.
+#   """
+
+#   posemb_init: Callable[[PRNGKey, Shape, Dtype], Array]
+
+#   @nn.compact
+#   def __call__(self, inputs):
+#     """Applies AddPositionEmbs module.
+
+#     By default this layer uses a fixed sinusoidal embedding table. If a
+#     learned position embedding is desired, pass an initializer to
+#     posemb_init.
+
+#     Args:
+#       inputs: Inputs to the layer.
+
+#     Returns:
+#       Output tensor with shape `(bs, timesteps, in_dim)`.
+#     """
+#     # inputs.shape is (batch_size, seq_len, emb_dim).
+#     assert inputs.ndim == 3, ('Number of dimensions should be 3,'
+#                               ' but it is: %d' % inputs.ndim)
+#     pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
+#     pe = t5x.layers.param_with_axes(
+#         'pos_embedding',
+#         self.posemb_init,
+#         pos_emb_shape,
+#         jnp.float32,
+#         axes=('_null0', 'length', 'embed'))
+#     return inputs + pe
+
+
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
   """
@@ -84,6 +120,7 @@ class AddPositionEmbs(nn.Module):
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
     if not self.sincos:
+      raise NotImplementedError
       init_fn = posemb_init
     else:
       pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
@@ -113,6 +150,7 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
+    
     pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
 
     if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
@@ -185,21 +223,6 @@ class Encoder1DBlock(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   layer_id: int = None
-  adapter: Any = None
-
-  def apply_adapter(self, x, deterministic, name):
-    adater_mlp_dim = round(self.adapter.mlp_dim_ratio * x.shape[-1])
-    z = MlpBlock(
-        mlp_dim=adater_mlp_dim,
-        dtype=self.dtype,
-        dropout_rate=0.,
-        kernel_init=lambda *args: mlp_kernel_init(*args) * self.adapter.rescale_init,
-        bias_init=mlp_bias_init,
-        name=name,
-        )(x, deterministic=deterministic)
-    x = z + x
-    return x
-
 
   @nn.compact
   def __call__(self, inputs, deterministic):
@@ -223,6 +246,13 @@ class Encoder1DBlock(nn.Module):
       t5x.layers.MultiHeadDotProductAttention,
       kernel_init=msa_kernel_init,
     )
+    # original
+    # MsaBlock = functools.partial(
+    #   nn.MultiHeadDotProductAttention,
+    #   kernel_init=msa_kernel_init,
+    #   broadcast_dropout=False,
+    #   deterministic=deterministic,
+    # )
     # ----------------------------------------------------
 
     x = MsaBlock(
@@ -230,13 +260,7 @@ class Encoder1DBlock(nn.Module):
         dropout_rate=self.attention_dropout_rate,
         num_heads=self.num_heads,
     )(x, x)
-    assert self.dropout_rate == 0.
-    # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)  # not used
-
-    # adapter
-    if self.adapter and self.adapter.on_use:
-      x = self.apply_adapter(x, deterministic, name='adapter_msa')
-
+    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
     x = x + inputs
@@ -248,11 +272,6 @@ class Encoder1DBlock(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         )(y, deterministic=deterministic)
-
-    # adapter
-    if self.adapter and self.adapter.on_use:
-      y = self.apply_adapter(y, deterministic, name='adapter_mlp')
-
     # droppath
     y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
 
@@ -277,7 +296,6 @@ class Encoder(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
-  adapter: Any = None
   remat_policy: str = 'none'
 
   @nn.compact
@@ -291,7 +309,7 @@ class Encoder(nn.Module):
     Returns:
       output of a transformer encoder.
     """
-    assert inputs.ndim == 3  # (batch, len, emb)
+    assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
 
     BlockLayer = Encoder1DBlock
     if self.remat_policy not in (None, 'none'):
@@ -306,7 +324,7 @@ class Encoder(nn.Module):
           static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
 
     x = inputs
-
+    
     # Input Encoder
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
@@ -321,7 +339,6 @@ class Encoder(nn.Module):
           name=name,
           num_heads=self.num_heads,
           layer_id=lyr,
-          adapter=self.adapter,
         )(x, deterministic)
       if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
         x = jax.lax.stop_gradient(x)
@@ -356,7 +373,6 @@ class VisionTransformer(nn.Module):
   rescale_head_init: float = 1.
   stopgrad_blocks: int = -1
   predictor: Any = None
-  adapter: Any = None
   sincos: bool = True
   split: Any = None
   load_bottleneck: bool = False
@@ -461,10 +477,10 @@ class VisionTransformer(nn.Module):
       x = jnp.concatenate([cls, x], axis=1)
 
     use_encoder_norm = (self.predictor == None and self.classifier == 'token') or (self.predictor != None)
-    x = Encoder(name='Transformer', **self.transformer, adapter=self.adapter)(
+    x = Encoder(name='Transformer', **self.transformer)(
       x, train=train, encoder_norm=use_encoder_norm, stopgrad_blocks=self.stopgrad_blocks)
 
-    if not self.adapter.on_use and self.stopgrad_blocks == self.transformer.num_layers + 1:
+    if self.stopgrad_blocks == self.transformer.num_layers + 1:
       x = jax.lax.stop_gradient(x)
       logging.info('Stop gradient.')
 
@@ -485,7 +501,7 @@ class VisionTransformer(nn.Module):
       raise ValueError(f'Invalid classifier={self.classifier}')
 
     x = IdentityLayer(name='pre_logits')(x)
-
+    
     if self.split and self.split.on_use:
       x = self.undo_split(x)
 

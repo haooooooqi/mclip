@@ -83,11 +83,6 @@ def get_config():
   config.model.predictor.transformer.droppath_rate = 0.0
   config.model.load_bottleneck = False
 
-  config.model.adapter = ml_collections.ConfigDict()
-  config.model.adapter.on_use = False
-  config.model.adapter.mlp_dim_ratio = 1 / 4.
-  config.model.adapter.rescale_init = 1e-4
-
   config.model.split = ml_collections.ConfigDict()
   config.model.split.on_use = False
   config.model.split.splits = 4
@@ -102,7 +97,6 @@ def get_config():
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm, cls, posembed)
-  config.exclude_wd_adapter = False
 
   # config.ema = False
   # config.ema_decay = 0.9999

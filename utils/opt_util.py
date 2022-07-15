@@ -69,16 +69,6 @@ def filter_head(path: Tuple[Any], val: jnp.ndarray):
         raise NotImplementedError
 
 
-def filter_adapter(path: Tuple[Any], val: jnp.ndarray):
-    """Filter to exclude cls token and pos emb."""
-    del val
-    name = '.'.join(path)
-    if 'adapter' in name:
-        return True
-    else:
-        return False
-
-
 def filter_block(path: Tuple[Any], val: jnp.ndarray, config: Any):
     """Freeze/train blocks by layer_id."""
     del val
