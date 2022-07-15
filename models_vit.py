@@ -309,7 +309,7 @@ class Encoder(nn.Module):
     Returns:
       output of a transformer encoder.
     """
-    assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
+    assert inputs.ndim == 3  # (batch, len, emb)
 
     BlockLayer = Encoder1DBlock
     if self.remat_policy not in (None, 'none'):
@@ -374,7 +374,6 @@ class VisionTransformer(nn.Module):
   stopgrad_blocks: int = -1
   predictor: Any = None
   sincos: bool = True
-  split: Any = None
   load_bottleneck: bool = False
 
   def apply_predictor(self, x, train, img_shape):
@@ -397,34 +396,6 @@ class VisionTransformer(nn.Module):
     # apply the predictor
     x = Encoder(name='pred', **self.predictor.transformer)(x, train=train)
 
-    return x
-
-  def apply_split(self, x):
-    """ x: [N, L, C] -> [N * 4, L // 4, C] """
-    N, L, C = x.shape
-
-    rng = self.make_rng('dropout')
-    noise = random.uniform(rng, shape=x.shape[:2])
-
-    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
-    # ids_restore = jnp.argsort(ids_shuffle, axis=1)
-
-    x_shuffled = gather_by_einsum(x, ids_shuffle)
-    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
-
-    splits = self.split.splits
-    x_shuffled = jnp.reshape(x_shuffled, [N * splits, L // splits, C])
-    x_shuffled = t5x.layers.with_sharding_constraint(x_shuffled, ('batch', 'length', 'embed'))
-
-    return x_shuffled
-
-  def undo_split(self, x):
-    """ x: [N * 4, C] -> [N, C] """
-    N, C = x.shape
-    splits = self.split.splits
-    x = jnp.reshape(x, [N // splits, splits, C])
-    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'embed'))
-    x = jnp.mean(x, axis=1)  # average pool
     return x
 
   @nn.compact
@@ -466,10 +437,6 @@ class VisionTransformer(nn.Module):
     use_cls_token = (self.classifier in {'token', 'tgap'})
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    if self.split and self.split.on_use:
-      x = self.apply_split(x)
-      n = x.shape[0]
-
     # If we want to add a class token, add it here.
     if self.classifier in {'token', 'tgap'}:
       cls = t5x.layers.param_with_axes('cls', clstoken_init, (1, 1, c), jnp.float32, axes=('_null0', '_null1', 'embed'))
@@ -501,9 +468,6 @@ class VisionTransformer(nn.Module):
       raise ValueError(f'Invalid classifier={self.classifier}')
 
     x = IdentityLayer(name='pre_logits')(x)
-    
-    if self.split and self.split.on_use:
-      x = self.undo_split(x)
 
     if self.num_classes:
       x = t5x.layers.Dense(

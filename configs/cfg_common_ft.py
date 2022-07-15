@@ -83,10 +83,6 @@ def get_config():
   config.model.predictor.transformer.droppath_rate = 0.0
   config.model.load_bottleneck = False
 
-  config.model.split = ml_collections.ConfigDict()
-  config.model.split.on_use = False
-  config.model.split.splits = 4
-
   # optimizer config
   config.opt_type = 'adamw'
   config.opt = ml_collections.ConfigDict()
