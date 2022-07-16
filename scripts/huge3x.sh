@@ -12,7 +12,7 @@ lr=1e-4
 ep=1600
 mask=0.75
 rescale=1.0
-vitsize=huge2x
+vitsize=huge3x
 
 seed=1
 partitions=8

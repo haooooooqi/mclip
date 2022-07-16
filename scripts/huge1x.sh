@@ -18,7 +18,7 @@ seed=1
 partitions=8
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=huge1x_${ep}
+JOBNAME=${vitsize}_${ep}
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
 RESUME_DIR=''
