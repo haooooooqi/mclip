@@ -16,6 +16,7 @@ vitsize=huge3x
 
 seed=1
 partitions=8
+partition_states=True
 
 CONFIG=cfg_mae_${vitsize}
 JOBNAME=${vitsize}_${ep}
@@ -54,7 +55,8 @@ python3 main.py \
     --config.partitioning.num_partitions=${partitions} \
     --config.opt_type=adamw \
     --config.opt_mu_dtype=float32 \
-    --config.partitioning.partition_states=False \
+    --config.partitioning.force_partition_states_data_first=${partition_states} \
+    --config.partitioning.partition_states=${partition_states} \
     --config.model.visualize=False \
     --config.resume_dir=$RESUME_DIR \
     --config.torchload.data_dir=/datasets/imagenet-1k \

@@ -115,11 +115,11 @@ def _scale_by_adam(
 
   def update_fn(updates, state, params=None):
     del params
-    mu = _update_moment(updates, state.mu, b1, 1)
-    nu = _update_moment(updates, state.nu, b2, 2)
+    mu = update_moment(updates, state.mu, b1, 1)
+    nu = update_moment(updates, state.nu, b2, 2)
     count_inc = numerics.safe_int32_increment(state.count)
-    mu_hat = _bias_correction(mu, b1, count_inc)
-    nu_hat = _bias_correction(nu, b2, count_inc)
+    mu_hat = bias_correction(mu, b1, count_inc)
+    nu_hat = bias_correction(nu, b2, count_inc)
     updates = jax.tree_map(
         lambda m, v: m / (jnp.sqrt(v + eps_root) + eps), mu_hat, nu_hat)
     mu = utils.cast_tree(mu, mu_dtype)
@@ -199,15 +199,15 @@ def _scale_by_adam_per_rows(
 
   def update_fn(updates, state, params=None):
     del params
-    mu = _update_moment(updates, state.mu, b1, 1)  # no change
-    # nu = _update_moment(updates, state.nu, b2, 2)  # original adam
+    mu = update_moment(updates, state.mu, b1, 1)  # no change
+    # nu = update_moment(updates, state.nu, b2, 2)  # original adam
 
     nu = jax.tree_map(lambda g: g**2 if g.ndim != 2 else jnp.mean(g**2, axis=axis_row, keepdims=True), updates)
     nu = jax.tree_map(lambda g, t: (1 - b2) * g + b2 * t, nu, state.nu)
 
     count_inc = numerics.safe_int32_increment(state.count)
-    mu_hat = _bias_correction(mu, b1, count_inc)
-    nu_hat = _bias_correction(nu, b2, count_inc)
+    mu_hat = bias_correction(mu, b1, count_inc)
+    nu_hat = bias_correction(nu, b2, count_inc)
     updates = jax.tree_map(
         lambda m, v: m / (jnp.sqrt(v + eps_root) + eps), mu_hat, nu_hat)
     mu = utils.cast_tree(mu, mu_dtype)
@@ -216,7 +216,7 @@ def _scale_by_adam_per_rows(
   return base.GradientTransformation(init_fn, update_fn)
 
 
-def _update_moment(updates, moments, decay, order):
+def update_moment(updates, moments, decay, order):
   """Compute the exponential moving average of the `order`-th moment."""
   return jax.tree_map(
       lambda g, t: (1 - decay) * (g ** order) + decay * t, updates, moments)
