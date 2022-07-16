@@ -52,6 +52,8 @@ def get_config():
   config.opt_mu_dtype = 'float32'  # bfloat16, float32
 
   # partition
-  config.partitioning.partition_states = True
+  config.partitioning.partition_states = False
+  config.partitioning.activation_partitioning_dims = 2
+  config.partitioning.parameter_partitioning_dims = 2
 
   return config

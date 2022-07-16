@@ -11,12 +11,12 @@ dp=0.2
 pdp=0.0
 beta2=0.999
 
-partitions=1
+partitions=4
 
 pft=0  # predictor layers for ft
-stopg=0  # number of stopgrad blocks
+stopg=16  # number of stopgrad blocks
 
-vitsize=huge1x_p16 # large
+vitsize=huge4x_p16 # large
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
@@ -83,9 +83,7 @@ python3 main.py \
     --config.model.sincos=True \
     --config.model.adapter.on_use=False \
     --config.model.stopgrad_blocks=${stopg} \
-    --config.partitioning.partition_states=False \
-    --config.partitioning.activation_partitioning_dims=1 \
-    --config.partitioning.parameter_partitioning_dims=1 \
+    --config.partitioning.partition_states=True \
     --config.resume_dir=$RESUME \
     --config.torchload.data_dir=/datasets/imagenet-1k \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
