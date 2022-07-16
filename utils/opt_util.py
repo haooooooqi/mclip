@@ -30,7 +30,7 @@ def layer_rescale(path: Tuple[Any], val: jnp.ndarray):
 def filter_bias_and_norm(path: Tuple[Any], val: jnp.ndarray):
     """Filter to exclude biases and normalizations weights."""
     del val
-    if path[-1] == "bias" or path[-1] == 'scale':
+    if path[-1] == "bias" or path[-1] == 'scale' or path[-1] == 'gamma':
         return False
     return True
 

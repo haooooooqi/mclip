@@ -267,6 +267,7 @@ class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
   num_classes: int
+  drop_path: float
   patches: Any
   transformer: Any
   hidden_size: int
@@ -284,6 +285,6 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
 
     # apply the encoder
-    x = ConvNeXt(depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.2)(x, train=train)
+    x = ConvNeXt(depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=self.drop_path)(x, train=train)
 
     return x

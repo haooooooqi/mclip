@@ -65,9 +65,12 @@ class DepthwiseConv2D(nn.Module):
         else:
             return conv
 
-initializer = nn.initializers.variance_scaling(
-    0.02, "fan_in", distribution="truncated_normal"
-)
+# initializer = nn.initializers.variance_scaling(
+#     0.02, "fan_in", distribution="truncated_normal"
+# )
+fixed_gaussian_init = nn.initializers.normal(stddev=0.02)
+
+initializer = fixed_gaussian_init
 
 class ConvNeXtBlock(nn.Module):
     dim: int = 256
@@ -173,6 +176,6 @@ class ConvNeXt(nn.Module):
             x = nn.Dense(self.num_classes, kernel_init=initializer, name="head")(x)
         return x
 
-ConvNeXt_tiny = partial(ConvNeXt, depths=(3,3,9,3), dims=(96, 192, 384, 768), drop_path=0.1)
-ConvNeXt_base = partial(ConvNeXt, depths=(3,3,27,3), dims=(128, 256, 512, 1024), drop_path=0.1)
-ConvNeXt_large = partial(ConvNeXt, depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.1)
+ConvNeXt_tiny = partial(ConvNeXt, depths=(3,3,9,3), dims=(96, 192, 384, 768), drop_path=0.1, layer_scale_init_value=1e-6)
+ConvNeXt_base = partial(ConvNeXt, depths=(3,3,27,3), dims=(128, 256, 512, 1024), drop_path=0.2, layer_scale_init_value=1e-6)
+ConvNeXt_large = partial(ConvNeXt, depths=(3,3,27,3), dims=(192, 384, 768, 1536), drop_path=0.5, layer_scale_init_value=1e-6)

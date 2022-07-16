@@ -418,7 +418,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
   model_cls = models_vit.VisionTransformer
-  model = model_cls(num_classes=len(dataset_train.classes), **config.model)
+  model = model_cls(num_classes=len(dataset_train.classes), drop_path=config.model.transformer.droppath_rate, **config.model)
 
   learning_rate_fn = create_learning_rate_fn(
       config, abs_learning_rate, steps_per_epoch)
