@@ -7,7 +7,7 @@ wd=1e-8
 lrd=0.9
 ep=30
 warm=5
-dp=0.2
+dp=0.3
 pdp=0.0
 beta2=0.999
 
