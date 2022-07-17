@@ -1,31 +1,34 @@
 CODEDIR=/checkpoint/xinleic/mae_jax/repo_vit
 
-TPU_NAME=xinleic-mae-iv-1
+TPU_NAME=xinleic-mae-iv-0
 ZONE=europe-west4-a
 
 ################################################################
 # configs
 ################################################################
 
-vitsize=huge2x
+vitsize=huge3x
 batch=1024
-lr=1e-3
-wd=0.02
-lrd=0.75
-ep=50
-warm=5
-dp=0.3
+lr=2.5e-4
+wd=0.3
+ep=100
+warm=20
+dp=0.1
 beta2=0.999
+stopgrad_blocks=-1
+load_bottleneck=False
 
 seed=0
 partitions=8
+partition_states=True
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=huge2x_1600
+JOBNAME=${vitsize}_1600
+TAG=default
 
-PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-WORKDIR=gs://xinleic/mae_jax/checkpoints/tune/${JOBNAME}/wd@${wd}
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/tune/${JOBNAME}/wd@${wd}
+PRETRAIN_DIR=gs://kmh-gcp/checkpoints/flax/20220606_070525_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_huge3x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p4_re1.0_normpix_exwd_split_fastsave
+WORKDIR=gs://xinleic/mae_jax/checkpoints/km_pred/${JOBNAME}/${TAG}
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/km_pred/${JOBNAME}/${TAG}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
@@ -46,7 +49,7 @@ python3 main.py \
     --config.batch_size=${batch} \
     --config.log_every_steps=100 \
     --config.learning_rate=${lr} \
-    --config.learning_rate_decay=${lrd} \
+    --config.learning_rate_decay=1. \
     --config.opt.weight_decay=${wd} \
     --config.opt.b2=${beta2} \
     --config.warmup_epochs=${warm} \
@@ -59,15 +62,21 @@ python3 main.py \
     --config.aug.mix.cutmix=True \
     --config.aug.randerase.on=True \
     --config.aug.autoaug=randaugv2 \
-    --config.model.transformer.droppath_rate=${dp} \
+    --config.model.transformer.droppath_rate=0. \
+    --config.model.sincos=False \
     --config.seed_tf=${seed} \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
     --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
+    --config.partitioning.force_partition_states_data_first=${partition_states} \
+    --config.partitioning.partition_states=${partition_states} \
     --config.pretrain_fmt=t5x \
-    --config.partitioning.partition_states=False \
     --config.torchload.data_dir=/datasets/imagenet-1k \
+    --config.model.predictor.transformer.num_layers=12 \
+    --config.model.predictor.transformer.droppath_rate=${dp} \
+    --config.model.load_bottleneck=${load_bottleneck} \
+    --config.model.stopgrad_blocks=${stopgrad_blocks} \
     2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

@@ -16,17 +16,18 @@ warm=20
 dp=0.1
 beta2=0.999
 stopgrad_blocks=-1
-load_bottleneck=False
+load_bottleneck=True
 
 seed=0
-partitions=8
+partitions=2
 
 CONFIG=cfg_vit_${vitsize}
-JOBNAME=huge2x_1600
+JOBNAME=${vitsize}_1600
+TAG=lb@${load_bottleneck}_tuned
 
 PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-WORKDIR=gs://xinleic/mae_jax/checkpoints/pred/${JOBNAME}/default
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/pred/${JOBNAME}/default
+WORKDIR=gs://xinleic/mae_jax/checkpoints/pred/${JOBNAME}/${TAG}
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/pred/${JOBNAME}/${TAG}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################

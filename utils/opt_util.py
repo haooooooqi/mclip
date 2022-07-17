@@ -65,7 +65,7 @@ def filter_predictor(path: Tuple[Any], val: jnp.ndarray, config: Any):
         trainable_keys += ['pred_posembed']
 
     if config.model.load_bottleneck:
-        pretrained_keys += ['bottleneck']
+        trainable_keys += ['bottleneck']
     else:
         trainable_keys += ['pred_bottleneck']
 

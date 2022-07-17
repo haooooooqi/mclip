@@ -348,9 +348,6 @@ class VisionTransformer(nn.Module):
       bias_init=mlp_bias_init,
       kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
       name=bottleneck_name)(x)
-    if self.load_bottleneck and self.stopgrad_blocks == self.transformer.num_layers + 1:
-      x = jax.lax.stop_gradient(x)
-      logging.info('Stop gradient after bottleneck.')
 
     # add predictor pos emb
     use_cls_token = (self.classifier in {'token', 'tgap'})
