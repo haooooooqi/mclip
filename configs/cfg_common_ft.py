@@ -68,6 +68,7 @@ def get_config():
   config.model.transformer.droppath_rate = 0.1
   
   config.model.transformer.renew_layers = 0
+  config.model.transformer.inter_layers = 0
 
   config.model.num_classes = 1000
   # number of blocks with stop gradient (stopgrad_blocks=1 means stopgrad applied after block0 and before block1)

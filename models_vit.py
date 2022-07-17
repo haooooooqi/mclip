@@ -325,6 +325,7 @@ class Encoder(nn.Module):
   prefix: str = 'encoder'
   adapter: Any = None
   renew_layers: int = 0
+  inter_layers: int = 0
 
   @nn.compact
   def __call__(self, inputs, *, train, encoder_norm=True, stopgrad_blocks=None):
@@ -358,6 +359,20 @@ class Encoder(nn.Module):
           layer_id=lyr,
           adapter=self.adapter,
         )(x, deterministic=not train)
+
+      if lyr >= self.num_layers - self.inter_layers:
+        name = self.prefix + 'block_inter_{:02d}'.format(lyr)
+        x = Encoder1DBlock(
+            mlp_dim=self.mlp_dim,
+            dropout_rate=self.dropout_rate,
+            attention_dropout_rate=self.attention_dropout_rate,
+            droppath_rate=dp,
+            name=name,
+            num_heads=self.num_heads,
+            layer_id=lyr,
+            adapter=self.adapter,
+          )(x, deterministic=not train)
+
       if stopgrad_blocks is not None and stopgrad_blocks == lyr + 1:
         x = jax.lax.stop_gradient(x)
         logging.info('Stop gradient after block: {}'.format(name))

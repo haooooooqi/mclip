@@ -36,7 +36,8 @@ python3 main.py \
     --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220527_064059_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_1600ep_b4096_lr1e-4_mk0.75_s100_p1_normpix_exwd_adamw32' \
     --config.pretrain_fmt=t5x \
     --config.model.canonical_grid=14 \
-    --config.model.transformer.renew_layers=4 \
+    --config.model.transformer.renew_layers=0 \
+    --config.model.transformer.inter_layers=4 \
 
     # --config.torchload.data_dir='/datasets/imagenet-22k' \
     # --config.model.num_classes=21841 \

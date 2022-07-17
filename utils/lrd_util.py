@@ -29,6 +29,9 @@ def _layerwise_lr_decay(
     if layer_name.startswith('Transformer.encoderblock_renew_'):
         layer_idx = path[1][len('encoderblock_renew_'):]  # e.g., '01'
         layer_idx = int(layer_idx)
+    elif layer_name.startswith('Transformer.encoderblock_inter_'):
+        layer_idx = path[1][len('encoderblock_inter_'):]  # e.g., '01'
+        layer_idx = int(layer_idx)
     elif layer_name.startswith('Transformer.encoderblock_'):
         layer_idx = path[1][len('encoderblock_'):]  # e.g., '01'
         layer_idx = int(layer_idx)
