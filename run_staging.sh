@@ -1,5 +1,5 @@
-VM_NAME=kmh-tpuvm-v3-512-1
-# VM_NAME=kmh-tpuvm-v3-256-6
+# VM_NAME=kmh-tpuvm-v3-512-1
+VM_NAME=kmh-tpuvm-v3-256-2
 echo $VM_NAME
 
 # ------------------------------------------------
@@ -21,7 +21,7 @@ echo 'Current dir: '`pwd`
 
 for seed in 0
 do
-source run_remote_in22kto1k.sh
+source run_remote.sh
 
 echo sleep 1m
 sleep 1m
