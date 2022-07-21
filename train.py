@@ -109,16 +109,18 @@ def compute_eval_metrics(logits, labels, labels_one_hot):
 def create_learning_rate_fn(
     config: ml_collections.ConfigDict,
     base_learning_rate: float,
+    min_abs_learning_rate: float,
+    warmup_abs_learning_rate: float,
     steps_per_epoch: int):
   """Create learning rate schedule."""
   warmup_fn = optax.linear_schedule(
-      init_value=config.warmup_abs_lr, end_value=base_learning_rate,
+      init_value=warmup_abs_learning_rate, end_value=base_learning_rate,
       transition_steps=config.warmup_epochs * steps_per_epoch)
   cosine_epochs = max(config.num_epochs - config.warmup_epochs, 1)
   cosine_fn = optax.cosine_decay_schedule(
       init_value=base_learning_rate,
       decay_steps=cosine_epochs * steps_per_epoch,
-      alpha=config.min_abs_lr / base_learning_rate)
+      alpha=min_abs_learning_rate / base_learning_rate)
   schedule_fn = optax.join_schedules(
       schedules=[warmup_fn, cosine_fn],
       boundaries=[config.warmup_epochs * steps_per_epoch])
@@ -416,12 +418,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   assert steps_per_epoch == len(dataset_train) // config.batch_size
   
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
+  min_abs_learning_rate = config.min_abs_lr * config.batch_size / 256.
+  warmup_abs_learning_rate = config.warmup_abs_lr * config.batch_size / 256.
 
   model_cls = models_vit.VisionTransformer
   model = model_cls(num_classes=len(dataset_train.classes), drop_path=config.model.transformer.droppath_rate, **config.model)
 
   learning_rate_fn = create_learning_rate_fn(
-      config, abs_learning_rate, steps_per_epoch)
+      config, abs_learning_rate, min_abs_learning_rate, warmup_abs_learning_rate, steps_per_epoch)
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
 
