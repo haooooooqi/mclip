@@ -6,18 +6,21 @@ lr=$1
 lrd=$2
 ep=$3
 dp=$4
+wep=$5
 ema=0.9999
+mlr=2.5e-7
+wlr=2.5e-7
 
-vitsize=large
+vitsize=base
 CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 
-PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_large/20220707_235231_cx_512a_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
+PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_base/20220721_091038_cx_256b_cfg_mae_base_maetf_100ep_10wep_b4096_lr0.5e-4_mlr0.25e-5_wlr0.25e-6_psize32_lrscosine_TorchLoader_wseed100_simmim'
 name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax_dev_ft/mae_convnext_${vitsize}_sweep/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_fttl_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_s${seed}_${ema}
+JOBNAME=flax_dev_ft/mae_convnext_${vitsize}_sweep/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_${wep}wep_fttl_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_mlr${mlr}_wlr${wlr}_s${seed}_${ema}
 
 WORKDIR=gs://shoubhikdn_storage/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}
@@ -46,8 +49,11 @@ python3 main.py \
     --config.batch_size=${batch} \
     --config.learning_rate=${lr} \
     --config.learning_rate_decay=${lrd} \
+    --config.min_abs_lr=${mlr} \
+    --config.warmup_abs_lr=${wlr} \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
+    --config.warmup_epochs=${wep} \
     --config.save_every_epochs=10 \
     --config.profile_memory=True \
     --config.donate=True \
