@@ -4,7 +4,7 @@ import flax
 import jax.numpy as jnp
 
 
-def GumbelSoftmaxLoss(logits, rng, temperature=1.0, is_hard=False):
+def GumbelSoftmaxWithLoss(logits, rng, tau=1.0, is_hard=False):
   """
   logits: [.., .., K]
   """
@@ -13,10 +13,8 @@ def GumbelSoftmaxLoss(logits, rng, temperature=1.0, is_hard=False):
 
   logits = logits.reshape([-1, K])  # [M, K]
 
-  g = gumbel_softmax(logits, rng, temperature, is_hard)  # gumbel_softmax scores, (M, K)
-
-  from IPython import embed; embed();
-  if (0 == 0): raise NotImplementedError
+  g = gumbel_softmax(logits, rng, tau, is_hard)  # gumbel_softmax scores, (M, K)
+  g = g.reshape(input_shape)  # [N, ..., K]
 
   # compute the KL div loss for regularization
   # v2:
@@ -34,9 +32,9 @@ def GumbelSoftmaxLoss(logits, rng, temperature=1.0, is_hard=False):
   return g, kl_div, perplexity
 
 
-def gumbel_softmax(logits, rng, temperature, is_hard):
-  gumbel_softmax_sample = logits + jax.random.gumbel(rng, logits.shape)
-  y = jax.nn.softmax(gumbel_softmax_sample / temperature, axis=-1)
+def gumbel_softmax(logits, rng, tau, is_hard):
+  gumbels = logits + jax.random.gumbel(rng, logits.shape)
+  y = jax.nn.softmax(gumbels / tau, axis=-1)
 
   if is_hard:
     raise NotImplementedError

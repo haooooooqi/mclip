@@ -330,6 +330,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  gumbel: Any = None
 
   def random_mask(self, x):
     
@@ -465,16 +466,32 @@ class VisionTransformer(nn.Module):
     n, h, w = ids_restore.shape
     ids_restore = jnp.reshape(ids_restore, [n, h * w])
 
-    # apply the encoder-decoder bottleneck
-    x = nn.Dense(
-      features=self.decoder.hidden_size,
-      dtype=self.dtype,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      name='bottleneck')(x)    
 
-    rng = self.make_rng('dropout')
-    x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, temperature=1.0, is_hard=False)
+    if self.gumbel.on:
+      # apply the encoder-decoder bottleneck
+      x = nn.Dense(
+        features=self.gumbel.vocab_size,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='bottleneck')(x)    
+      rng = self.make_rng('dropout')
+      x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
+      x = nn.Dense(
+        features=self.decoder.hidden_size,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='reembed')(x)    
+    else:
+      # apply the encoder-decoder bottleneck
+      x = nn.Dense(
+        features=self.decoder.hidden_size,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='bottleneck')(x)
+      kl_div, perplexity = None, None
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
@@ -501,7 +518,7 @@ class VisionTransformer(nn.Module):
 
     # remove cls token
     pred = x[:, num_clstokens:, :]
-    return pred
+    return pred, kl_div, perplexity
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -538,14 +555,21 @@ class VisionTransformer(nn.Module):
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
+    pred, kl_div, perplexity = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    loss_l2 = self.compute_loss(imgs, pred, mask)
+    if self.gumbel.on:
+      loss_kl = self.gumbel.kl_weight * kl_div
+      loss = loss_l2 + loss_kl
+      artifacts = (loss_l2, loss_kl, perplexity)
+    else:
+      loss = loss_l2
+      artifacts = None
 
     if self.visualize and not train:
       outcome = self.visualization(imgs, pred, mask)
     else:
       outcome = pred  # not used
 
-    return loss, outcome, knn_accuracy
+    return loss, outcome, knn_accuracy, artifacts

@@ -147,4 +147,13 @@ def get_config():
   config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
   config.torchload.num_workers = 32
 
+  # torchload
+  config.model.gumbel = ml_collections.ConfigDict()
+  config.model.gumbel.on = True
+  config.model.gumbel.kl_weight = 1.0
+  config.model.gumbel.tau = 1.0
+  config.model.gumbel.is_hard = False
+
+  config.model.gumbel.vocab_size = 8192
+
   return config

@@ -134,8 +134,8 @@ def train_step(state, batch, learning_rate_fn, config):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    (loss, pred, knn_accuracy), new_variables = outcome
-    return loss, (new_variables, loss, knn_accuracy)
+    (loss, pred, knn_accuracy, artifacts), new_variables = outcome
+    return loss, (new_variables, loss, knn_accuracy, artifacts)
 
   step = state.step
   lr = learning_rate_fn(step)
@@ -145,9 +145,16 @@ def train_step(state, batch, learning_rate_fn, config):
   # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
   grads = lax.pmean(grads, axis_name='batch')
 
-  new_variables, loss, knn_accuracy = aux[1]
+  new_variables, loss, knn_accuracy, artifacts = aux[1]
 
   metrics = {'loss': loss, 'learning_rate': lr, 'knn_accuracy': knn_accuracy}
+
+  if artifacts is not None:
+    loss_l2, loss_kl, perplexity = artifacts
+    metrics['loss_l2'] = loss_l2
+    metrics['loss_kl'] = loss_kl
+    metrics['perplexity'] = perplexity
+
   metrics = lax.pmean(metrics, axis_name='batch')
 
   # ----------------------------------------------------------------------------
@@ -189,7 +196,7 @@ def eval_step(state, batch):
 
   dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))  # kaiming: eval rng should not matter?
   outcome = state.apply_fn(variables, batch, train=False, mutable=False, rngs=dict(dropout=dropout_rng))
-  loss, imgs_vis, _ = outcome
+  loss, imgs_vis, _, artifacts = outcome
 
   metrics = {'test_loss': loss}
   metrics = lax.pmean(metrics, axis_name='batch')
