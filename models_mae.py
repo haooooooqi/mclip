@@ -474,7 +474,7 @@ class VisionTransformer(nn.Module):
       name='bottleneck')(x)    
 
     rng = self.make_rng('dropout')
-    x = gumbel_util.GumbelSoftmaxLoss(logits=x, rng=rng, kl_weight=1.0, temperature=1.0, is_hard=False)
+    x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, temperature=1.0, is_hard=False)
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
