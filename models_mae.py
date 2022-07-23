@@ -28,6 +28,7 @@ from utils import initializers_util
 from utils import attention_util
 from utils import dist_util
 from utils.onlineknn_util import OnlineKNN
+from utils import gumbel_util
 
 
 Array = Any
@@ -471,6 +472,9 @@ class VisionTransformer(nn.Module):
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       name='bottleneck')(x)    
+
+    rng = self.make_rng('dropout')
+    x = gumbel_util.GumbelSoftmaxLoss(logits=x, rng=rng, kl_weight=1.0, temperature=1.0, is_hard=False)
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
