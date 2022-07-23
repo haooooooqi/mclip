@@ -15,6 +15,8 @@
 import functools
 from typing import Any, Callable, Optional, Tuple
 
+from absl import logging
+
 import flax.linen as nn
 import jax.numpy as jnp
 
@@ -150,6 +152,7 @@ class Encoder1DBlock(nn.Module):
   droppath_rate: float = 0.0
   layer_id: int = None
   torch_qkv: bool = False
+  mask: Any = None
 
   @nn.compact
   def __call__(self, inputs, *, deterministic):
@@ -169,6 +172,7 @@ class Encoder1DBlock(nn.Module):
 
     # ----------------------------------------------------
     if self.torch_qkv:
+      raise NotImplementedError
       # revised, QKV
       # we do not need to specify init in finetune
       MsaBlock = functools.partial(
@@ -181,13 +185,13 @@ class Encoder1DBlock(nn.Module):
         kernel_init=msa_kernel_init,)
     # ----------------------------------------------------
 
-    x = MsaBlock(
+    msablock = MsaBlock(
         dtype=self.dtype,
         broadcast_dropout=False,
         deterministic=deterministic,
         dropout_rate=self.attention_dropout_rate,
-        num_heads=self.num_heads)(
-            x, x)
+        num_heads=self.num_heads)
+    x = msablock(x, x, mask=self.mask)
     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
     x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
@@ -226,7 +230,7 @@ class Encoder(nn.Module):
   torch_qkv: bool = False
 
   @nn.compact
-  def __call__(self, inputs, *, train, encoder_norm=True):
+  def __call__(self, inputs, *, train, encoder_norm=True, use_mask=False):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -245,9 +249,23 @@ class Encoder(nn.Module):
     #         inputs)
     # x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
+    # build the mask:
+    # mask: mask for the attention weights. This should be broadcastable to the
+    #   shape `[batch..., num_heads, q_length, kv_length]`.
+    #   This can be used for incorporating causal masks.
+    #   Attention weights are masked out if their corresponding mask value
+    #   is `False`.
+    if use_mask:
+      logging.info('Using mask.')
+      _, L, _ = inputs.shape
+      mask = jnp.tril(jnp.ones(shape=(L, L), dtype=jnp.bool_)) # make a lower triangle
+      mask = jnp.reshape(mask, (1, 1, L, L))
+    else:
+      mask = None
+
     # Input Encoder
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
+      block = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
@@ -255,8 +273,9 @@ class Encoder(nn.Module):
           name='encoderblock_{:02d}'.format(lyr),
           num_heads=self.num_heads,
           layer_id=lyr,
-          torch_qkv=self.torch_qkv)(
-              x, deterministic=not train)
+          torch_qkv=self.torch_qkv,
+          mask=mask)
+      x = block(x, deterministic=not train)
     encoded = nn.LayerNorm(name='encoder_norm')(x) if encoder_norm else x
 
     return encoded
@@ -273,6 +292,7 @@ class VisionTransformer(nn.Module):
   representation_size: Optional[int] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
+  use_mask: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -307,7 +327,7 @@ class VisionTransformer(nn.Module):
     # we add posemb here
     x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'))
+    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'), use_mask=self.use_mask)
 
     if self.classifier == 'token':
       x = x[:, 0]

@@ -49,6 +49,7 @@ from utils import opt_util
 from utils import checkpoint_util
 from utils import lrd_util
 from utils import torchloader_util
+from utils import state_utils
 
 import jax.profiler
 
@@ -308,6 +309,8 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     lrd_func = lrd_util.lrd_func(config.model.transformer.num_layers, config.learning_rate_decay)
     lrd = lrd_util.filter_parameters(params, lrd_func)
     # logging.info('Apply lrd: {}'.format(lrd))
+    logging.info('Apply lrd: {}'.format(state_utils.str_flatten_dict(lrd)))
+    
     tx = optax._src.combine.chain(tx, lrd_util.scale_by_lrd(lrd))
 
   tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
