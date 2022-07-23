@@ -1,17 +1,18 @@
 # run remote
 
 lr=1.0e-4
-ep=100
+ep=800
 batch=4096
 mask=0.75
 
 vocab=8192
+klw=1.0
 
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_gumbel${vocab}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_gumbel${vocab}_klw${klw}_hard
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -50,9 +51,10 @@ python3 main.py \
     --config.seed_pt=${seed} \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
-    --config.model.gumbel.kl_weight=1.0 \
+    --config.model.gumbel.on=True \
+    --config.model.gumbel.kl_weight=${klw} \
     --config.model.gumbel.tau=1.0 \
-    --config.model.gumbel.is_hard=False \
+    --config.model.gumbel.is_hard=True \
     --config.model.gumbel.vocab_size=${vocab} \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log

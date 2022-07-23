@@ -37,6 +37,8 @@ def gumbel_softmax(logits, rng, tau, is_hard):
   y = jax.nn.softmax(gumbels / tau, axis=-1)
 
   if is_hard:
-    raise NotImplementedError
+    z = jnp.max(y, axis=-1, keepdims=True)
+    y_hard = jnp.float32(y == z)
+    y = jax.lax.stop_gradient(y_hard - y) + y
   
   return y

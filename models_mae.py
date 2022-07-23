@@ -475,6 +475,7 @@ class VisionTransformer(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         name='bottleneck')(x)    
+      kl_div, perplexity = 0.0, 0.0
       rng = self.make_rng('dropout')
       x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
       x = nn.Dense(
