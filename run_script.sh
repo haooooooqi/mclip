@@ -23,6 +23,7 @@ python3 main.py \
     --config.eval_only=False \
     --config.model.classifier=gap \
     --config.model.use_mask=True \
+    --config.model.force_encoder_norm=True \
 
     # --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220703_013446_kmh-tpuvm-v3-256-2_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off20'
 

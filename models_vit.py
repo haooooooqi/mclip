@@ -293,6 +293,7 @@ class VisionTransformer(nn.Module):
   classifier: str = 'token'
   dtype: Any = jnp.float32
   use_mask: bool = False
+  force_encoder_norm: bool = False
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -327,7 +328,7 @@ class VisionTransformer(nn.Module):
     # we add posemb here
     x = AddPositionEmbs(posemb_init=posemb_init, name='posembed_encoder')(x)
 
-    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token'), use_mask=self.use_mask)
+    x = Encoder(name='Transformer', **self.transformer)(x, train=train, encoder_norm=(self.classifier == 'token' or self.force_encoder_norm), use_mask=self.use_mask)
 
     if self.classifier == 'token':
       x = x[:, 0]
@@ -337,7 +338,8 @@ class VisionTransformer(nn.Module):
       x = nn.LayerNorm(name='fc_norm')(x)
     elif self.classifier == 'gap':
       x = jnp.mean(x, axis=list(range(1, x.ndim - 1)))  # (1,) or (1,2)
-      x = nn.LayerNorm(name='fc_norm')(x)
+      if not self.force_encoder_norm:
+        x = nn.LayerNorm(name='fc_norm')(x)
     else:
       raise ValueError(f'Invalid classifier={self.classifier}')
 

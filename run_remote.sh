@@ -65,6 +65,7 @@ python3 main.py \
     --config.ema_decay=${ema} \
     --config.model.classifier=gap \
     --config.model.use_mask=True \
+    --config.model.force_encoder_norm=False \
 2>&1 | tee $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/finetune.log
 

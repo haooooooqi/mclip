@@ -69,6 +69,7 @@ def get_config():
   config.model.transformer.torch_qkv = False  # torch_qkv=True means using **one** qkv conv and then seperate it (JAX default is torch_qkv=False)
 
   config.model.use_mask = False
+  config.model.force_encoder_norm = False  # force to use encoder norm
 
   # optimizer config
   config.opt_type = 'adamw'
