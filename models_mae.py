@@ -479,8 +479,8 @@ class VisionTransformer(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         name='bottleneck')(x)
-      norm_x = jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
-      x /= norm_x
+      # norm_x = jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
+      # x /= norm_x
 
       # kl_div, perplexity = 0.0, 0.0
       rng = self.make_rng('dropout')
