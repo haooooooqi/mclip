@@ -331,6 +331,7 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
   gumbel: Any = None
+  loss_all_patches: bool = False 
 
   def random_mask(self, x):
     
@@ -397,7 +398,10 @@ class VisionTransformer(nn.Module):
     loss = jnp.square(pred - target)
     loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
 
-    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    if self.loss_all_patches:
+      loss = jnp.mean(loss)
+    else:
+      loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
   def visualization(self, imgs, pred, mask):
@@ -474,8 +478,11 @@ class VisionTransformer(nn.Module):
         dtype=self.dtype,
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
-        name='bottleneck')(x)    
-      kl_div, perplexity = 0.0, 0.0
+        name='bottleneck')(x)
+      norm_x = jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
+      x /= norm_x
+
+      # kl_div, perplexity = 0.0, 0.0
       rng = self.make_rng('dropout')
       x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
       x = nn.Dense(

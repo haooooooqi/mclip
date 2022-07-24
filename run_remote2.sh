@@ -1,9 +1,10 @@
 # run remote
 
 lr=1.0e-4
-ep=800
+wd=0
+ep=100
 batch=4096
-mask=0.75
+mask=0.
 
 vocab=8192
 klw=1.0
@@ -13,7 +14,7 @@ seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_gumbel${vocab}_klw${klw}_t${tau}_normx
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_wd${wd}_mask${mask}_TorchLoader_wseed${seed}_gumbel${vocab}_klw${klw}_t${tau}_normx_lossall
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -42,6 +43,7 @@ python3 main.py \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
+    --config.opt.weight_decay=${wd} \
     --config.save_every_epochs=50 \
     --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
@@ -57,6 +59,7 @@ python3 main.py \
     --config.model.gumbel.tau=${tau} \
     --config.model.gumbel.is_hard=False \
     --config.model.gumbel.vocab_size=${vocab} \
+    --config.model.loss_all_patches=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 

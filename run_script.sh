@@ -19,6 +19,7 @@ python3 main.py \
     --config.model.transformer.torch_qkv=False \
     --config.model.gumbel.on=True \
     --config.model.gumbel.is_hard=True \
+    --config.model.loss_all_patches=True \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

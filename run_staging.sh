@@ -1,4 +1,4 @@
-VM_NAME=kmh-tpuvm-v3-256-3
+VM_NAME=kmh-tpuvm-v3-256-2
 echo $VM_NAME
 
 # ------------------------------------------------
@@ -18,4 +18,4 @@ cd $STAGEDIR
 echo 'Current dir: '`pwd`
 # ------------------------------------------------
 
-source run_remote.sh
+source run_remote2.sh
