@@ -1,6 +1,6 @@
 CODEDIR=/checkpoint/xinleic/mae_jax/repo_mae
 
-TPU_NAME=xinleic-mae-iv-1
+TPU_NAME=xinleic-mae-iv-0
 ZONE=europe-west4-a
 
 ################################################################
@@ -10,7 +10,7 @@ ZONE=europe-west4-a
 batch=4096
 lr=1e-4
 ep=1600
-mask=0.75
+mask=0.8
 rescale=1.0
 vitsize=huge3x
 
@@ -19,10 +19,10 @@ partitions=4
 partition_states=True
 
 CONFIG=cfg_mae_${vitsize}
-JOBNAME=${vitsize}_${ep}
+JOBNAME=${vitsize}_${ep}_mask@${mask}
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-RESUME_DIR=$WORKDIR
+RESUME_DIR=''
 LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
