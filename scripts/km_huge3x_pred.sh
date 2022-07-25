@@ -9,22 +9,22 @@ ZONE=europe-west4-a
 
 vitsize=huge3x
 batch=1024
-lr=2.5e-4
+lr=1e-4
 wd=0.3
 ep=100
 warm=20
 dp=0.1
 beta2=0.999
 stopgrad_blocks=-1
-load_bottleneck=False
+load_bottleneck=True
 
 seed=0
-partitions=8
+partitions=4
 partition_states=True
 
 CONFIG=cfg_vit_${vitsize}
 JOBNAME=${vitsize}_1600
-TAG=default
+TAG=lb@${load_bottleneck}_lr@${lr}
 
 PRETRAIN_DIR=gs://kmh-gcp/checkpoints/flax/20220606_070525_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_huge3x_p16_1600ep_b4096_lr1e-4_mk0.75_s100_p4_re1.0_normpix_exwd_split_fastsave
 WORKDIR=gs://xinleic/mae_jax/checkpoints/km_pred/${JOBNAME}/${TAG}
