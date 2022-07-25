@@ -104,8 +104,15 @@ def get_config():
 
   config.aug.mix.switch_elementwise = False  # element-wise switch between mixup/cutmix
 
-  # shuffle config
   config.aug.shuffle_buffer_size = 16 * 1024  # following TF
+
+  # second config
+  config.aug.aug_clr = ml_collections.ConfigDict()
+  config.aug.aug_clr.area_range = (0.2, 1)
+  config.aug.aug_clr.aspect_ratio_range = (3. / 4, 4. / 3.)
+  config.aug.aug_clr.crop_ver = 'v4'  # v1, v3
+  config.aug.aug_clr.autoaug = None  # autoaug, randaug, or None
+  config.aug.aug_clr.color_jit = [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id

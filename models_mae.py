@@ -527,6 +527,11 @@ class VisionTransformer(nn.Module):
     imgs = inputs['image']
     labels = inputs['label']
 
+    imgs, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
+    imgs = imgs.squeeze(axis=1)
+    imgs0 = imgs0.squeeze(axis=1)
+    imgs1 = imgs1.squeeze(axis=1)
+
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 

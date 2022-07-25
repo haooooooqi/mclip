@@ -48,17 +48,30 @@ class GeneralImageFolder(datasets.ImageFolder):
         lines = [head] + [" " * self._repr_indent + line for line in body]
         return '\n'.join(lines)
 
+    def __getitem__(self, index: int):
+        path, target = self.samples[index]
+        img = self.loader(path)
+
+        sample = self.transform(img).unsqueeze(0)
+        sample_view0 = self.second_transform(img).unsqueeze(0)
+        sample_view1 = self.second_transform(img).unsqueeze(0)
+
+        sample = torch.cat([sample, sample_view0, sample_view1])
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
+
 
 def build_dataset(is_train, data_dir, aug):
     transform = build_transform(is_train, aug)
+    second_transform = build_transform(is_train, aug.aug_clr)
 
     root = os.path.join(data_dir, 'train' if is_train else 'val')
-    dataset = GeneralImageFolder(root=root, transform=transform, second_transform=transform)
+    dataset = GeneralImageFolder(root=root, transform=transform, second_transform=second_transform)
 
     logging.info(dataset)
-
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
 
     return dataset
 
