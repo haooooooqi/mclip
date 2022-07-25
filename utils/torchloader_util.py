@@ -29,13 +29,36 @@ IMAGE_SIZE = 224
 AUTOAUGS = {'autoaug': 'v0', 'randaugv2': 'rand-m9-mstd0.5-inc1'}
 
 
+class GeneralImageFolder(datasets.ImageFolder):
+    def __init__(self, second_transform, **kwargs):
+        super(GeneralImageFolder, self).__init__(**kwargs)
+        self.second_transform = second_transform
+
+    def __repr__(self) -> str:
+        head = "Dataset " + self.__class__.__name__
+        body = ["Number of datapoints: {}".format(self.__len__())]
+        if self.root is not None:
+            body.append("Root location: {}".format(self.root))
+        body += self.extra_repr().splitlines()
+        if hasattr(self, "transforms") and self.transforms is not None:
+            body += [repr(self.transforms)]
+        body.append("Second Transform: ")
+        if hasattr(self, "second_transform") and self.second_transform is not None:
+            body += [repr(self.second_transform)]
+        lines = [head] + [" " * self._repr_indent + line for line in body]
+        return '\n'.join(lines)
+
+
 def build_dataset(is_train, data_dir, aug):
     transform = build_transform(is_train, aug)
 
     root = os.path.join(data_dir, 'train' if is_train else 'val')
-    dataset = datasets.ImageFolder(root=root, transform=transform)
+    dataset = GeneralImageFolder(root=root, transform=transform, second_transform=transform)
 
     logging.info(dataset)
+
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
 
     return dataset
 
