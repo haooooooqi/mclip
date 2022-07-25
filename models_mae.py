@@ -473,14 +473,20 @@ class VisionTransformer(nn.Module):
 
     if self.gumbel.on:
       # apply the encoder-decoder bottleneck
-      x = nn.Dense(
-        features=self.gumbel.vocab_size,
-        dtype=self.dtype,
-        kernel_init=mlp_kernel_init,
-        bias_init=mlp_bias_init,
-        name='bottleneck')(x)
-      # norm_x = jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
-      # x /= norm_x
+      if self.gumbel.is_norm:
+        x /= jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
+
+        embed = self.param('bottleneck_embed', mlp_kernel_init, [x.shape[-1], self.gumbel.vocab_size])
+        embed /= jnp.linalg.norm(embed, axis=0, keepdims=True) + 1e-20
+
+        x = jnp.einsum('nlc,cd->nld', x, embed)
+      else:
+        x = nn.Dense(
+          features=self.gumbel.vocab_size,
+          dtype=self.dtype,
+          kernel_init=mlp_kernel_init,
+          bias_init=mlp_bias_init,
+          name='bottleneck')(x)
 
       # kl_div, perplexity = 0.0, 0.0
       rng = self.make_rng('dropout')

@@ -153,6 +153,7 @@ def get_config():
   config.model.gumbel.kl_weight = 1.0
   config.model.gumbel.tau = 1.0
   config.model.gumbel.is_hard = False
+  config.model.gumbel.is_norm = False
 
   config.model.gumbel.vocab_size = 8192
 

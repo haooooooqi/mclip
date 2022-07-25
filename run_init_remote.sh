@@ -17,11 +17,15 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
 # pip3 install torchvision==0.8.2
 # pip3 install timm==0.4.12
 
-pip3 list | grep 'jax\|flax\|tensorflow\|clu '
+pip3 uninstall -y optax
+pip3 install optax==0.1.2
+pip3 list | grep 'optax '
 
-python3 -c 'import tensorflow as tf'
-python3 -c 'import jax; print(jax.device_count());'
-python3 -c 'import flax'
+# pip3 list | grep 'jax\|flax\|tensorflow\|clu '
+
+# python3 -c 'import tensorflow as tf'
+# python3 -c 'import jax; print(jax.device_count());'
+# python3 -c 'import flax'
 
 # sudo apt-get -y update
 # sudo apt-get -y install nfs-common
