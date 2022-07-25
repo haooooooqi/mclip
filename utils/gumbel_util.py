@@ -30,6 +30,9 @@ class GumbelVectorQuantizer(nn.Module):
 
     softmax_logits, kl_div, perplexity = GumbelSoftmaxWithLoss(logits, rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
 
+    if self.gumbel.softmax_only:
+      softmax_logits = jax.nn.softmax(logits / self.gumbel.tau, axis=-1)
+
     quantized = jnp.einsum('mk,ck->mc', softmax_logits, emb)  # (M, C), same as x_flat
     quantized = quantized.reshape(x.shape)  # (.., .., C)
 
