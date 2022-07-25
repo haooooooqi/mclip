@@ -1,7 +1,39 @@
 from ast import Not
 import jax
-import flax
 import jax.numpy as jnp
+import flax
+import flax.linen as nn
+
+from typing import Any, Callable, Optional, Tuple
+
+
+class GumbelVectorQuantizer(nn.Module):
+  gumbel: Any  # config of gumbel
+
+  @nn.compact
+  def __call__(self, x, rng):
+    """
+    Input:
+    x: [.., .., C]
+    Output:
+    q: [.., .., C] of the same shape
+    """
+    # prepare the input
+    input_shape = x.shape
+    C = input_shape[-1]
+    x_flat = x.reshape([-1, C])  # (M, C)
+
+    # project x
+    emb = self.param('vq_embed', nn.initializers.xavier_uniform(), [C, self.gumbel.vocab_size])
+
+    logits = jnp.einsum('mc,ck->mk', x_flat, emb)  # (M, K), bigger is more similar
+
+    softmax_logits, kl_div, perplexity = GumbelSoftmaxWithLoss(logits, rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
+
+    quantized = jnp.einsum('mk,ck->mc', softmax_logits, emb)  # (M, C), same as x_flat
+    quantized = quantized.reshape(x.shape)  # (.., .., C)
+
+    return quantized, kl_div, perplexity
 
 
 def GumbelSoftmaxWithLoss(logits, rng, tau=1.0, is_hard=False):

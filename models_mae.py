@@ -20,7 +20,6 @@ import jax.numpy as jnp
 import jax.random as random
 
 import flax.linen as nn
-from uritemplate import partial
 
 
 from utils import posembed_util
@@ -473,30 +472,17 @@ class VisionTransformer(nn.Module):
 
     if self.gumbel.on:
       # apply the encoder-decoder bottleneck
-      if self.gumbel.is_norm:
-        x /= jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
 
-        embed = self.param('bottleneck_embed', mlp_kernel_init, [x.shape[-1], self.gumbel.vocab_size])
-        embed /= jnp.linalg.norm(embed, axis=0, keepdims=True) + 1e-20
-
-        x = jnp.einsum('nlc,cd->nld', x, embed)
-      else:
-        x = nn.Dense(
-          features=self.gumbel.vocab_size,
-          dtype=self.dtype,
-          kernel_init=mlp_kernel_init,
-          bias_init=mlp_bias_init,
-          name='bottleneck')(x)
-
-      # kl_div, perplexity = 0.0, 0.0
       rng = self.make_rng('dropout')
-      x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
+      VQ = gumbel_util.GumbelVectorQuantizer(self.gumbel)
+      x, kl_div, perplexity = VQ(x, rng=rng)
+
       x = nn.Dense(
         features=self.decoder.hidden_size,
         dtype=self.dtype,
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
-        name='reembed')(x)    
+        name='bottleneck')(x)    
     else:
       # apply the encoder-decoder bottleneck
       x = nn.Dense(
