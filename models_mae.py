@@ -643,7 +643,11 @@ class VisionTransformer(nn.Module):
     logits = jnp.einsum('nc,mc->nm', z0, z1)
     logits /= self.clr.tau
     labels_one_hot = jnp.eye(logits.shape[0])
-    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+
+    # symmetric loss for simclr
+    loss01 = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    loss10 = optax.softmax_cross_entropy(logits=logits.transpose(), labels=labels_one_hot)
+    loss = (loss01 + loss10) / 2
     loss = loss.mean()
     loss *= 2 * self.clr.tau
     return loss
