@@ -159,6 +159,8 @@ def get_config():
   config.model.clr.tau = 0.2
   config.model.clr.proj_layers = 2
   config.model.clr.proj_dim_hidden = 2048
-  config.model.clr.proj_dim_out = 256
+  config.model.clr.proj_dim_out = 512
+
+  config.model.clr.loss_weight = 1.0
 
   return config

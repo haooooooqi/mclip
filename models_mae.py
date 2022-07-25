@@ -20,7 +20,7 @@ import jax.numpy as jnp
 import jax.random as random
 
 import flax.linen as nn
-from uritemplate import partial
+import optax
 
 
 from utils import posembed_util
@@ -544,7 +544,7 @@ class VisionTransformer(nn.Module):
     x, mask, ids_restore, encoder_layers = self.apply_encoder(imgs, train=train)
 
     # apply contrastive learning
-    self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
+    loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
@@ -553,14 +553,18 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    loss_l2 = self.compute_loss(imgs, pred, mask)
+
+    loss = loss_l2 + self.clr.loss_weight * loss_clr
 
     if self.visualize and not train:
       outcome = self.visualization(imgs, pred, mask)
     else:
       outcome = pred  # not used
 
-    return loss, outcome, knn_accuracy
+    artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
+
+    return loss, outcome, knn_accuracy, artifacts
 
   # ----------------------------------------
   # contrastive learning
@@ -591,11 +595,14 @@ class VisionTransformer(nn.Module):
     x = blocks(x, train=train)
 
     # apply the head
-    x = self.contrastive_heads(x)
-  
-  def contrastive_heads(self, x):
-    z = x.mean(axis=1)  # [N, C]
+    x = x.mean(axis=1)  # [N, C]
+    z = self.contrastive_heads(x)
 
+    loss_clr = self.contrastive_loss(z, train=train)
+
+    return loss_clr
+
+  def contrastive_heads(self, z):
     for i in range(self.clr.proj_layers - 1):
       z = nn.Dense(
         features=self.clr.proj_dim_hidden,
@@ -613,3 +620,27 @@ class VisionTransformer(nn.Module):
       name='mlp_pred{}'.format(self.clr.proj_layers))(z)
 
     return z
+
+  def contrastive_loss(self, z, train):
+
+    z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
+
+    z0, z1 = jnp.split(z, 2, axis=0)
+
+    # if 'batch' in jax.core.thread_local_state.trace_state.axis_env:
+    if train:
+      z0_all = jax.lax.all_gather(z0, axis_name='batch')
+      z1_all = jax.lax.all_gather(z1, axis_name='batch')
+
+      z0 = z0_all.reshape([-1, z0.shape[-1]])
+      z1 = z1_all.reshape([-1, z1.shape[-1]])
+
+    logits = jnp.einsum('nc,mc->nm', z0, z1)
+    logits /= self.clr.tau
+    labels_one_hot = jnp.eye(logits.shape[0])
+    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    loss = loss.mean()
+    loss *= 2 * self.clr.tau
+    return loss
+
+    
