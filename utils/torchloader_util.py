@@ -40,7 +40,8 @@ class GeneralImageFolder(datasets.ImageFolder):
         if self.root is not None:
             body.append("Root location: {}".format(self.root))
         body += self.extra_repr().splitlines()
-        if hasattr(self, "transforms") and self.transforms is not None:
+        body.append("First Transform: ")
+        if hasattr(self, "transform") and self.transform is not None:
             body += [repr(self.transforms)]
         body.append("Second Transform: ")
         if hasattr(self, "second_transform") and self.second_transform is not None:

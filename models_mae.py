@@ -329,6 +329,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  clr: Any = None
 
   def random_mask(self, x):
     
@@ -425,7 +426,7 @@ class VisionTransformer(nn.Module):
     x = inputs
 
     # We can merge s2d+emb into a single conv; it's the same.
-    x = nn.Conv(
+    patch_embed = nn.Conv(
         features=self.hidden_size,
         kernel_size=self.patches.size,
         strides=self.patches.size,
@@ -433,7 +434,8 @@ class VisionTransformer(nn.Module):
         name='embedding',
         kernel_init=patch_kernel_init,
         bias_init=patch_bias_init,
-        )(x)
+        )
+    x = patch_embed(x)
 
     # Here, x is a grid of embeddings.
 
@@ -441,7 +443,8 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
+    posembed = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')
+    x = posembed(x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
@@ -449,14 +452,19 @@ class VisionTransformer(nn.Module):
 
     # If we want to add a class token, add it here.
     if use_cls_token:
-      cls = self.param('cls', clstoken_init, (1, 1, c))
-      cls = jnp.tile(cls, [n, 1, 1])
+      clstoken = self.param('cls', clstoken_init, (1, 1, c))
+      cls = jnp.tile(clstoken, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
+    else:
+      clstoken = None
 
     # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+    blocks = Encoder(name='Transformer', **self.transformer, prefix='encoder')
+    x = blocks(x, train=train)
 
-    return x, mask, ids_restore
+    layers = (patch_embed, posembed, clstoken, blocks)
+
+    return x, mask, ids_restore, layers
 
   def apply_decoder(self, x, ids_restore, train):
     use_cls_token=(self.classifier == 'token')
@@ -533,7 +541,10 @@ class VisionTransformer(nn.Module):
     imgs1 = imgs1.squeeze(axis=1)
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
+    x, mask, ids_restore, encoder_layers = self.apply_encoder(imgs, train=train)
+
+    # apply contrastive learning
+    self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
@@ -550,3 +561,55 @@ class VisionTransformer(nn.Module):
       outcome = pred  # not used
 
     return loss, outcome, knn_accuracy
+
+  # ----------------------------------------
+  # contrastive learning
+  # ----------------------------------------
+  def apply_contrast(self, imgs0, imgs1, encoder_layers, train):
+    (patch_embed, posembed, clstoken, blocks) = encoder_layers
+
+    use_cls_token=(self.classifier == 'token')
+    assert use_cls_token  # kaiming: TODO: support both?
+
+    x = jnp.concatenate([imgs0, imgs1], axis=0)
+
+    x = patch_embed(x)
+
+    n, h, w, c = x.shape
+    x = jnp.reshape(x, [n, h * w, c])
+
+    x = posembed(x)
+
+    # If we want to add a class token, add it here.
+    if use_cls_token:
+      cls = jnp.tile(clstoken, [n, 1, 1])
+      x = jnp.concatenate([cls, x], axis=1)
+    else:
+      clstoken = None
+
+    # apply the encoder
+    x = blocks(x, train=train)
+
+    # apply the head
+    x = self.contrastive_heads(x)
+  
+  def contrastive_heads(self, x):
+    z = x.mean(axis=1)  # [N, C]
+
+    for i in range(self.clr.proj_layers - 1):
+      z = nn.Dense(
+        features=self.clr.proj_dim_hidden,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='mlp_pred{}'.format(i))(z)
+      z = nn.gelu(z)
+
+    z = nn.Dense(
+      features=self.clr.proj_dim_out,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='mlp_pred{}'.format(self.clr.proj_layers))(z)
+
+    return z
