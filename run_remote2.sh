@@ -7,13 +7,13 @@ batch=4096
 mask=0.25
 
 vocab=8192
-klw=1.0
+beta=0.25
 
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_wd${wd}_mask${mask}_TorchLoader_wseed${seed}_vqvae${vocab}_klw${klw}_lossall
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_wd${wd}_mask${mask}_TorchLoader_wseed${seed}_vqvae${vocab}_beta${beta}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -54,7 +54,7 @@ python3 main.py \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
     --config.model.vqvae.on=True \
-    --config.model.vqvae.kl_weight=${klw} \
+    --config.model.vqvae.beta=${beta} \
     --config.model.vqvae.vocab_size=${vocab} \
     --config.model.loss_all_patches=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log

@@ -7,6 +7,7 @@ import flax.linen as nn
 
 class VectorQuantizer(nn.Module):
   vocab_size: int
+  beta: float
 
   @nn.compact
   def __call__(self, x):
@@ -16,9 +17,6 @@ class VectorQuantizer(nn.Module):
     Output:
     q: [.., .., C] of the same shape
     """
-
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
 
     input_shape = x.shape
     C = input_shape[-1]
@@ -40,27 +38,18 @@ class VectorQuantizer(nn.Module):
     # compute "quantized" x
     quantized = jnp.einsum('mk,ck->mc', encodings, emb)  # (M, C), same as x_flat
     quantized = quantized.reshape(x.shape)  # (.., .., C)
+
+    # compute the VQ loss
+    # reduce_mean: this is l2_dist / D
+    e_latent_loss = ((jax.lax.stop_gradient(quantized) - x)**2).mean()
+    q_latent_loss = ((quantized - jax.lax.stop_gradient(x))**2).mean()
+    loss_vq = q_latent_loss + self.beta * e_latent_loss
+
+    # straight-through estimator
     quantized = x + jax.lax.stop_gradient(quantized - x)
 
+    # compute the perplexity for monitoring
+    avg_probs = encodings.mean(axis=0)  # usage of each embedding, (K,)
+    perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
 
-    # --------------------------------------------
-
-    # logits = logits.reshape([-1, K])  # [M, K]
-
-    # g = gumbel_softmax(logits, rng, is_hard)  # gumbel_softmax scores, (M, K)
-    # g = g.reshape(input_shape)  # [N, ..., K]
-
-    # # compute the KL div loss for regularization
-    # # v2:
-    # q = jax.nn.softmax(logits)  # (N*L, K)
-    # avg_q = q.mean(axis=0)  # (K,)
-    # kl_div = avg_q * (jax.lax.log(avg_q) - jax.lax.log(1.0 / K))  # (K,)
-    # kl_div = kl_div.sum()
-
-    # # compute the perplexity
-    # encoding_indices = jnp.argmax(logits, axis=-1)  # nearest-neighbor encoding, (M,)
-    # encodings = jax.nn.one_hot(encoding_indices, K)  # one-hot, (M, K)
-    # avg_probs = encodings.mean(axis=0)  # usage of each embedding, (K,)
-    # perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
-
-    return g, kl_div, perplexity
+    return quantized, loss_vq, perplexity

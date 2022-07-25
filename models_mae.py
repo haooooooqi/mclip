@@ -471,30 +471,17 @@ class VisionTransformer(nn.Module):
     n, h, w = ids_restore.shape
     ids_restore = jnp.reshape(ids_restore, [n, h * w])
 
-
     if self.vqvae.on:
+      VQ = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size, beta=self.vqvae.beta)
+      x, loss_vq, perplexity = VQ(x)
+
       # apply the encoder-decoder bottleneck
-      # x /= jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
-
-      # embed = self.param('bottleneck_embed', mlp_kernel_init, [x.shape[-1], self.vqvae.vocab_size])
-      # embed /= jnp.linalg.norm(embed, axis=0, keepdims=True) + 1e-20
-
-      # x = jnp.einsum('nlc,cd->nld', x, embed)
-
-      # x = nn.Dense(
-      #   features=self.vqvae.vocab_size,
-      #   dtype=self.dtype,
-      #   kernel_init=mlp_kernel_init,
-      #   bias_init=mlp_bias_init,
-      #   name='bottleneck')(x)
-
-      x, kl_div, perplexity = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size)(x)
       x = nn.Dense(
         features=self.decoder.hidden_size,
         dtype=self.dtype,
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
-        name='reembed')(x)    
+        name='bottleneck')(x)    
     else:
       # apply the encoder-decoder bottleneck
       x = nn.Dense(
@@ -503,7 +490,7 @@ class VisionTransformer(nn.Module):
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         name='bottleneck')(x)
-      kl_div, perplexity = None, None
+      loss_vq, perplexity = None, None
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
@@ -530,7 +517,7 @@ class VisionTransformer(nn.Module):
 
     # remove cls token
     pred = x[:, num_clstokens:, :]
-    return pred, kl_div, perplexity
+    return pred, loss_vq, perplexity
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -567,14 +554,13 @@ class VisionTransformer(nn.Module):
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
-    pred, kl_div, perplexity = self.apply_decoder(x, ids_restore, train=train)
+    pred, loss_vq, perplexity = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
     loss_l2 = self.compute_loss(imgs, pred, mask)
     if self.vqvae.on:
-      loss_kl = self.vqvae.kl_weight * kl_div
-      loss = loss_l2 + loss_kl
-      artifacts = (loss_l2, loss_kl, perplexity)
+      loss = loss_l2 + self.vqvae.loss_vq_weight * loss_vq
+      artifacts = (loss_l2, loss_vq, perplexity)
     else:
       loss = loss_l2
       artifacts = None

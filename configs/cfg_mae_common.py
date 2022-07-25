@@ -150,7 +150,8 @@ def get_config():
   # vqvae
   config.model.vqvae = ml_collections.ConfigDict()
   config.model.vqvae.on = True
-  config.model.vqvae.kl_weight = 1.0
+  config.model.vqvae.beta = 0.25
+  config.model.vqvae.loss_vq_weight = 1.0
 
   config.model.vqvae.vocab_size = 8192
 

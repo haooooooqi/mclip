@@ -150,9 +150,9 @@ def train_step(state, batch, learning_rate_fn, config):
   metrics = {'loss': loss, 'learning_rate': lr, 'knn_accuracy': knn_accuracy}
 
   if artifacts is not None:
-    loss_l2, loss_kl, perplexity = artifacts
+    loss_l2, loss_vq, perplexity = artifacts
     metrics['loss_l2'] = loss_l2
-    metrics['loss_kl'] = loss_kl
+    metrics['loss_vq'] = loss_vq
     metrics['perplexity'] = perplexity
 
   metrics = lax.pmean(metrics, axis_name='batch')
