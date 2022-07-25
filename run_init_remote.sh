@@ -1,4 +1,4 @@
-VM_NAME=kmh-tpuvm-v3-256-6
+VM_NAME=kmh-tpuvm-v3-256-3
 
 gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
@@ -17,9 +17,9 @@ gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
 # pip3 install torchvision==0.8.2
 # pip3 install timm==0.4.12
 
-pip3 uninstall -y optax
-pip3 install optax==0.1.2
-pip3 list | grep 'optax '
+# pip3 uninstall -y optax
+# pip3 install optax==0.1.2
+# pip3 list | grep 'optax '
 
 # pip3 list | grep 'jax\|flax\|tensorflow\|clu '
 
@@ -30,7 +30,7 @@ pip3 list | grep 'optax '
 # sudo apt-get -y update
 # sudo apt-get -y install nfs-common
 # sudo mkdir -p /kmh_data
-# sudo mount 10.60.38.146:/kmh_data /kmh_data
-# sudo chmod go+rw /kmh_data
-# ls /kmh_data
+sudo mount 10.60.38.146:/kmh_data /kmh_data
+sudo chmod go+rw /kmh_data
+ls /kmh_data
 "
