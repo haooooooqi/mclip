@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ast import Not
 import functools
 from typing import Any, Callable, Optional, Tuple
 
@@ -28,7 +29,7 @@ from utils import initializers_util
 from utils import attention_util
 from utils import dist_util
 from utils.onlineknn_util import OnlineKNN
-from utils import gumbel_util
+from utils import vqvae_util
 
 
 Array = Any
@@ -330,7 +331,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
-  gumbel: Any = None
+  vqvae: Any = None
   loss_all_patches: bool = False 
 
   def random_mask(self, x):
@@ -471,26 +472,23 @@ class VisionTransformer(nn.Module):
     ids_restore = jnp.reshape(ids_restore, [n, h * w])
 
 
-    if self.gumbel.on:
+    if self.vqvae.on:
       # apply the encoder-decoder bottleneck
-      if self.gumbel.is_norm:
-        x /= jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
+      # x /= jnp.linalg.norm(x, axis=-1, keepdims=True) + 1e-20
 
-        embed = self.param('bottleneck_embed', mlp_kernel_init, [x.shape[-1], self.gumbel.vocab_size])
-        embed /= jnp.linalg.norm(embed, axis=0, keepdims=True) + 1e-20
+      # embed = self.param('bottleneck_embed', mlp_kernel_init, [x.shape[-1], self.vqvae.vocab_size])
+      # embed /= jnp.linalg.norm(embed, axis=0, keepdims=True) + 1e-20
 
-        x = jnp.einsum('nlc,cd->nld', x, embed)
-      else:
-        x = nn.Dense(
-          features=self.gumbel.vocab_size,
-          dtype=self.dtype,
-          kernel_init=mlp_kernel_init,
-          bias_init=mlp_bias_init,
-          name='bottleneck')(x)
+      # x = jnp.einsum('nlc,cd->nld', x, embed)
 
-      # kl_div, perplexity = 0.0, 0.0
-      rng = self.make_rng('dropout')
-      x, kl_div, perplexity = gumbel_util.GumbelSoftmaxWithLoss(logits=x, rng=rng, tau=self.gumbel.tau, is_hard=self.gumbel.is_hard)
+      # x = nn.Dense(
+      #   features=self.vqvae.vocab_size,
+      #   dtype=self.dtype,
+      #   kernel_init=mlp_kernel_init,
+      #   bias_init=mlp_bias_init,
+      #   name='bottleneck')(x)
+
+      x, kl_div, perplexity = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size)(x)
       x = nn.Dense(
         features=self.decoder.hidden_size,
         dtype=self.dtype,
@@ -573,8 +571,8 @@ class VisionTransformer(nn.Module):
 
     # compute loss
     loss_l2 = self.compute_loss(imgs, pred, mask)
-    if self.gumbel.on:
-      loss_kl = self.gumbel.kl_weight * kl_div
+    if self.vqvae.on:
+      loss_kl = self.vqvae.kl_weight * kl_div
       loss = loss_l2 + loss_kl
       artifacts = (loss_l2, loss_kl, perplexity)
     else:
