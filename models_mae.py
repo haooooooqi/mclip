@@ -575,6 +575,11 @@ class VisionTransformer(nn.Module):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
+    # subsample
+    assert imgs0.shape == imgs1.shape
+    imgs0 = imgs0[:int(self.clr.sample_rate * imgs0.shape[0]), :, :, :]
+    imgs1 = imgs1[:int(self.clr.sample_rate * imgs1.shape[0]), :, :, :]
+
     x = jnp.concatenate([imgs0, imgs1], axis=0)
 
     x = patch_embed(x)

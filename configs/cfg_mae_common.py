@@ -162,5 +162,6 @@ def get_config():
   config.model.clr.proj_dim_out = 512
 
   config.model.clr.loss_weight = 1.0
+  config.model.clr.sample_rate = 0.25
 
   return config
