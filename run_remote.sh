@@ -1,13 +1,13 @@
 # run remote
 
 lr=1.0e-4
-ep=100
+ep=1600
 batch=4096
 mask=0.75
 
 seed=100
 
-CONFIG=cfg_mae_large
+CONFIG=cfg_mae_giant
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
 JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}
 RESUME_DIR=''
