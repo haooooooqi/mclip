@@ -8,12 +8,13 @@ mask=0.75
 tau=0.2
 lossw=1
 rate=0.25
+unshared=4
 
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeclr_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_knnclr
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeclr_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_un${unshared}_knnclr
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -55,6 +56,7 @@ python3 main.py \
     --config.model.clr.tau=${tau} \
     --config.model.clr.loss_weight=${lossw} \
     --config.model.clr.sample_rate=${rate} \
+    --config.model.clr.num_unshared_layers=${unshared} \
     --config.model.clr.knn_clr=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
