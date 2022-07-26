@@ -164,4 +164,6 @@ def get_config():
   config.model.clr.loss_weight = 1.0
   config.model.clr.sample_rate = 0.25
 
+  config.model.clr.knn_clr = False  # use the full feature for knn
+
   return config

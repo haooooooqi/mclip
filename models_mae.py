@@ -544,10 +544,14 @@ class VisionTransformer(nn.Module):
     x, mask, ids_restore, encoder_layers = self.apply_encoder(imgs, train=train)
 
     # apply contrastive learning
-    loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
+    x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x, labels, train=train)
+    if self.clr.knn_clr:
+      labels_clr = labels[:round(self.clr.sample_rate * imgs0.shape[0])]
+      knn_accuracy = self.apply_knn(x_clr, labels_clr, train=train)
+    else:
+      knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
@@ -577,8 +581,8 @@ class VisionTransformer(nn.Module):
 
     # subsample
     assert imgs0.shape == imgs1.shape
-    imgs0 = imgs0[:int(self.clr.sample_rate * imgs0.shape[0]), :, :, :]
-    imgs1 = imgs1[:int(self.clr.sample_rate * imgs1.shape[0]), :, :, :]
+    imgs0 = imgs0[:round(self.clr.sample_rate * imgs0.shape[0]), :, :, :]
+    imgs1 = imgs1[:round(self.clr.sample_rate * imgs1.shape[0]), :, :, :]
 
     x = jnp.concatenate([imgs0, imgs1], axis=0)
 
@@ -598,6 +602,7 @@ class VisionTransformer(nn.Module):
 
     # apply the encoder
     x = blocks(x, train=train)
+    x_clr = jnp.split(x, 2, axis=0)[0]
 
     # apply the head
     x = x.mean(axis=1)  # [N, C]
@@ -605,7 +610,7 @@ class VisionTransformer(nn.Module):
 
     loss_clr = self.contrastive_loss(z, train=train)
 
-    return loss_clr
+    return x_clr, loss_clr
 
   def contrastive_heads(self, z):
     for i in range(self.clr.proj_layers - 1):
