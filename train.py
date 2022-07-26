@@ -476,8 +476,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # train one epoch
     # ------------------------------------------------------------
     for i, batch in enumerate(data_loader_train):
-      if i > 200:
-        break
       batch = parse_batch(batch)
       state, metrics = p_train_step(state, batch)
 
