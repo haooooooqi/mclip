@@ -277,6 +277,7 @@ class Encoder(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
+  start_idx: int = 0
   torch_qkv: bool = False
 
   @nn.compact
@@ -297,7 +298,7 @@ class Encoder(nn.Module):
     if num_layers is None:
       num_layers = self.num_layers
     for lyr in range(num_layers):
-      name = self.prefix + 'block_{:02d}'.format(lyr)
+      name = self.prefix + 'block_{:02d}'.format(lyr + self.start_idx)
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
@@ -310,7 +311,9 @@ class Encoder(nn.Module):
               x, deterministic=not train)
       logging.info('Block: {}/{}'.format(self.name, name))
     if num_layers == self.num_layers:
-      X = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
+      name = self.prefix + '_norm'
+      X = nn.LayerNorm(name=name)(x)  # 'encoder_norm'
+      logging.info('Block: {}/{}'.format(self.name, name))
 
     return x
 
@@ -608,13 +611,14 @@ class VisionTransformer(nn.Module):
       clstoken = None
 
     # apply the encoder
-    x = blocks(x, train=train, num_layers=blocks.num_layers - self.clr.num_unshared_layers)
+    num_shared_layers = blocks.num_layers - self.clr.num_unshared_layers
+    x = blocks(x, train=train, num_layers=num_shared_layers)
 
-    # apply the 
+    # apply the unshared
     if self.clr.num_unshared_layers > 0:
-      cfg = self.transformer
+      cfg = self.transformer.copy_and_resolve_references()
       cfg.num_layers = self.clr.num_unshared_layers
-      blocks_clr = Encoder(name='TransformerCLR', **cfg, prefix='clrencoder')
+      blocks_clr = Encoder(name='TransformerCLR', **cfg, prefix='clrencoder', start_idx=num_shared_layers)
       x = blocks_clr(x, train=train)
 
     x_clr = jnp.split(x, 2, axis=0)[0]
