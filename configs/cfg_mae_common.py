@@ -166,4 +166,6 @@ def get_config():
 
   config.model.clr.knn_clr = False  # use the full feature for knn
 
+  config.model.clr.num_unshared_layers = 0
+
   return config

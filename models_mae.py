@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from re import X
+from absl import logging
 import functools
 from typing import Any, Callable, Optional, Tuple
 
@@ -278,7 +280,7 @@ class Encoder(nn.Module):
   torch_qkv: bool = False
 
   @nn.compact
-  def __call__(self, inputs, *, train):
+  def __call__(self, inputs, *, train, num_layers=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -292,20 +294,25 @@ class Encoder(nn.Module):
 
     x = inputs
     # Input Encoder
-    for lyr in range(self.num_layers):
+    if num_layers is None:
+      num_layers = self.num_layers
+    for lyr in range(num_layers):
+      name = self.prefix + 'block_{:02d}'.format(lyr)
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
           dropout_rate=self.dropout_rate,
           attention_dropout_rate=self.attention_dropout_rate,
           droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
+          name=name,  # 'encoderblock_'
           num_heads=self.num_heads,
           layer_id=lyr,
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
-    encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
+      logging.info('Block: {}/{}'.format(self.name, name))
+    if num_layers == self.num_layers:
+      X = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
 
-    return encoded
+    return x
 
 
 def gather(x, ids):
@@ -601,7 +608,15 @@ class VisionTransformer(nn.Module):
       clstoken = None
 
     # apply the encoder
-    x = blocks(x, train=train)
+    x = blocks(x, train=train, num_layers=blocks.num_layers - self.clr.num_unshared_layers)
+
+    # apply the 
+    if self.clr.num_unshared_layers > 0:
+      cfg = self.transformer
+      cfg.num_layers = self.clr.num_unshared_layers
+      blocks_clr = Encoder(name='TransformerCLR', **cfg, prefix='clrencoder')
+      x = blocks_clr(x, train=train)
+
     x_clr = jnp.split(x, 2, axis=0)[0]
 
     # apply the head
