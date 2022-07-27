@@ -102,4 +102,5 @@
 
 # explore: MAE+SimCLR
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220726_011542_kmh-tpuvm-v3-512-1_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw1_r0.5'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220726_014123_kmh-tpuvm-v3-256-3_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw1_r0.25_knnclr'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220726_014123_kmh-tpuvm-v3-256-3_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw1_r0.25_knnclr'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220726_070056_kmh-tpuvm-v3-256-6_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw1_r0.25_un4_knnclr'
