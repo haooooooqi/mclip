@@ -473,7 +473,7 @@ class VisionTransformer(nn.Module):
 
     if self.vqvae.on:
       VQ = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size, beta=self.vqvae.beta)
-      x, loss_vq, perplexity = VQ(x)
+      x, loss_vq, perplexity = VQ(x, train=train)
 
       # apply the encoder-decoder bottleneck
       x = nn.Dense(

@@ -11,7 +11,7 @@ class VectorQuantizer(nn.Module):
   beta: float
 
   @nn.compact
-  def __call__(self, x):
+  def __call__(self, x, train=True):
     """
     Input:
     x: [.., .., C]
@@ -55,8 +55,11 @@ class VectorQuantizer(nn.Module):
 
     # the ema update version
     running_avg_probs = self.variable('vqvae', 'running_avg_probs', lambda s: jnp.ones(s, jnp.float32) / s[0], (self.vocab_size,))
-    momentum = 0.9
-    running_avg_probs.value = running_avg_probs.value * momentum + avg_probs * (1 - momentum)
-    perplexity = jax.lax.exp(-jnp.sum(running_avg_probs.value * jax.lax.log(running_avg_probs.value + 1e-10)))
+    if train:
+      momentum = 0.9
+      running_avg_probs.value = running_avg_probs.value * momentum + avg_probs * (1 - momentum)
+      avg_probs = running_avg_probs.value
+
+    perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
 
     return quantized, loss_vq, perplexity
