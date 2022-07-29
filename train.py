@@ -78,7 +78,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
   # init = jax.jit(init, backend=init_backend)
   logging.info('Initializing params...')
   variables = init(
-    {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
+    {'params': key, 'dropout': random.PRNGKey(0), 'vqvae': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
     init_batch)
   logging.info('Initializing params done.')
   return variables
@@ -121,11 +121,11 @@ def create_learning_rate_fn(
 
 def train_step(state, batch, learning_rate_fn, config):
   """Perform a single training step."""
-  _, new_rng = jax.random.split(state.rng)
+  new_rng, current_rng = jax.random.split(state.rng)
   # Bind the rng key to the device id (which is unique across hosts)
   # Note: This is only used for multi-host training (i.e. multiple computers
   # each with multiple accelerators).
-  dropout_rng = jax.random.fold_in(state.rng, jax.lax.axis_index('batch'))
+  dropout_rng = jax.random.fold_in(current_rng, jax.lax.axis_index('batch'))
   def loss_fn(params):
     """loss function used for training."""
     mutable = [k for k in state.variables]
@@ -133,7 +133,7 @@ def train_step(state, batch, learning_rate_fn, config):
         {'params': params, **state.variables},
         inputs=batch,
         mutable=mutable,
-        rngs=dict(dropout=dropout_rng),
+        rngs={'dropout': dropout_rng, 'vqvae': current_rng},
         train=True)
     (loss, pred, knn_accuracy, artifacts), new_variables = outcome
     return loss, (new_variables, loss, knn_accuracy, artifacts)

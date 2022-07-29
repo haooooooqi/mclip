@@ -13,6 +13,10 @@ class VectorQuantizer(nn.Module):
   beta: float
   dim: int
   momentum: float = 0.995
+  # Threshold for the discounted count after which the codeword will be
+  # considered unused. For the `dict_momentum` param of 0.995 the codeword
+  # should not be present in ~500 batches in a row.
+  min_count: float = 0.1  # ~= 0.995 ** 500
 
   def setup(self):
     # the ema update version
@@ -62,68 +66,73 @@ class VectorQuantizer(nn.Module):
     x_pre_q = x
     x_q, ids = self.quantize(x, e)
 
+    # perform k-means like update
     if train:
       counts = jnp.zeros(self.vocab_size, dtype=jnp.int32)
       counts = counts.at[ids].add(1)
 
-      from IPython import embed; embed();
-      if (0 == 0): raise NotImplementedError
       x_sum = jnp.zeros_like(self.dictionary.value)
       x_sum = x_sum.at[ids].add(jax.lax.stop_gradient(x_pre_q))
 
+      counts = dist_util.psum(counts, axis_name='batch')
+      x_sum = dist_util.psum(x_sum, axis_name='batch')
 
-    # ------------------------------------------------
-    # compute the "codes"
-    encoding_indices = jnp.argmax(-distances, axis=-1)  # nearest-neighbor encoding, (M,)
-    encodings = jax.nn.one_hot(encoding_indices, self.vocab_size)  # one-hot, (M, K)
+      # update dict
+      self.counts.value = self.counts.value * self.momentum + counts
+      self.dictionary.value = self.dictionary.value * self.momentum + x_sum
 
-    # compute "quantized" x
-    quantized = jnp.einsum('mk,ck->mc', encodings, emb)  # (M, C), same as x_flat
-    quantized = quantized.reshape(x.shape)  # (.., .., C)
+      state = {"dictionary": self.dictionary.value,
+                "counts": self.counts.value,
+                "rng": self.make_rng("vqvae"),  # this should be a device-shared rng
+                "step": jnp.zeros((), dtype=jnp.int32)}
+      # split_the_most_frequent_embedding(state)
+      new_state = jax.lax.while_loop(
+          lambda state: jnp.logical_and(jnp.any(state["counts"] < self.min_count), state["step"] < 100),
+          split_the_most_frequent_embedding,
+          state)
+      self.counts.value = new_state["counts"]
+      self.dictionary.value = new_state["dictionary"]
 
     # compute the VQ loss
     # reduce_mean: this is l2_dist / D
-    e_latent_loss = ((jax.lax.stop_gradient(quantized) - x)**2).mean()
-    q_latent_loss = ((quantized - jax.lax.stop_gradient(x))**2).mean()
-    loss_vq = q_latent_loss + self.beta * e_latent_loss
-
-    # straight-through estimator
-    quantized = x + jax.lax.stop_gradient(quantized - x)
+    e_latent_loss = ((jax.lax.stop_gradient(x_q) - x)**2).mean()
+    # q_latent_loss = ((x_q - jax.lax.stop_gradient(x))**2).mean()
+    loss_vq = self.beta * e_latent_loss
 
     # compute the perplexity for monitoring
-    avg_probs = encodings.mean(axis=0)  # usage of each embedding, (K,)
-    avg_probs = dist_util.pmean(avg_probs, axis_name='batch')
-
-    if train:
-      running_avg_probs = self.running_avg_probs
-      running_avg_probs.value = running_avg_probs.value * self.momentum + avg_probs * (1 - self.momentum)
-      avg_probs = running_avg_probs.value
-
+    avg_probs = self.counts.value
+    avg_probs /= avg_probs.sum()
     perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
 
-    return quantized, loss_vq, perplexity
+    x_q = x_q.reshape(input_shape)
+    return x_q, loss_vq, perplexity
 
 
-def split_embeddings(emb, probs, cfg):
+def split_the_most_frequent_embedding(state):
+  """Splits most frequent embedding into two and eliminates least frequent.
+
+  Args:
+    state: a dict. that contains current jax rng, embeddings and their counts.
+
+  Returns:
+    New dict. with the updated jax rng, embeddings and counts.
   """
-  emb: [D, K]
-  probs: [K,] 
-  """
-  ids_max = jnp.argmax(probs)
-  ids_min = jnp.argmin(probs)
+  rng, e, c, step = state["rng"], state["dictionary"], state["counts"], state["step"]
+  rng, rng_local = jax.random.split(rng)
 
-  prob_max = probs[ids_max]
-  prob_min = probs[ids_min]
-  
-  thr = cfg.threshold
-  if prob_max > prob_min * thr:
-    logging.info('Splitting...')
+  i_max = jnp.argmax(c)
+  i_min = jnp.argmin(c)
 
-    emb_max = emb[:, ids_max]
-    emb_min = emb[:, ids_min]
-    emb_max_jit = emb_max + 1e-6 * emb_min  # hack: slightly change it towards emb_min
+  PERTURB = 0.001
+  jitter = jax.random.uniform(rng_local, (e.shape[1],), jnp.float32, 1.0 - PERTURB, 1.0 + PERTURB)
+  e = e.at[i_min].set(e[i_max] * jitter)
 
-    new_emb = emb.at[:, ids_min].set(emb_max_jit)
-    return new_emb
-  else:
-    return emb
+  c = c.at[i_min].set(c[i_max] / 2.0)
+  c = c.at[i_max].set(c[i_max] / 2.0)
+
+  # dictionary is the sum of centers, so when c is changed, e should be changed
+  e = e.at[i_min].set(e[i_min] / 2.0)
+  e = e.at[i_max].set(e[i_max] / 2.0)
+
+  step += 1
+  return {"rng": rng, "dictionary": e, "counts": c, "step": step}
