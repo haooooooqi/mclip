@@ -11,29 +11,68 @@ from utils import dist_util
 class VectorQuantizer(nn.Module):
   vocab_size: int
   beta: float
+  dim: int
+  momentum: float = 0.995
 
-  @nn.compact
-  def __call__(self, x, train=True):
+  def setup(self):
+    # the ema update version
+    norm_init = nn.initializers.normal(stddev=1.0 / (self.vocab_size**.5))
+    self.dictionary = self.variable('vqvae', 'dictionary',
+      lambda shape: norm_init(self.make_rng("params"), shape),
+      (self.vocab_size, self.dim,))
+    self.counts = self.variable('vqvae', 'counts', lambda shape: jnp.ones(shape, jnp.float32), (self.vocab_size,))
+
+  def get_codewords(self):
+    e = self.dictionary.value / self.counts.value[:, None]
+    return e
+
+  @staticmethod
+  def quantize(x, e):
+    """
+    x: [M, C]
+    e: [K, C]
+    """
+    distances = (
+      (x**2).sum(axis=1, keepdims=True)  # (M, 1)
+      - 2 * jnp.einsum('mc,kc->mk', x, e)  # (M, K)
+      + (e**2).sum(axis=1)  # (K,)
+    )  # (M, K)
+    ids = jnp.argmin(distances, axis=-1)  # nearest-neighbor encoding, (M,)
+
+    one_hot = jax.nn.one_hot(ids, e.shape[0])  # one-hot, (M, K)
+    x_q = jnp.einsum('mk,kc->mc', one_hot, e)  # (M, C), same as x
+
+    x_q = x + jax.lax.stop_gradient(x_q - x)  # straight-through estimator
+    return x_q, ids
+
+  def __call__(self, inputs, train=True, split=False):
     """
     Input:
-    x: [.., .., C]
+    inputs: [.., .., C]
     Output:
     q: [.., .., C] of the same shape
     """
 
-    input_shape = x.shape
+    input_shape = inputs.shape
     C = input_shape[-1]
 
-    emb = self.param('vq_embed', nn.initializers.xavier_uniform(), [C, self.vocab_size])
+    x = inputs.reshape([-1, C])  # (M, C)
 
-    x_flat = x.reshape([-1, C])  # (M, C)
+    e = self.get_codewords()
+    x_pre_q = x
+    x_q, ids = self.quantize(x, e)
 
-    distances = (
-      (x_flat**2).sum(axis=1, keepdims=True)  # (M, 1)
-      - 2 * jnp.einsum('mc,ck->mk', x_flat, emb)  # (M, K)
-      + (emb**2).sum(axis=0, keepdims=True)  # (1, K)
-    )  # (M, K)
+    if train:
+      counts = jnp.zeros(self.vocab_size, dtype=jnp.int32)
+      counts = counts.at[ids].add(1)
 
+      from IPython import embed; embed();
+      if (0 == 0): raise NotImplementedError
+      x_sum = jnp.zeros_like(self.dictionary.value)
+      x_sum = x_sum.at[ids].add(jax.lax.stop_gradient(x_pre_q))
+
+
+    # ------------------------------------------------
     # compute the "codes"
     encoding_indices = jnp.argmax(-distances, axis=-1)  # nearest-neighbor encoding, (M,)
     encodings = jax.nn.one_hot(encoding_indices, self.vocab_size)  # one-hot, (M, K)
@@ -55,11 +94,9 @@ class VectorQuantizer(nn.Module):
     avg_probs = encodings.mean(axis=0)  # usage of each embedding, (K,)
     avg_probs = dist_util.pmean(avg_probs, axis_name='batch')
 
-    # the ema update version
-    running_avg_probs = self.variable('vqvae', 'running_avg_probs', lambda s: jnp.ones(s, jnp.float32) / s[0], (self.vocab_size,))
     if train:
-      momentum = 0.9
-      running_avg_probs.value = running_avg_probs.value * momentum + avg_probs * (1 - momentum)
+      running_avg_probs = self.running_avg_probs
+      running_avg_probs.value = running_avg_probs.value * self.momentum + avg_probs * (1 - self.momentum)
       avg_probs = running_avg_probs.value
 
     perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))

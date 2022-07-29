@@ -512,18 +512,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
       # --------------------------------------------------
       # hack for split
-      if config.model.vqvae.split.on and (i + 1) % config.model.vqvae.split.check_every_steps == 0:
-        new_emb = vqvae_util.split_embeddings(
-          emb=state.params['VectorQuantizer_0']['vq_embed'][0],
-          probs=state.variables['vqvae']['VectorQuantizer_0']['running_avg_probs'][0],
-          cfg=config.model.vqvae.split,
-        )
-        new_emb = jax_utils.replicate(new_emb)
-        new_params = flax.core.frozen_dict.unfreeze(state.params)
-        del new_params['VectorQuantizer_0']['vq_embed']
-        new_params['VectorQuantizer_0']['vq_embed'] = new_emb
-        new_params = flax.core.frozen_dict.freeze(new_params)
-        state = state.replace(params=new_params)
+      # if config.model.vqvae.split.on and (i + 1) % config.model.vqvae.split.check_every_steps == 0:
+      #   new_emb = vqvae_util.split_embeddings(
+      #     emb=state.params['VectorQuantizer_0']['vq_embed'][0],
+      #     probs=state.variables['vqvae']['VectorQuantizer_0']['running_avg_probs'][0],
+      #     cfg=config.model.vqvae.split,
+      #   )
+      #   new_emb = jax_utils.replicate(new_emb)
+      #   new_params = flax.core.frozen_dict.unfreeze(state.params)
+      #   del new_params['VectorQuantizer_0']['vq_embed']
+      #   new_params['VectorQuantizer_0']['vq_embed'] = new_emb
+      #   new_params = flax.core.frozen_dict.freeze(new_params)
+      #   state = state.replace(params=new_params)
       # --------------------------------------------------
         
       epoch_1000x = int(step * config.batch_size / 1281167 * 1000)  # normalize to IN1K epoch anyway

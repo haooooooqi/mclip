@@ -472,8 +472,8 @@ class VisionTransformer(nn.Module):
     ids_restore = jnp.reshape(ids_restore, [n, h * w])
 
     if self.vqvae.on:
-      VQ = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size, beta=self.vqvae.beta)
-      x, loss_vq, perplexity = VQ(x, train=train)
+      VQ = vqvae_util.VectorQuantizer(vocab_size=self.vqvae.vocab_size, beta=self.vqvae.beta, dim=x.shape[-1], name='vector_quantizer')
+      x, loss_vq, perplexity = VQ(x, train=train, split=self.vqvae.split.on)
 
       # apply the encoder-decoder bottleneck
       x = nn.Dense(
