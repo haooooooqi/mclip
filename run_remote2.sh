@@ -4,7 +4,7 @@ lr=1.0e-4
 wd=0
 ep=100
 batch=4096
-mask=0.5
+mask=0.25
 warm=40
 
 vocab=8192
@@ -14,7 +14,7 @@ seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_wd${wd}_mask${mask}_TorchLoader_wseed${seed}_warm${warm}_vqvae${vocab}_beta${beta}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_wd${wd}_mask${mask}_TorchLoader_wseed${seed}_warm${warm}_vqvae${vocab}_beta${beta}_ema
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}

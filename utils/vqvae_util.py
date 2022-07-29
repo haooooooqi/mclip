@@ -3,6 +3,7 @@ import flax
 import jax.numpy as jnp
 
 import flax.linen as nn
+from utils import dist_util
 
 
 class VectorQuantizer(nn.Module):
@@ -50,6 +51,12 @@ class VectorQuantizer(nn.Module):
 
     # compute the perplexity for monitoring
     avg_probs = encodings.mean(axis=0)  # usage of each embedding, (K,)
-    perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
+    avg_probs = dist_util.pmean(avg_probs, axis_name='batch')
+
+    # the ema update version
+    running_avg_probs = self.variable('vqvae', 'running_avg_probs', lambda s: jnp.ones(s, jnp.float32) / s[0], (self.vocab_size,))
+    momentum = 0.9
+    running_avg_probs.value = running_avg_probs.value * momentum + avg_probs * (1 - momentum)
+    perplexity = jax.lax.exp(-jnp.sum(running_avg_probs.value * jax.lax.log(running_avg_probs.value + 1e-10)))
 
     return quantized, loss_vq, perplexity
