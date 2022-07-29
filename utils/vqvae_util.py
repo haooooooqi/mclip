@@ -2,6 +2,8 @@ import jax
 import flax
 import jax.numpy as jnp
 
+from absl import logging
+
 import flax.linen as nn
 from utils import dist_util
 
@@ -63,3 +65,28 @@ class VectorQuantizer(nn.Module):
     perplexity = jax.lax.exp(-jnp.sum(avg_probs * jax.lax.log(avg_probs + 1e-10)))
 
     return quantized, loss_vq, perplexity
+
+
+def split_embeddings(emb, probs, cfg):
+  """
+  emb: [D, K]
+  probs: [K,] 
+  """
+  ids_max = jnp.argmax(probs)
+  ids_min = jnp.argmin(probs)
+
+  prob_max = probs[ids_max]
+  prob_min = probs[ids_min]
+  
+  thr = cfg.threshold
+  if prob_max > prob_min * thr:
+    logging.info('Splitting...')
+
+    emb_max = emb[:, ids_max]
+    emb_min = emb[:, ids_min]
+    emb_max_jit = emb_max + 1e-6 * emb_min  # hack: slightly change it towards emb_min
+
+    new_emb = emb.at[:, ids_min].set(emb_max_jit)
+    return new_emb
+  else:
+    return emb

@@ -155,6 +155,11 @@ def get_config():
 
   config.model.vqvae.vocab_size = 8192
 
+  config.model.vqvae.split = ml_collections.ConfigDict()
+  config.model.vqvae.split.on = False
+  config.model.vqvae.split.check_every_steps = 10
+  config.model.vqvae.split.threshold = 100.0  # trigger
+
   config.model.loss_all_patches = False
 
   return config
