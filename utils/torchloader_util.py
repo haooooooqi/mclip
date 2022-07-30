@@ -65,14 +65,12 @@ class GeneralImageFolder(datasets.ImageFolder):
         path, target = self.samples[index]
         img = self.loader(path)
 
-        patches = self.transform_crops(img)
+        patch_a, patch_b = self.transform_crops(img)
 
+        sample_a = self.transform(patch_a).unsqueeze()
+        sample_b = self.transform(patch_b).unsqueeze()
 
-        sample = self.transform(img).unsqueeze(0)
-        sample_view0 = self.second_transform(img).unsqueeze(0)
-        sample_view1 = self.second_transform(img).unsqueeze(0)
-
-        sample = torch.cat([sample, sample_view0, sample_view1])
+        sample = torch.cat([sample_a, sample_b])
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -86,7 +84,9 @@ def build_dataset(is_train, data_dir, aug):
         patch_size=aug.patch_size,
         super_size=aug.super_size,
         ref_img_size=224,
-        scale=aug.area_range, ratio=aug.aspect_ratio_range,
+        scale=aug.area_range,
+        ratio=aug.aspect_ratio_range,
+        patch_scale=aug.patch_area_range,
         interpolation=Image.BICUBIC)
 
     # other non-geometric transforms
@@ -106,6 +106,7 @@ def build_dataset(is_train, data_dir, aug):
 
 
 def build_transform(is_train, aug):
+    raise NotImplementedError
     input_size = IMAGE_SIZE
 
     mean = IMAGENET_DEFAULT_MEAN
@@ -125,8 +126,6 @@ def build_transform(is_train, aug):
             mean=mean,
             std=std,
         )
-        from IPython import embed; embed();
-        if (0 == 0): raise NotImplementedError
         return transform
     else:  # eval transform
         raise NotImplementedError
@@ -213,7 +212,7 @@ def _setup_size(size, error_msg):
     return size
 
 class RandomPatchCrop(torch.nn.Module):
-    def __init__(self, patch_size, super_size, ref_img_size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR):
+    def __init__(self, patch_size, super_size, ref_img_size, patch_scale, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR):
         super().__init__()
         self.patch_size = _setup_size(patch_size, error_msg="")
         self.super_size = _setup_size(super_size, error_msg="")
@@ -232,22 +231,13 @@ class RandomPatchCrop(torch.nn.Module):
         self.scale = (scale[0] * area_rescale, scale[1] * area_rescale)
         self.ratio = ratio
 
+        self.patch_scale = patch_scale
+
     @staticmethod
     def get_params(
-            img: Tensor, scale: List[float], ratio: List[float]
+            width, height, scale: List[float], ratio: List[float]
     ) -> Tuple[int, int, int, int]:
-        """Get parameters for ``crop`` for a random sized crop.
-
-        Args:
-            img (PIL Image or Tensor): Input image.
-            scale (list): range of scale of the origin size cropped
-            ratio (list): range of aspect ratio of the origin aspect ratio cropped
-
-        Returns:
-            tuple: params (i, j, h, w) to be passed to ``crop`` for a random
-                sized crop.
-        """
-        width, height = F._get_image_size(img)
+        # width, height = F._get_image_size(img)
         area = height * width
 
         for _ in range(10):
@@ -288,13 +278,24 @@ class RandomPatchCrop(torch.nn.Module):
         Returns:
             PIL Image or Tensor: Randomly cropped and resized image.
         """
-        i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        return F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
+        # step 1: crop the super patch 
+        width, height = F._get_image_size(img)
+        i, j, h, w = self.get_params(width, height, self.scale, self.ratio)
+
+        # step 2: crop the patch
+        i2, j2, h2, w2 = self.get_params(w, h, self.patch_scale, self.ratio)
+        patch_a = F.resized_crop(img, i + i2, j + j2, h2, w2, self.patch_size, self.interpolation)
+
+        i2, j2, h2, w2 = self.get_params(w, h, self.patch_scale, self.ratio)
+        patch_b = F.resized_crop(img, i + i2, j + j2, h2, w2, self.patch_size, self.interpolation)
+
+        return patch_a, patch_b
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]
         format_string = self.__class__.__name__ + '(patch_size={0}'.format(self.patch_size)
-        format_string += self.__class__.__name__ + '(super_size={0}'.format(self.super_size)
+        format_string += ', super_size={0}'.format(self.super_size)
+        format_string += ', patch_scale={0}'.format(tuple(round(s, 4) for s in self.patch_scale))
         format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
         format_string += ', ratio={0}'.format(tuple(round(r, 4) for r in self.ratio))
         format_string += ', interpolation={0})'.format(interpolate_str)

@@ -41,7 +41,6 @@ import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import input_pipeline
 import models_mae
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'

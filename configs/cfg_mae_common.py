@@ -108,6 +108,7 @@ def get_config():
 
   config.aug.patch_size = 16
   config.aug.super_size = 32
+  config.aug.patch_area_range = (0.25, 1.)  # the range of cropping a patch from a super patch
 
   # second config
   # config.aug.aug_clr = ml_collections.ConfigDict()
