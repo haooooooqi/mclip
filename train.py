@@ -51,6 +51,7 @@ from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
 from utils import state_utils
+from utils import checkpoint_util
 
 import torch
 
@@ -434,7 +435,13 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
   state = create_train_state(rng, config, model, image_size, learning_rate_fn)
-  state = restore_checkpoint(state, workdir if config.resume_dir == '' else config.resume_dir)
+
+  if config.resume_dir != '':
+    state = restore_checkpoint(state, config.resume_dir)
+  elif config.token_pretrain_dir != '':
+    logging.info('Loading from token pre-training:')
+    state = checkpoint_util.load_from_pretrain(state, config.token_pretrain_dir)
+
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
 

@@ -17,6 +17,7 @@ python3 main.py \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=False \
     --config.model.transformer.torch_qkv=False \
+    --config.token_pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220730_031232_kmh-tpuvm-v3-256-3_cfg_mae_large_maeclr_800ep_b2048_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.1_re4'
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
