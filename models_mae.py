@@ -141,6 +141,35 @@ class AddPositionEmbs(nn.Module):
     return output
 
 
+class MlpEncoder(nn.Module):
+  """Simple Mlp Encoder."""
+  proj_layers: int
+  proj_dim_hidden: int
+  proj_dim_out: int
+  dtype: Dtype = jnp.float32
+
+  @nn.compact
+  def __call__(self, inputs):
+    z = inputs
+    for i in range(self.proj_layers - 1):
+      z = nn.Dense(
+        features=self.proj_dim_hidden,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='mlp_enc{}'.format(i))(z)
+      z = nn.relu(z)
+
+    z = nn.Dense(
+      features=self.proj_dim_out,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='mlp_enc{}'.format(self.proj_layers))(z)
+
+    return z
+
+
 class MlpBlock(nn.Module):
   """Transformer MLP / feed-forward block."""
 
@@ -545,7 +574,13 @@ class VisionTransformer(nn.Module):
     logging.info('x.shape: {}'.format(x.shape))
 
     x = x.reshape([x.shape[0], -1])  # flatten
-    z = self.contrastive_heads(x)
+    z = MlpEncoder(
+      proj_layers=self.clr.proj_layers,
+      proj_dim_hidden=self.clr.proj_dim_hidden,
+      proj_dim_out=self.clr.proj_dim_out,
+      name='PatchEncoder')(x)
+
+    # z = self.contrastive_heads(x)
     loss_clr = self.contrastive_loss(z, train=train)
 
     loss = loss_clr

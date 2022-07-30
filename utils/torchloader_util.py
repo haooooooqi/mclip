@@ -78,7 +78,7 @@ class GeneralImageFolder(datasets.ImageFolder):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return sample, target
+        return samples, target
 
 
 def build_dataset(is_train, data_dir, aug):

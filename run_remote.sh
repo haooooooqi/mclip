@@ -5,7 +5,7 @@ ep=800
 batch=2048
 mask=0.75
 
-tau=0.2
+tau=0.1
 repeat=4
 
 seed=100
@@ -53,7 +53,6 @@ python3 main.py \
     --config.resume_dir=$RESUME_DIR \
     --config.model.clr.tau=${tau} \
     --config.aug.repeat=${repeat} \
-    --config.model.clr.knn_clr=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
