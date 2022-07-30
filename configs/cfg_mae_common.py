@@ -147,4 +147,11 @@ def get_config():
   config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
   config.torchload.num_workers = 32
 
+  # mixup config
+  config.model.clr = ml_collections.ConfigDict()
+  config.model.clr.tau = 0.2
+  config.model.clr.proj_layers = 4
+  config.model.clr.proj_dim_hidden = 512
+  config.model.clr.proj_dim_out = 128
+
   return config

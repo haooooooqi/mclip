@@ -308,6 +308,35 @@ class Encoder(nn.Module):
     return encoded
 
 
+class MlpEncoder(nn.Module):
+  """Simple Mlp Encoder."""
+  proj_layers: int
+  proj_dim_hidden: int
+  proj_dim_out: int
+  dtype: Dtype = jnp.float32
+
+  @nn.compact
+  def __call__(self, inputs):
+    z = inputs
+    for i in range(self.proj_layers - 1):
+      z = nn.Dense(
+        features=self.proj_dim_hidden,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='mlp_enc{}'.format(i))(z)
+      z = nn.relu(z)
+
+    z = nn.Dense(
+      features=self.proj_dim_out,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='mlp_enc{}'.format(self.proj_layers))(z)
+
+    return z
+
+
 def gather(x, ids):
   return x[ids]
 vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
@@ -329,6 +358,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  clr: Any = None
 
   def random_mask(self, x):
     
@@ -521,11 +551,22 @@ class VisionTransformer(nn.Module):
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
     return knn_accuracy
 
+  def apply_patchclr(self, imgs, train):
+    x = self.patchify(imgs)
+    z = MlpEncoder(
+      proj_layers=self.clr.proj_layers,
+      proj_dim_hidden=self.clr.proj_dim_hidden,
+      proj_dim_out=self.clr.proj_dim_out,
+      name='PatchEncoder')(x)
+    return z
 
   @nn.compact
   def __call__(self, inputs, *, train):
     imgs = inputs['image']
     labels = inputs['label']
+
+    # apply patchclr
+    z = self.apply_patchclr(imgs, train=train)
 
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
