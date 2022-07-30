@@ -92,7 +92,7 @@ def get_config():
 
   config.aug.autoaug = None  # autoaug, randaug, or None
 
-  config.aug.color_jit = None  # [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
+  config.aug.color_jit = [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
   # mixup config
   config.aug.mix = ml_collections.ConfigDict()
@@ -106,13 +106,16 @@ def get_config():
 
   config.aug.shuffle_buffer_size = 16 * 1024  # following TF
 
+  config.aug.patch_size = 16
+  config.aug.super_size = 32
+
   # second config
-  config.aug.aug_clr = ml_collections.ConfigDict()
-  config.aug.aug_clr.area_range = (0.2, 1)
-  config.aug.aug_clr.aspect_ratio_range = (3. / 4, 4. / 3.)
-  config.aug.aug_clr.crop_ver = 'v4'  # v1, v3
-  config.aug.aug_clr.autoaug = None  # autoaug, randaug, or None
-  config.aug.aug_clr.color_jit = [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
+  # config.aug.aug_clr = ml_collections.ConfigDict()
+  # config.aug.aug_clr.area_range = (0.2, 1)
+  # config.aug.aug_clr.aspect_ratio_range = (3. / 4, 4. / 3.)
+  # config.aug.aug_clr.crop_ver = 'v4'  # v1, v3
+  # config.aug.aug_clr.autoaug = None  # autoaug, randaug, or None
+  # config.aug.aug_clr.color_jit = [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id

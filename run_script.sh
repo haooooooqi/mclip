@@ -18,7 +18,7 @@ python3 main.py \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
     --config.model.clr.knn_clr=True \
-    --config.model.clr.num_unshared_layers=1 \
+    --config.model.clr.num_unshared_layers=0 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
