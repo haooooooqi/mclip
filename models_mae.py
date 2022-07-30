@@ -428,6 +428,24 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
+  def compute_token_loss(self, target, pred, mask):
+    """
+    target: [N, H, W, D]
+    pred: [N, L, D]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    z = target
+    # normalize
+    z /= jnp.linalg.norm(z, axis=-1, keepdims=True) + 1e-8  # we did this in pre-training
+    pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
+
+    # l2 loss (not contrastive yet)
+    loss = jnp.square(pred - z)
+    loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
+
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
+
   def visualization(self, imgs, pred, mask):
     """
     imgs: [N, H, W, 3]
@@ -519,7 +537,8 @@ class VisionTransformer(nn.Module):
 
     # apply the predictor
     x = nn.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
+      # features=self.patches.size[0] * self.patches.size[1] * 3,
+      features=self.clr.proj_dim_out,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
@@ -567,6 +586,7 @@ class VisionTransformer(nn.Module):
 
     # apply patchclr
     z = self.apply_patchclr(imgs, train=train)
+    z = jax.lax.stop_gradient(z)
 
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
@@ -578,9 +598,11 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    # loss = self.compute_loss(imgs, pred, mask)
+    loss = self.compute_token_loss(z, pred, mask)
 
     if self.visualize and not train:
+      raise NotImplementedError
       outcome = self.visualization(imgs, pred, mask)
     else:
       outcome = pred  # not used
