@@ -33,15 +33,14 @@ import warnings
 from collections.abc import Sequence
 from typing import Tuple, List
 
-IMAGE_SIZE = 224
-
 AUTOAUGS = {'autoaug': 'v0', 'randaugv2': 'rand-m9-mstd0.5-inc1'}
 
 
 class GeneralImageFolder(datasets.ImageFolder):
-    def __init__(self, transform_crops, **kwargs):
+    def __init__(self, transform_crops, repeat, **kwargs):
         super(GeneralImageFolder, self).__init__(**kwargs)
         self.transform_crops = transform_crops
+        self.repeat = repeat
 
     def __repr__(self) -> str:
         head = "Dataset " + self.__class__.__name__
@@ -65,12 +64,16 @@ class GeneralImageFolder(datasets.ImageFolder):
         path, target = self.samples[index]
         img = self.loader(path)
 
-        patch_a, patch_b = self.transform_crops(img)
-
-        sample_a = self.transform(patch_a).unsqueeze()
-        sample_b = self.transform(patch_b).unsqueeze()
-
-        sample = torch.cat([sample_a, sample_b])
+        samples = []
+        for _ in range(self.repeat):
+            patch_a, patch_b = self.transform_crops(img)
+            sample_a = self.transform(patch_a).unsqueeze(0)
+            sample_b = self.transform(patch_b).unsqueeze(0)
+            sample = torch.cat([sample_a, sample_b], axis=0)
+            samples.append(sample.unsqueeze(0))
+        samples = torch.cat(samples, axis=0)  # [repeat, view, c, h, w]
+        repeat, view, c, h, w = samples.shape
+        samples = samples.view([-1, c, h, w])  # [repeat * view, c, h, w]
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -98,7 +101,7 @@ def build_dataset(is_train, data_dir, aug):
     transform = transforms.Compose(t)
     
     root = os.path.join(data_dir, 'train' if is_train else 'val')
-    dataset = GeneralImageFolder(root=root, transform=transform, transform_crops=transform_crops)
+    dataset = GeneralImageFolder(root=root, transform=transform, transform_crops=transform_crops, repeat=aug.repeat)
 
     logging.info(dataset)
 

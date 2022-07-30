@@ -65,8 +65,9 @@ import random as _random
 
 
 def initialized(key, image_size, model, init_backend='tpu'):
-  init_batch_size = 16
-  input_shape = (init_batch_size, 3, image_size, image_size, 3)
+  init_batch_size = 4
+  repeat = 4
+  input_shape = (init_batch_size, repeat * 2, image_size, image_size, 3)
   # TODO{kaiming}: load a real batch
   init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
     'label': jnp.zeros((init_batch_size,), jnp.int32)}
@@ -280,7 +281,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     )
   else:
     mask = None
-  # logging.info('Apply weight decay: {}'.format(mask))
+  logging.info('Apply weight decay: {}'.format(mask))
 
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
@@ -362,7 +363,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   rng = random.PRNGKey(config.seed_jax)  # used to be 0
 
-  image_size = 224
+  image_size = config.aug.patch_size
 
   if config.batch_size % jax.device_count() > 0:
     raise ValueError('Batch size must be divisible by the number of devices')

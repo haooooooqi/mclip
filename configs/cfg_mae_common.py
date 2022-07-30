@@ -108,15 +108,9 @@ def get_config():
 
   config.aug.patch_size = 16
   config.aug.super_size = 32
-  config.aug.patch_area_range = (0.25, 1.)  # the range of cropping a patch from a super patch
+  config.aug.patch_area_range = (0.25, 0.75)  # the range of cropping a patch from a super patch
 
-  # second config
-  # config.aug.aug_clr = ml_collections.ConfigDict()
-  # config.aug.aug_clr.area_range = (0.2, 1)
-  # config.aug.aug_clr.aspect_ratio_range = (3. / 4, 4. / 3.)
-  # config.aug.aug_clr.crop_ver = 'v4'  # v1, v3
-  # config.aug.aug_clr.autoaug = None  # autoaug, randaug, or None
-  # config.aug.aug_clr.color_jit = [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
+  config.aug.repeat = 1
 
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id
@@ -161,15 +155,8 @@ def get_config():
   # mixup config
   config.model.clr = ml_collections.ConfigDict()
   config.model.clr.tau = 0.2
-  config.model.clr.proj_layers = 2
-  config.model.clr.proj_dim_hidden = 2048
-  config.model.clr.proj_dim_out = 512
-
-  config.model.clr.loss_weight = 1.0
-  config.model.clr.sample_rate = 0.25
-
-  config.model.clr.knn_clr = False  # use the full feature for knn
-
-  config.model.clr.num_unshared_layers = 0
+  config.model.clr.proj_layers = 4
+  config.model.clr.proj_dim_hidden = 512
+  config.model.clr.proj_dim_out = 128
 
   return config

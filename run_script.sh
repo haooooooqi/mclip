@@ -17,8 +17,7 @@ python3 main.py \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
-    --config.model.clr.knn_clr=True \
-    --config.model.clr.num_unshared_layers=0 \
+    --config.aug.repeat=4 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
