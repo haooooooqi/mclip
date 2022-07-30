@@ -53,6 +53,19 @@ def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
+# filter layerwise
+# ---------------------------------------------------------
+def trainable_exclude_tokenizer(path: Tuple[Any], val: jnp.ndarray, config: Any):
+    """Filter for layerwise training."""
+    del val
+
+    if path[0] == 'PatchEncoder':
+        return False
+    
+    return True
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):
