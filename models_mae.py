@@ -459,8 +459,8 @@ class VisionTransformer(nn.Module):
     pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
 
     # contrastive loss
-    loss = self.contrastive_loss_all_gather(pred, z, mask)
-    # loss = self.contrastive_loss(pred, z, mask)
+    # loss = self.contrastive_loss_all_gather(pred, z, mask)
+    loss = self.contrastive_loss(pred, z, mask)
     return loss
 
   def contrastive_loss(self, z0, z1, mask):
