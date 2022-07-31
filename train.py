@@ -76,7 +76,7 @@ def initialized(key, image_size, model, init_backend='tpu'):
 
   def init(*args):
     return model.init(*args, train=False)
-  init = jax.jit(init, backend=init_backend)
+  # init = jax.jit(init, backend=init_backend)
   logging.info('Initializing params...')
   variables = init(
     {'params': key, 'dropout': random.PRNGKey(0)},  # kaiming: random masking needs the 'dropout' key
@@ -136,8 +136,8 @@ def train_step(state, batch, learning_rate_fn, config):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    (loss, pred, knn_accuracy), new_variables = outcome
-    return loss, (new_variables, loss, knn_accuracy)
+    (loss, artifacts, knn_accuracy), new_variables = outcome
+    return loss, (new_variables, loss, knn_accuracy, artifacts)
 
   step = state.step
   lr = learning_rate_fn(step)
@@ -147,7 +147,7 @@ def train_step(state, batch, learning_rate_fn, config):
   # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
   grads = lax.pmean(grads, axis_name='batch')
 
-  new_variables, loss, knn_accuracy = aux[1]
+  new_variables, loss, knn_accuracy, artifacts = aux[1]
 
   metrics = {'loss': loss, 'learning_rate': lr, 'knn_accuracy': knn_accuracy}
   metrics = lax.pmean(metrics, axis_name='batch')

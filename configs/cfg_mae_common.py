@@ -156,4 +156,6 @@ def get_config():
   config.model.clr.proj_dim_hidden = 512
   config.model.clr.proj_dim_out = 128
 
+  config.model.clr.clr_loss = False
+
   return config

@@ -29,6 +29,7 @@ from utils import attention_util
 from utils import dist_util
 from utils.onlineknn_util import OnlineKNN
 
+import optax
 
 Array = Any
 PRNGKey = Any
@@ -446,6 +447,42 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
+  def compute_token_clr_loss(self, target, pred, mask):
+    """
+    target: [N, H, W, D]
+    pred: [N, L, D]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    z = target
+    # normalize
+    z /= jnp.linalg.norm(z, axis=-1, keepdims=True) + 1e-8  # we did this in pre-training
+    pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
+
+    # contrastive loss
+    z0 = pred
+    z1 = z
+
+    z0 = z0.reshape([-1, z0.shape[-1]])  # [M, C]
+
+    # only all gather targets
+    z1 = dist_util.all_gather(z1, axis_name='batch')
+    z1 = z1.reshape([-1, z1.shape[-1]])  # [M, C], M=kN
+
+    device_idx = dist_util.axis_index(axis_name='batch')
+
+    logits = jnp.einsum('nc,mc->nm', z0, z1)  # [N, M]
+    logits /= self.clr.tau
+
+    ids = jnp.arange(z0.shape[0]) + device_idx * z0.shape[0]
+    labels_one_hot = jax.nn.one_hot(ids, z1.shape[0])
+
+    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)  # over the last axis
+
+    loss = loss.reshape(mask.shape)
+
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
+
   def visualization(self, imgs, pred, mask):
     """
     imgs: [N, H, W, 3]
@@ -599,7 +636,10 @@ class VisionTransformer(nn.Module):
 
     # compute loss
     # loss = self.compute_loss(imgs, pred, mask)
-    loss = self.compute_token_loss(z, pred, mask)
+    if self.clr.clr_loss:
+      loss = self.compute_token_clr_loss(z, pred, mask)
+    else:
+      loss = self.compute_token_loss(z, pred, mask)
 
     if self.visualize and not train:
       raise NotImplementedError
