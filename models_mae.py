@@ -459,9 +459,32 @@ class VisionTransformer(nn.Module):
     pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
 
     # contrastive loss
-    z0 = pred
-    z1 = z
+    # loss = self.contrastive_loss_all_gather(pred, z, mask)
+    loss = self.contrastive_loss(pred, z, mask)
+    return loss
 
+  def contrastive_loss(self, z0, z1, mask):
+    """
+    negatives from the same image
+    z0: pred, [N, L, C]
+    z1: target, [N, L, C]
+    """
+    logits = jnp.einsum('nlc,nkc->nlk', z0, z1)  # [N, L of z0, L of z1], K="L of z1"
+    logits /= self.clr.tau
+
+    labels_one_hot = jnp.eye(logits.shape[-1])[None, :, :]  # [1, L, K]
+    labels_one_hot = jnp.repeat(labels_one_hot, repeats=z0.shape[0], axis=0)  # [N, L, K]
+
+    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)  # over the last axis
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
+
+  def contrastive_loss_all_gather(self, z0, z1, mask):
+    """
+    negatives from the entire batch
+    z0: pred
+    z1: target
+    """
     z0 = z0.reshape([-1, z0.shape[-1]])  # [M, C]
 
     # only all gather targets
