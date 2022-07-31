@@ -156,6 +156,8 @@ def get_config():
   config.model.clr.proj_dim_hidden = 512
   config.model.clr.proj_dim_out = 128
 
-  config.model.clr.clr_loss = False
+  config.model.clr.clr_loss = True  # whether to use clr_loss
+
+  config.model.clr.add_pix_loss = False  # whether to add l2_loss
 
   return config

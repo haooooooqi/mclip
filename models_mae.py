@@ -596,17 +596,28 @@ class VisionTransformer(nn.Module):
     x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
 
     # apply the predictor
-    x = nn.Dense(
+    pred = nn.Dense(
       # features=self.patches.size[0] * self.patches.size[1] * 3,
       features=self.clr.proj_dim_out,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       name='pred')(x)
-
     # remove cls token
-    pred = x[:, num_clstokens:, :]
-    return pred
+    pred = pred[:, num_clstokens:, :]
+
+    if self.clr.add_pix_loss:
+      pred_pix = nn.Dense(
+        features=self.patches.size[0] * self.patches.size[1] * 3,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='pred_pix')(x)
+      pred_pix = pred_pix[:, num_clstokens:, :]
+    else:
+      pred_pix = None
+
+    return pred, pred_pix
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -655,14 +666,16 @@ class VisionTransformer(nn.Module):
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
+    pred, pred_pix = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    # loss = self.compute_loss(imgs, pred, mask)
     if self.clr.clr_loss:
       loss = self.compute_token_clr_loss(z, pred, mask)
     else:
       loss = self.compute_token_loss(z, pred, mask)
+
+    if self.clr.add_pix_loss:
+      loss += self.compute_loss(imgs, pred_pix, mask)
 
     if self.visualize and not train:
       raise NotImplementedError
