@@ -112,5 +112,13 @@ def get_config():
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False
 
+  # patch clr config
+  config.model.clr = ml_collections.ConfigDict()
+  config.model.clr.tau = 0.2
+  config.model.clr.proj_layers = 4
+  config.model.clr.proj_dim_hidden = 512
+  config.model.clr.proj_dim_out = 128
+
+  config.model.clr.clr_loss = True
 
   return config
