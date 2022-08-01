@@ -17,6 +17,7 @@ python3 main.py \
     --config.opt_mu_dtype=float32 \
     --config.partitioning.partition_states=True \
     --config.torchload.data_dir='/datasets/imagenet-1k' \
+    --config.model.visualize=False \
     --config.model.clr.clr_loss=True \
 
 

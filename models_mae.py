@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional, Tuple
 import jax
 import jax.numpy as jnp
 import jax.random as random
+import optax
 
 import flax.linen as nn
 
@@ -421,6 +422,38 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
+  def compute_token_clr_loss(self, target, pred, mask):
+    """
+    target: [N, H, W, D]
+    pred: [N, L, D]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    z = target
+    # normalize
+    z /= jnp.linalg.norm(z, axis=-1, keepdims=True) + 1e-8  # we did this in pre-training
+    pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
+
+    # contrastive loss
+    # loss = self.contrastive_loss_all_gather(pred, z, mask)
+    loss = self.contrastive_loss(pred, z, mask)
+    return loss
+
+  def contrastive_loss(self, z0, z1, mask):
+    """
+    negatives from the same image
+    z0: pred, [N, L, C]
+    z1: target, [N, L, C]
+    """
+    logits = jnp.einsum('nlc,nkc->nlk', z0, z1)  # [N, L of z0, L of z1], K="L of z1"
+    logits /= self.clr.tau
+
+    labels_one_hot = jnp.eye(logits.shape[-1])[None, :, :]  # [1, L, K]
+    labels_one_hot = jnp.repeat(labels_one_hot, repeats=z0.shape[0], axis=0)  # [N, L, K]
+
+    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)  # over the last axis
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
+
   def visualization(self, imgs, pred, mask):
     """
     imgs: [N, H, W, 3]
@@ -508,7 +541,8 @@ class VisionTransformer(nn.Module):
 
     # apply the predictor
     x = t5x.layers.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
+      # features=self.patches.size[0] * self.patches.size[1] * 3,
+      features=self.clr.proj_dim_out,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       kernel_axes=('embed', 'classes'),  # 'mlp' is split first
@@ -536,19 +570,23 @@ class VisionTransformer(nn.Module):
     z = self.apply_patchclr(imgs, train=train)
     z = jax.lax.stop_gradient(z)
 
-
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
-    x = pred
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    # loss = self.compute_loss(imgs, pred, mask)
+    if self.clr.clr_loss:
+      loss = self.compute_token_clr_loss(z, pred, mask)
+    else:
+      raise NotImplementedError
+      loss = self.compute_token_loss(z, pred, mask)
 
     if self.visualize: # and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      raise NotImplementedError
+      # outcome = self.visualization(imgs, pred, mask)
     else:
       outcome = pred  # not used
 
