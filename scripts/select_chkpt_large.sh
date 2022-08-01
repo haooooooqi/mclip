@@ -109,4 +109,8 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220730_193810_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_030051_kmh-tpuvm-v3-256-6_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.2'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_080627_kmh-tpuvm-v3-512-1_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.2_dec4'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_080007_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.1'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_080007_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.1'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_075258_kmh-tpuvm-v3-256-7_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v1clrt0.2'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_203826_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.2_dec8_addpix'
+# 1600ep
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220731_202846_kmh-tpuvm-v3-512-1_cfg_mae_large_maetf_1600ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0_v2clrt0.2_dec8'
