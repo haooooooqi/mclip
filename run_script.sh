@@ -19,6 +19,7 @@ python3 main.py \
     --config.torchload.data_dir='/datasets/imagenet-1k' \
     --config.model.visualize=False \
     --config.model.clr.clr_loss=True \
+    --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220730_031232_kmh-tpuvm-v3-256-3_cfg_mae_large_maeclr_800ep_b2048_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.1_re4'
 
 
     # --config.resume_dir='gs://kmh-gcp/checkpoints/flax/20220521_221137_scratch_kmh-tpuvm-v3-256-1_cfg_vit_large_50ep_fttl_b1024_wd0.3_lr1e-4_lrd1.0_dp0.2_warm20_s0_beta0.95_p16_dbgp16/checkpoint_62550'

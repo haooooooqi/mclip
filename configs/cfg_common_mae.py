@@ -93,8 +93,8 @@ def get_config():
   config.resume_dir = ''
   config.vis_every_epochs = 20.
 
-  config.pretrain_dir = ''
-  config.pretrain_fmt = 'jax'  # 't5x'
+  config.pretrain_dir = ''  # Here, this is the pretrained tokenizer 
+  config.pretrain_fmt = 'jax'  # 't5x' (must be 'jax')
 
   # seeds
   config.seed_jax = 0

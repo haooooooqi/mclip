@@ -3,7 +3,7 @@ echo 'code dir: '$STAGEDIR
 # seed=0
 batch=4096
 lr=1e-4
-ep=1600
+ep=800
 
 mask=0.75
 
@@ -11,7 +11,12 @@ partitions=1
 
 rescale=1.0
 
-vitsize=gpt2b_p14
+dec_layers=4
+tau=0.2
+
+source scripts/select_tokenizer.sh
+
+vitsize=large
 CONFIG=cfg_mae_${vitsize}
 
 
@@ -58,8 +63,12 @@ python3 main.py \
     --config.opt_type=adamw \
     --config.opt_mu_dtype=float32 \
     --config.partitioning.partition_states=True \
-    --config.model.visualize=False \
     --config.resume_dir=${RESUME} \
+    --config.token_pretrain_dir=$RESUME_DIR \
+    --config.model.clr.tau=${tau} \
+    --config.model.clr.clr_loss=True \
+    --config.model.visualize=False \
+    --config.model.decoder.transformer.num_layers=${dec_layers} \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

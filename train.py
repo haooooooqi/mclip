@@ -306,7 +306,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   if config.resume_dir != '':
     state = ckp.restore_checkpoint(checkpointer, path=config.resume_dir)
   elif config.pretrain_dir != '':
-    raise NotImplementedError
+    # When partially loading, we run initialization anyway
+    logging.info('Initializing train_state...')
+    state = p_init_fn(rng_init)
+    logging.info('Initializing train_state done.')
+    
+    state = ckp.restore_from_pretrain(state, config, partitioner, state_axes)
   else:
     logging.info('Initializing train_state...')
     state = p_init_fn(rng_init)

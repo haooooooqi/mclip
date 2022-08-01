@@ -60,11 +60,14 @@ def load_from_pretrain(state, pretrain_dir):
   load_keys = set(named_state_params.keys()) - missing_keys
   ignored_keys = set(named_load_params.keys()) - load_keys - missing_keys
 
-  # logging.info('Loaded keys: {}'.format(load_keys))
+  logging.info('Loaded keys: {}'.format(load_keys))
   logging.info('Missing keys: {}'.format(missing_keys))
   logging.info('Ignored keys: {}'.format(ignored_keys))
 
-  assert len(missing_keys) == 2 or len(missing_keys) == 4
+  # assert no missing keys start with 'PatchEncoder'
+  assert np.all(np.array(jax.tree_map(lambda k: not k.startswith('PatchEncoder'), list(missing_keys))))
+  # assert pre-trained encoder is fully loaded
+  assert len(ignored_keys) == 0
 
   named_params = {}
   for k in named_state_params.keys():
