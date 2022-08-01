@@ -10,6 +10,7 @@ from jax.interpreters.sharded_jit import PartitionSpec
 
 import t5x.train_state as train_state_lib
 import t5x.optimizers
+import t5x.state_utils
 
 from utils import opt_util
 from utils import adamw
@@ -63,7 +64,20 @@ def create_optimizer(config, params_names, steps_per_epoch):
       )
     # logging.info('Apply wd: {}'.format(mask))
 
-    opt = getattr(adamw, config.opt_type)  # optax.adamw
+    if True:  # freeze some parameters
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+
+      # True: trainable; False: frozen
+      # mask_trainable = jax.tree_map(lambda x: True, params_names)  # all True
+      mask_trainable = opt_util.filter_parameters(params_names, functools.partial(opt_util.trainable_exclude_tokenizer, config=config))
+      logging.info('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)))
+
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    else:
+      opt = getattr(adamw, config.opt_type)  # optax.adamw
+
+
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
     opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
     opt.metric_learning_rate_fn = learning_rate_fn  # hack for metric

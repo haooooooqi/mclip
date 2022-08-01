@@ -63,7 +63,7 @@ def log_model_info(log_file: Optional[str],
       if isinstance(arr, dict) and not arr:
         return
       if arr is None:
-        _log_info_and_write_to_file(writer, 'Variable    %-80s None', name)
+        _log_info_and_write_to_file(writer, '%-80s None', name)
         return
       if logical_axes is None or len(logical_axes) != len(arr.shape):
         shape_str = str(arr.shape)
