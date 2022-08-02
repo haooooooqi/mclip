@@ -11,7 +11,7 @@ partitions=1
 
 rescale=1.0
 
-dec_layers=4
+dec_layers=8
 tau=0.2
 
 source scripts/select_tokenizer.sh
@@ -20,7 +20,7 @@ vitsize=large
 CONFIG=cfg_mae_${vitsize}
 
 
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}_s${seed}_p${partitions}st_re${rescale}_normpix_exwd_NOsplit_fastsave
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}_s${seed}_p${partitions}_re${rescale}_tokenv0_v2clrt${tau}_dec${dec_layers}_dbg
 RESUME=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -62,9 +62,9 @@ python3 main.py \
     --config.partitioning.num_partitions=${partitions} \
     --config.opt_type=adamw \
     --config.opt_mu_dtype=float32 \
-    --config.partitioning.partition_states=True \
+    --config.partitioning.partition_states=False \
     --config.resume_dir=${RESUME} \
-    --config.token_pretrain_dir=$RESUME_DIR \
+    --config.pretrain_dir=${PRETRAIN_DIR} \
     --config.model.clr.tau=${tau} \
     --config.model.clr.clr_loss=True \
     --config.model.visualize=False \
