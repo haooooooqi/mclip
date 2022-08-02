@@ -1,6 +1,6 @@
 VM_NAME=kmh-tpuvm-v3-256-2
 
-# source ~/run_mount_data.sh
+source ~/run_mount_data.sh
 # source ~/run_mount_data.sh
 
 gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \

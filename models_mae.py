@@ -422,6 +422,24 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
+  def compute_token_loss(self, target, pred, mask):
+    """
+    target: [N, H, W, D]
+    pred: [N, L, D]
+    mask: [N, L], 0 is keep, 1 is remove, 
+    """
+    z = target
+    # normalize
+    z /= jnp.linalg.norm(z, axis=-1, keepdims=True) + 1e-8  # we did this in pre-training
+    pred /= jnp.linalg.norm(pred, axis=-1, keepdims=True) + 1e-8
+
+    # l2 loss (not contrastive yet)
+    loss = jnp.square(pred - z)
+    loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
+
+    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
+    return loss
+
   def compute_token_clr_loss(self, target, pred, mask):
     """
     target: [N, H, W, D]
@@ -555,6 +573,7 @@ class VisionTransformer(nn.Module):
 
   def apply_patchclr(self, imgs, train):
     x = self.patchify(imgs)
+    # x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', '_null0'))
     z = MlpEncoder(
       proj_layers=self.clr.proj_layers,
       proj_dim_hidden=self.clr.proj_dim_hidden,
@@ -581,7 +600,6 @@ class VisionTransformer(nn.Module):
     if self.clr.clr_loss:
       loss = self.compute_token_clr_loss(z, pred, mask)
     else:
-      raise NotImplementedError
       loss = self.compute_token_loss(z, pred, mask)
 
     if self.visualize: # and not train:
