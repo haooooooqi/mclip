@@ -1,7 +1,7 @@
 # run remote
 
 lr=1.0e-4
-ep=1600
+ep=800
 batch=4096
 mask=0.75
 
@@ -14,7 +14,7 @@ source scripts/select_tokenizer.sh
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_tokenv0_v2clrt${tau}_dec${dec_layers}_addpix
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_tokenv1_v2clrt${tau}_dec${dec_layers}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -53,10 +53,10 @@ python3 main.py \
     --config.seed_pt=${seed} \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
-    --config.token_pretrain_dir=$RESUME_DIR \
     --config.model.clr.tau=${tau} \
     --config.model.clr.clr_loss=True \
-    --config.model.clr.add_pix_loss=True \
+    --config.token_pretrain_dir=$PRETRAIN_DIR \
+    --config.model.clr.add_pix_loss=False \
     --config.model.visualize=False \
     --config.model.decoder.transformer.num_layers=${dec_layers} \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
