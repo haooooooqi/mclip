@@ -67,7 +67,8 @@ import random as _random
 
 def initialized(key, image_size, model, init_backend='tpu'):
   init_batch_size = 16
-  input_shape = (init_batch_size, image_size, image_size, 3)
+  views = 2
+  input_shape = (init_batch_size, views, image_size, image_size, 3)
   # TODO{kaiming}: load a real batch
   init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
     'label': jnp.zeros((init_batch_size,), jnp.int32)}
@@ -552,7 +553,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
 def parse_batch(batch):
   images, labels = batch
-  images = images.permute([0, 2, 3, 1])  # nchw -> nhwc
+  images = images.permute([0, 1, 3, 4, 2])  # nvchw -> nvhwc
   batch = {'image': images, 'label': labels}
   batch = prepare_pt_data(batch)  # to (local_devices, device_batch_size, height, width, 3)
   return batch

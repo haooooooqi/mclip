@@ -398,9 +398,10 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
-  def visualization(self, imgs, pred, mask):
+  def visualization(self, imgs, imgs_patches, pred, mask):
     """
     imgs: [N, H, W, 3]
+    imgs_patches: [N, H, W, 3]
     pred: [N, L, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
@@ -410,11 +411,11 @@ class VisionTransformer(nn.Module):
     mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
     imgs_mask = imgs * (1 - mask)
 
-    imgs_plus = imgs * (1 - mask) + imgs_pred * mask
+    # imgs_plus = imgs * (1 - mask) + imgs_pred * mask
 
     imgs_vis = jnp.concatenate(
     [jnp.concatenate([imgs, imgs_mask], axis=2),
-     jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
+     jnp.concatenate([imgs_pred, imgs_patches], axis=2)],
     axis=1)
     return imgs_vis
 
@@ -527,6 +528,10 @@ class VisionTransformer(nn.Module):
     imgs = inputs['image']
     labels = inputs['label']
 
+    imgs, imgs_patches = jnp.split(imgs, 2, axis=1)
+    imgs = imgs.squeeze(axis=1)
+    imgs_patches = imgs_patches.squeeze(axis=1)
+
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
@@ -540,7 +545,7 @@ class VisionTransformer(nn.Module):
     loss = self.compute_loss(imgs, pred, mask)
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      outcome = self.visualization(imgs, imgs_patches, pred, mask)
     else:
       outcome = pred  # not used
 
