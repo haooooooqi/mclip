@@ -104,6 +104,8 @@ def get_config():
 
   config.aug.mix.switch_elementwise = False  # element-wise switch between mixup/cutmix
 
+  config.aug.patch_size = 16
+
   # init config
   config.rescale_init = True  # rescale initialized weights by layer id
 

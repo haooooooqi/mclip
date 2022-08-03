@@ -94,18 +94,16 @@ def get_config():
 
   config.aug.color_jit = None  # [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
-  # mixup config
-  config.aug.mix = ml_collections.ConfigDict()
-  config.aug.mix.mixup = False
-  config.aug.mix.mixup_alpha = 0.8
-
-  config.aug.mix.cutmix = False
-  config.aug.mix.cutmix_alpha = 1.0
-
-  config.aug.mix.switch_elementwise = False  # element-wise switch between mixup/cutmix
-
   # shuffle config
   config.aug.shuffle_buffer_size = 16 * 1024  # following TF
+
+  # patch aug config
+  config.aug.img_size = 224
+  config.aug.patch_aug = ml_collections.ConfigDict()
+  config.aug.patch_aug.aspect_ratio_range = (3. / 4, 4. / 3.)
+  config.aug.patch_aug.area_range = (0.5, 2)
+  config.aug.patch_aug.color_jit = [0.4, 0.4, 0.4]
+  config.aug.patch_aug.patch_size = 16
 
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id

@@ -212,27 +212,6 @@ def prepare_pt_data(xs):
   return jax.tree_map(_prepare, xs)
 
 
-def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, force_shuffle=None, seed_per_host=False, aug=None,):
-  ds = input_pipeline.create_split(
-      dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, force_shuffle=force_shuffle, seed_per_host=seed_per_host, aug=aug,)
-
-  if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
-    apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
-    ds = map(apply_mix, ds)
-
-  # ------------------------------------------------
-  # from IPython import embed; embed();
-  # if (0 == 0): raise NotImplementedError
-  # x = next(iter(ds))
-  # ------------------------------------------------
-
-  ds = map(prepare_tf_data, ds)
-  it = jax_utils.prefetch_to_device(ds, 2)
-  return it
-
-
 class TrainState(train_state.TrainState):
   rng: Any
   variables: flax.core.FrozenDict[str, Any]
@@ -389,15 +368,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // jax.process_count()
 
-  # input_dtype = tf.float32
-  # dataset_builder = tfds.builder(config.dataset)
-  # train_iter = create_input_iter(
-  #     dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-  #     cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
-  # eval_iter = create_input_iter(
-  #     dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-  #     cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)  # for visualization
-
   dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
   dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
 
@@ -445,12 +415,17 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   data_loader_val = torch.utils.data.DataLoader(
     dataset_val, sampler=sampler_val,
     batch_size=local_batch_size,
-    num_workers=config.torchload.num_workers,
+    # num_workers=config.torchload.num_workers,
     pin_memory=True,
     drop_last=True,
-    persistent_workers=True,
-    timeout=60.,
+    # persistent_workers=True,
+    # timeout=60.,
   )
+
+  # --------------------------------------------------------------------------------
+  # debug
+  batch = next(iter(data_loader_val))
+  # --------------------------------------------------------------------------------
 
   # --------------------------------------------------------------------------------
   # up til now, state.params are for one device
