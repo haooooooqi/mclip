@@ -562,9 +562,27 @@ class VisionTransformer(nn.Module):
     imgs = inputs['image']
     labels = inputs['label']
 
-    imgs, imgs_patches = jnp.split(imgs, 2, axis=1)
+    imgs, imgs_patches = jnp.split(imgs, (1,), axis=1)  # split into (1, views - 1)
+
+    # imgs, imgs_patches = jnp.split(imgs, 2, axis=1)
     imgs = imgs.squeeze(axis=1)
-    imgs_patches = imgs_patches.squeeze(axis=1)
+    
+    # ------------------------------------------------------------
+    n, r, h, w, _ = imgs_patches.shape
+    p, q = self.patches.size
+    rng = self.make_rng('dropout')
+
+    noise = random.uniform(rng, shape=(n, r, h // p, w // q))
+    ids = jnp.argmax(noise, axis=1)
+    one_hot = jax.nn.one_hot(ids, r, axis=1)
+
+    imgs_patches = imgs_patches.reshape([n, r, h // p, p, w // q, q, 3])
+
+    imgs_patches = jnp.einsum('nrhpwqc,nrhw->nhpwqc', imgs_patches, one_hot)
+    imgs_patches = imgs_patches.reshape([n, h, w, 3])
+
+    # ------------------------------------------------------------
+    # imgs_patches = imgs_patches.squeeze(axis=1)
 
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)

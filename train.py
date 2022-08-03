@@ -67,7 +67,7 @@ import random as _random
 
 def initialized(key, image_size, model, init_backend='tpu'):
   init_batch_size = 16
-  views = 2
+  views = 3
   input_shape = (init_batch_size, views, image_size, image_size, 3)
   # TODO{kaiming}: load a real batch
   init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),

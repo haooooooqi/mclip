@@ -82,20 +82,21 @@ class GeneralImageFolder(datasets.ImageFolder):
             im = self.transform(im)
             img_crops[i] = im.unsqueeze(0)
 
-        p = self.transform_crops.patch_aug.patch_size
-        img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
-        r, _, h, w = img_crops.shape
-        img_crops = img_crops.reshape([r, 3, h // p, p, w // p, p])  # rchpwq
+        # p = self.transform_crops.patch_aug.patch_size
+        # img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
+        # r, _, h, w = img_crops.shape
+        # img_crops = img_crops.reshape([r, 3, h // p, p, w // p, p])  # rchpwq
        
-        # random pick
-        ids = np.random.randint(0, 4, size=(h // p * w // p))
-        onehot = np.zeros((r, h // p * w // p))
-        onehot[ids, np.arange(ids.size)] = 1
-        onehot = onehot.reshape((r, h // p, w // p))
+        # # random pick
+        # ids = np.random.randint(0, r, size=(h // p * w // p))
+        # onehot = np.zeros((r, h // p * w // p))
+        # onehot[ids, np.arange(ids.size)] = 1
+        # onehot = onehot.reshape((r, h // p, w // p))
 
-        img_crops = np.einsum('rchpwq,rhw->chpwq', img_crops, onehot)
-        img_crops = img_crops.reshape([1, 3, h, w])
+        # img_crops = np.einsum('rchpwq,rhw->chpwq', img_crops, onehot)
+        # img_crops = img_crops.reshape([1, 3, h, w])
 
+        img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
         samples = np.concatenate([img_main, img_crops], axis=0)  # [2, 3, 224, 224]
 
         if self.target_transform is not None:
