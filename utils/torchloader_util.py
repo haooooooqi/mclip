@@ -70,10 +70,13 @@ class GeneralImageFolder(datasets.ImageFolder):
 
         img_crop, patches = self.transform_crops(img)
 
+        color_aug = transforms.ColorJitter(*self.transform_crops.patch_aug.color_jit)
+
         # turn to tensor and normalize
         img_crop = self.transform(img_crop)
         img_patches = []
         for patch in patches:
+            patch = color_aug(patch)
             img_patches.append(self.transform(patch).unsqueeze(0))
         img_patches = np.concatenate(img_patches, axis=0)  # [196, 3, p, p]
         shape = img_patches.shape
