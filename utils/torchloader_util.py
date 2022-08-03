@@ -65,6 +65,9 @@ class GeneralImageFolder(datasets.ImageFolder):
         path, target = self.samples[index]
         img = self.loader(path)
 
+        # flip here:
+        img = transforms.RandomHorizontalFlip()(img)
+
         img_crop, patches = self.transform_crops(img)
 
         # turn to tensor and normalize
@@ -75,7 +78,7 @@ class GeneralImageFolder(datasets.ImageFolder):
         img_patches = np.concatenate(img_patches, axis=0)  # [196, 3, p, p]
         shape = img_patches.shape
         img_patches = img_patches.reshape((int(shape[0]**.5),) * 2 + shape[-3:])  # [14, 14, 3, p, p]
-        img_patches = img_patches.transpose(2, 0, 1, 3, 4)
+        img_patches = img_patches.transpose(2, 0, 3, 1, 4)  # [h, w, 3, p, q] => [3, h, p, w, q]
         img_patches = img_patches.reshape(img_crop.shape)
 
         samples = np.concatenate([img_crop[np.newaxis, :, :, :], img_patches[np.newaxis, :, :, :]], axis=0)  # [2, 3, 224, 224]
@@ -237,6 +240,34 @@ class RandomResizedCropWithPatchAug(torch.nn.Module):
         j = (width - w) // 2
         return i, j, h, w
 
+    def jitter_patch(self, width, height, x, y,):
+        p = self.patch_aug.patch_size
+        area = p * p
+        scale = self.patch_aug.area_range
+        ratio = self.patch_aug.aspect_ratio_range
+
+        for _ in range(10):
+            target_area = area * torch.empty(1).uniform_(scale[0], scale[1]).item()
+            log_ratio = torch.log(torch.tensor(ratio))
+            aspect_ratio = torch.exp(
+                torch.empty(1).uniform_(log_ratio[0], log_ratio[1])
+            ).item()
+            w = int(round(math.sqrt(target_area * aspect_ratio)))
+            h = int(round(math.sqrt(target_area / aspect_ratio)))
+
+            x_center = x + p // 2 + torch.randint(0, p // 2, size=(1,)).item()  # max_val excluded
+            y_center = y + p // 2 + torch.randint(0, p // 2, size=(1,)).item()  # max_val excluded
+
+            i = y_center - h // 2
+            j = x_center - w // 2
+
+            if 0 <= i and i + h < height and 0 <= j and j + w < width and w > 0 and h > 0:
+                return i, j, h, w
+        
+        # Fallback to no jitter
+        return y, x, p, p
+
+
     def forward(self, img):
         """
         Args:
@@ -257,10 +288,12 @@ class RandomResizedCropWithPatchAug(torch.nn.Module):
 
         # start points of the patch grid
         xs = ys = np.arange(m) * p
+
         patches = []
         for y in ys:
             for x in xs:
-                patch = F.resized_crop(img_crop, y, x, p, p, p, self.interpolation)
+                i, j, h, w = self.jitter_patch(width, height, x, y)
+                patch = F.resized_crop(img_crop, i, j, h, w, (p, p), self.interpolation)
                 patches.append(patch)
         return img_crop, patches
 
