@@ -22,7 +22,7 @@ CONFIG=cfg_mae_${vitsize}
 JOBNAME=${vitsize}_${ep}_mask@${mask}
 
 WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-RESUME_DIR=''
+RESUME_DIR=$WORKDIR
 LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
