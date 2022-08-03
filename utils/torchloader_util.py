@@ -88,9 +88,12 @@ class GeneralImageFolder(datasets.ImageFolder):
         img_crops = img_crops.reshape([r, 3, h // p, p, w // p, p])  # rchpwq
        
         # random pick
-        ids = np.random.randint(0, 4, size=(1, 1, h // p, 1, w // p, 1))
+        ids = np.random.randint(0, 4, size=(h // p * w // p))
+        onehot = np.zeros((r, h // p * w // p))
+        onehot[ids, np.arange(ids.size)] = 1
+        onehot = onehot.reshape((r, h // p, w // p))
 
-        img_crops = np.take_along_axis(img_crops, ids, axis=0)
+        img_crops = np.einsum('rchpwq,rhw->chpwq', img_crops, onehot)
         img_crops = img_crops.reshape([1, 3, h, w])
 
         samples = np.concatenate([img_main, img_crops], axis=0)  # [2, 3, 224, 224]
