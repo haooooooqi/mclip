@@ -82,7 +82,17 @@ class GeneralImageFolder(datasets.ImageFolder):
             im = self.transform(im)
             img_crops[i] = im.unsqueeze(0)
 
-        img_crops = img_crops[0]
+        p = self.transform_crops.patch_aug.patch_size
+        img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
+        r, _, h, w = img_crops.shape
+        img_crops = img_crops.reshape([r, 3, h // p, p, w // p, p])  # rchpwq
+       
+        # random pick
+        ids = np.random.randint(0, 4, size=(1, 1, h // p, 1, w // p, 1))
+
+        img_crops = np.take_along_axis(img_crops, ids, axis=0)
+        img_crops = img_crops.reshape([1, 3, h, w])
+
         samples = np.concatenate([img_main, img_crops], axis=0)  # [2, 3, 224, 224]
 
         if self.target_transform is not None:
