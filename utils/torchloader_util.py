@@ -68,23 +68,22 @@ class GeneralImageFolder(datasets.ImageFolder):
         # flip here:
         img = transforms.RandomHorizontalFlip()(img)
 
-        img_crop, patches = self.transform_crops(img)
+        img_main, img_crops = self.transform_crops(img)
 
         color_aug = transforms.ColorJitter(*self.transform_crops.patch_aug.color_jit)
 
         # turn to tensor and normalize
-        img_crop = self.transform(img_crop)
-        img_patches = []
-        for patch in patches:
-            patch = color_aug(patch)
-            img_patches.append(self.transform(patch).unsqueeze(0))
-        img_patches = np.concatenate(img_patches, axis=0)  # [196, 3, p, p]
-        shape = img_patches.shape
-        img_patches = img_patches.reshape((int(shape[0]**.5),) * 2 + shape[-3:])  # [14, 14, 3, p, p]
-        img_patches = img_patches.transpose(2, 0, 3, 1, 4)  # [h, w, 3, p, q] => [3, h, p, w, q]
-        img_patches = img_patches.reshape(img_crop.shape)
+        img_main = self.transform(img_main).unsqueeze(0)
 
-        samples = np.concatenate([img_crop[np.newaxis, :, :, :], img_patches[np.newaxis, :, :, :]], axis=0)  # [2, 3, 224, 224]
+        # add more aug
+        for i in range(len(img_crops)):
+            im = img_crops[i]
+            im = color_aug(im)
+            im = self.transform(im)
+            img_crops[i] = im.unsqueeze(0)
+
+        img_crops = img_crops[0]
+        samples = np.concatenate([img_main, img_crops], axis=0)  # [2, 3, 224, 224]
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -270,6 +269,33 @@ class RandomResizedCropWithPatchAug(torch.nn.Module):
         # Fallback to no jitter
         return y, x, p, p
 
+    def jitter_crop(self, crop_window, width, height):
+        """
+        crop_window: i, j, h, w (top, left, height, width of the main crop)
+        width, height: of the image
+        """
+        i, j, h, w = crop_window
+        p = self.patch_aug.patch_size
+        jitter = p // 2  # TODO: put to config?
+
+        for _ in range(10):
+            # jitter the top-left corner
+            i0 = i + torch.randint(-jitter, jitter + 1, size=(1,)).item()  # max_val excluded
+            j0 = j + torch.randint(-jitter, jitter + 1, size=(1,)).item()
+
+            # jitter the bottom-right corner
+            i1 = i + h + torch.randint(-jitter, jitter + 1, size=(1,)).item()
+            j1 = j + w + torch.randint(-jitter, jitter + 1, size=(1,)).item()
+
+            # compute the new width, hight
+            h0 = i1 - i0
+            w0 = j1 - j0
+
+            if (0 <= i0 and i0 + h0 < height and h0 > 0 and
+                0 <= j0 and j0 + w0 < width and w0 > 0):
+                return i0, j0, h0, w0
+        # Fallback to no jitter
+        return i, j, h, w
 
     def forward(self, img):
         """
@@ -283,22 +309,17 @@ class RandomResizedCropWithPatchAug(torch.nn.Module):
         width, height = F._get_image_size(img)
         i, j, h, w = self.get_params(width, height, self.scale, self.ratio)  # i, j: top-left corner
         
-        img_crop = F.resized_crop(img, i, j, h, w, (self.img_size,)*2, self.interpolation)
+        # main crop
+        img_main = F.resized_crop(img, i, j, h, w, (self.img_size,)*2, self.interpolation)
 
-        # step 2: crop the patches from the window of i, j, h, w
-        p = self.patch_aug.patch_size
-        m = self.img_size // p  # num of patches
+        # more crops
+        img_crops = []
+        for _ in range(self.patch_aug.repeats):
+            i0, j0, h0, w0 = self.jitter_crop((i, j, h, w), width, height)
+            crop = F.resized_crop(img, i0, j0, h0, w0, (self.img_size,)*2, self.interpolation)
+            img_crops.append(crop)
 
-        # start points of the patch grid
-        xs = ys = np.arange(m) * p
-
-        patches = []
-        for y in ys:
-            for x in xs:
-                i, j, h, w = self.jitter_patch(width, height, x, y)
-                patch = F.resized_crop(img_crop, i, j, h, w, (p, p), self.interpolation)
-                patches.append(patch)
-        return img_crop, patches
+        return img_main, img_crops
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]

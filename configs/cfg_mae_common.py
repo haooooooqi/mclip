@@ -102,8 +102,9 @@ def get_config():
   config.aug.patch_aug = ml_collections.ConfigDict()
   config.aug.patch_aug.aspect_ratio_range = (3. / 4, 4. / 3.)
   config.aug.patch_aug.area_range = (0.5, 2)
-  config.aug.patch_aug.color_jit = [0.4, 0.4, 0.4]
+  config.aug.patch_aug.color_jit = [0.4, 0.4, 0.4, 0.1]
   config.aug.patch_aug.patch_size = 16
+  config.aug.patch_aug.repeats = 4
 
   # init config
   config.rescale_init = False  # rescale initialized weights by layer id
