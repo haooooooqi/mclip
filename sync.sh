@@ -3,7 +3,7 @@
 DEST_RUN=/checkpoint/xinleic/mae_jax/repo_vit
 DEST_DEV=vit_jax
 
-for i in configs scripts t5x utils; do 
+for i in configs t5x utils; do 
     rsync -aiz --delete --partial --progress $i/ devtpux4:$DEST_RUN/$i/
     rsync -aiz --delete --partial --progress $i/ devtpux4:$DEST_DEV/$i/
 done
