@@ -96,7 +96,10 @@ class GeneralImageFolder(datasets.ImageFolder):
         # img_crops = np.einsum('rchpwq,rhw->chpwq', img_crops, onehot)
         # img_crops = img_crops.reshape([1, 3, h, w])
 
-        img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
+        if len(img_crops) > 0:
+            img_crops = np.concatenate(img_crops, axis=0)  # [repeats, 3, 224, 224]
+        else:  # hack:
+            img_crops = img_main
         samples = np.concatenate([img_main, img_crops], axis=0)  # [2, 3, 224, 224]
 
         if self.target_transform is not None:
