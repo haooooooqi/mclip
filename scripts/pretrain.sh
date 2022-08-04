@@ -38,14 +38,14 @@ else
 fi
 
 if [ ${#EXTRA_ARGS_ALL[@]} -gt 0 ]; then
-    EXTRA_ARGS_ALL_TAG=`echo ${EXTRA_ARGS_ALL//config./} | sed -e 's/--/#/g' | sed -e 's/=/@/g' | tr -d ' ' `
+    EXTRA_ARGS_ALL_TAG=`echo ${EXTRA_ARGS_ALL//config./} | sed -e 's/--/%/g' | sed -e 's/=/@/g' | tr -d ' ' `
     EXTRA_ARGS_ALL_TAG=${EXTRA_ARGS_ALL_TAG:1}
 else
     EXTRA_ARGS_ALL_TAG=default
 fi
 
 if [ ${#EXTRA_ARGS_COMMON[@]} -gt 0 ]; then
-    EXTRA_ARGS_COMMON_TAG=`echo ${EXTRA_ARGS_COMMON//config./} | sed -e 's/--/#/g' | sed -e 's/=/@/g' | tr -d ' ' `
+    EXTRA_ARGS_COMMON_TAG=`echo ${EXTRA_ARGS_COMMON//config./} | sed -e 's/--/%/g' | sed -e 's/=/@/g' | tr -d ' ' `
     EXTRA_ARGS_COMMON_TAG=${EXTRA_ARGS_COMMON_TAG:1}
 else
     EXTRA_ARGS_COMMON_TAG=default
