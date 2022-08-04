@@ -42,9 +42,9 @@ while true; do
         continue
     fi
 
-    my_current_use_128=`~/mask/list.sh | grep xinleic | grep " 128 " | wc -l`
-    my_current_use_256=`~/mask/list.sh | grep xinleic | grep " 256 " | wc -l`
-    my_current_use_512=`~/mask/list.sh | grep xinleic | grep " 512 " | wc -l`
+    my_current_use_128=`~/mae_jax/infra/list.sh | grep "xinleic-mae-i-" | wc -l`
+    my_current_use_256=`~/mae_jax/infra/list.sh | grep "xinleic-mae-ii-" | wc -l`
+    my_current_use_512=`~/mae_jax/infra/list.sh | grep "xinleic-mae-iv-" | wc -l`
     echo $now, "My current use: $my_current_use_128 (v3-128), $my_current_use_256 (v3-256), $my_current_use_512 (v3-512)"
 
     echo "Jobs in queue: `cat $queue_file | wc -l`"

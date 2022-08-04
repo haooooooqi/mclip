@@ -7,7 +7,6 @@ ZONE=europe-west4-a
 # configs
 ################################################################
 
-batch=4096
 lr=1.5e-4
 ep=800
 mask=0.75
@@ -39,13 +38,8 @@ export LOCAL_REDIRECT_CKPT_DIR=${WORKDIR}
 python3 main.py \
     --workdir=${LOGDIR} \
     --config=configs/$CONFIG.py \
-    --config.batch_size=${batch} \
-    --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
-    --config.model.transformer.rescale_init=${rescale} \
-    --config.profile_memory=False \
-    --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
     --config.model.mask_ratio=${mask} \
     --config.seed_tf=${seed} \

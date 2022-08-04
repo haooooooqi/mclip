@@ -46,7 +46,7 @@ def get_config():
   config.min_abs_lr = 0.  # this is abs lr
   config.warmup_abs_lr = 0.  # this is abs lr
 
-  config.num_epochs = 100.0
+  config.num_epochs = 800.0
   config.log_every_steps = 100
   config.save_every_epochs = 50
 
@@ -97,9 +97,9 @@ def get_config():
   config.pretrain_fmt = 'jax'  # 't5x'
 
   # seeds
-  config.seed_jax = 0
-  config.seed_tf = 0
-  config.seed_pt = 0
+  config.seed_jax = 2
+  config.seed_tf = 2
+  config.seed_pt = 2
 
   # torchload
   config.torchload = ml_collections.ConfigDict()

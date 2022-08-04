@@ -59,10 +59,13 @@ def get_config():
   config.model.decoder.transformer.dropout_rate = 0.0
   config.model.decoder.transformer.droppath_rate = 0.0
 
+  config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
+
   # opt config
   config.opt_mu_dtype = 'float32'
 
   # vis
-  # config.model.visualize = True
+  config.model.visualize = False
 
   return config

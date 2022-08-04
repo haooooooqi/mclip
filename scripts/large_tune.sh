@@ -1,4 +1,4 @@
-CODEDIR=/checkpoint/xinleic/mae_jax/repo_mae
+CODEDIR=/checkpoint/xinleic/mae_jax/repo_vit
 
 TPU_NAME=xinleic-mae-iv-0
 ZONE=europe-west4-a
@@ -7,30 +7,32 @@ ZONE=europe-west4-a
 # configs
 ################################################################
 
-batch=4096
-lr=1e-4
-ep=1600
-mask=0.8
-rescale=1.0
-vitsize=huge3x
+vitsize=large
+batch=1024
+lr=1e-3
+wd=0.05
+lrd=0.75
+ep=50
+warm=5
+dp=0.2
+beta2=0.999
 
-seed=1
-partitions=4
-partition_states=True
+seed=0
+partitions=1
 
-CONFIG=cfg_mae_${vitsize}
-JOBNAME=${vitsize}_${ep}_mask@${mask}
+CONFIG=cfg_vit_${vitsize}
+JOBNAME=large_baseline
 
-WORKDIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
-RESUME_DIR=$WORKDIR
-LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}
+PRETRAIN_DIR=gs://xinleic/mae_jax/checkpoints/${JOBNAME}
+WORKDIR=${PRETRAIN_DIR}/tune
+LOGDIR=/checkpoint/xinleic/mae_jax/logs/${JOBNAME}/tune
 sudo mkdir -p ${LOGDIR} && sudo chmod -R 777 ${LOGDIR}
 
 ################################################################
 # launch on all nodes
 ################################################################
 
-cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --worker all \
+cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --worker=all \
   --command "
 cd $CODEDIR
 
@@ -40,29 +42,34 @@ export LOCAL_REDIRECT_CKPT_DIR=${WORKDIR}
 python3 main.py \
     --workdir=${LOGDIR} \
     --config=configs/$CONFIG.py \
+    --config.pretrain_dir=${PRETRAIN_DIR} \
     --config.batch_size=${batch} \
     --config.log_every_steps=100 \
-    --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
-    --config.model.transformer.rescale_init=${rescale} \
+    --config.learning_rate_decay=${lrd} \
+    --config.opt.weight_decay=${wd} \
+    --config.opt.b2=${beta2} \
+    --config.warmup_epochs=${warm} \
+    --config.num_epochs=${ep} \
+    --config.save_every_epochs=50 \
     --config.profile_memory=False \
-    --config.model.norm_pix_loss=True \
-    --config.model.sincos=True \
-    --config.model.mask_ratio=${mask} \
+    --config.donate=True \
+    --config.init_backend=tpu \
+    --config.aug.mix.mixup=True \
+    --config.aug.mix.cutmix=True \
+    --config.aug.randerase.on=True \
+    --config.aug.autoaug=randaugv2 \
+    --config.model.transformer.droppath_rate=${dp} \
     --config.seed_tf=${seed} \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
+    --config.model.classifier=tgap \
     --config.partitioning.num_partitions=${partitions} \
-    --config.opt_type=adamw \
-    --config.opt_mu_dtype=float32 \
-    --config.partitioning.force_partition_states_data_first=${partition_states} \
-    --config.partitioning.partition_states=${partition_states} \
-    --config.model.visualize=False \
-    --config.resume_dir=$RESUME_DIR \
+    --config.pretrain_fmt=t5x \
+    --config.partitioning.partition_states=False \
     --config.torchload.data_dir=/datasets/imagenet-1k \
-    2>&1 | tee $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
-" 2>&1 | tee -a $LOGDIR/pretrain.log
-
+    2>&1 | tee -a $LOGDIR/pretrain_\${SSH_CLIENT// /_}.log
+" 2>&1 | tee -a $LOGDIR/finetune.log
 
 # kill all the jobs
 gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone ${ZONE} --worker all \

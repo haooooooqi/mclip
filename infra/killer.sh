@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ ! -n "$1" ]; then
     echo "Usage: " $0 " {TPU_NAME}"
     echo "       {TPU_NAME} is MANDATORY"
