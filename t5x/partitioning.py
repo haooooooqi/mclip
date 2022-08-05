@@ -848,7 +848,10 @@ class PjitPartitioner(BasePjitPartitioner):
         params_on_devices=params_on_devices,
         backend=backend)
     if logical_axis_rules is None:
-      logical_axis_rules = standard_logical_axis_rules()
+      logical_axis_rules = standard_logical_axis_rules(
+        activation_partitioning_dims=1,
+        parameter_partitioning_dims=1,
+      )
     self._logical_axis_rules = tuple(logical_axis_rules)
     self._data_axis, = flax_partitioning.logical_to_mesh_axes(
         ['batch'], logical_axis_rules)
@@ -902,6 +905,9 @@ class PjitPartitioner(BasePjitPartitioner):
     if self._partition_states:
       logging.info('Splitting optimizer states...')
       flat_mesh_axes = {k: revise_axes(k, v) for k, v in flat_mesh_axes.items()}
+    
+    logging.info('Running: revise_axes_datafirst')
+    flat_mesh_axes = {k: revise_axes_datafirst(k, v) for k, v in flat_mesh_axes.items()}
     # --------------------------------------------------------------------------------
 
     return logical_axes.restore_state(
@@ -917,6 +923,20 @@ def revise_axes(name, axes):
     if axes[0] == None and axes[1] == 'model':
       axes = PartitionSpec('data', 'model')
     elif axes[0] == 'model' and axes[1] == None:
+      # axes = PartitionSpec('model', 'data')
+      axes = PartitionSpec('data', 'model')
+    return axes
+  else:
+    return axes
+
+
+def revise_axes_datafirst(name, axes):
+  if type(axes) is not PartitionSpec:
+    return axes
+  if len(axes) == 2:
+    if axes[1] == 'model':
+      axes = PartitionSpec('data', 'model')
+    elif axes[0] == 'model':
       # axes = PartitionSpec('model', 'data')
       axes = PartitionSpec('data', 'model')
     return axes
