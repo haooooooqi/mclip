@@ -9,6 +9,11 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
+~/mae_jax/infra/wrapper.sh pretrain $salt 128 base imagenet-1k
+~/mae_jax/infra/wrapper.sh pretrain $salt 128 base imagenet-1k --config.learning_rate=1.0e-4
+~/mae_jax/infra/wrapper.sh pretrain $salt 256 base imagenet-1k --config.num_epochs=1600
+~/mae_jax/infra/wrapper.sh pretrain $salt 256 base imagenet-1k --config.learning_rate=1.0e-4 --config.num_epochs=1600
+
 ~/mae_jax/infra/wrapper.sh pretrain $salt 128 large imagenet-1k
 ~/mae_jax/infra/wrapper.sh pretrain $salt 128 large imagenet-1k --config.learning_rate=1.0e-4
 ~/mae_jax/infra/wrapper.sh pretrain $salt 256 large imagenet-1k --config.num_epochs=1600

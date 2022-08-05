@@ -441,7 +441,7 @@ class Checkpointer(object):
     self._partitioner = partitioner
     if checkpoints_dir.startswith('gs://'):
       self.checkpoints_dir = checkpoints_dir
-    else:  # kaiming: hack for local workdir
+    else:
       checkpoints_dir = os.environ.get('LOCAL_REDIRECT_CKPT_DIR', 'gs://kmh-gcp/checkpoints/flax')
       logging.info(f'Redirecting checkpoints_dir to: {checkpoints_dir}')
       self.checkpoints_dir = checkpoints_dir
@@ -637,7 +637,7 @@ class Checkpointer(object):
 
     logging.info('Saving checkpoint for step %d to: %s', step, tmp_dir)
 
-    if jax.process_index() == 0:  
+    if jax.process_index() == 0:
       gfile.makedirs(tmp_dir)
     
     # logging.info('Created dir: %s', tmp_dir)

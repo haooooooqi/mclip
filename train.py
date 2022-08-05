@@ -42,7 +42,7 @@ except ImportError:
 import ml_collections
 import optax
 import tensorflow as tf
-
+from tensorflow.io import gfile
 import models_mae
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
@@ -285,12 +285,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   data_loader_train, data_loader_val, local_batch_size = build_dataloaders(config, partitioner, rng_torch)
 
   steps_per_epoch = len(data_loader_train)
-  
+
   # ------------------------------------
   # Create model
   # ------------------------------------
   model = models_mae.VisionTransformer(**config.model)
-  
+
   p_init_fn, state_axes, state_shape = create_train_state(config, model, image_size, steps_per_epoch, partitioner)
   rng_init, rng = jax.random.split(rng)
 
@@ -299,15 +299,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # ------------------------------------
   # Create checkpointer
   # ------------------------------------
+  checkpoints_dir = os.environ.get('LOCAL_REDIRECT_CKPT_DIR', '')
   checkpointer = t5x.checkpoints.Checkpointer(
     train_state=state_shape,
     partitioner=partitioner,
     checkpoints_dir=workdir,
     keep=None,  # TODO: move to config
   )
-  
+
   if config.resume_dir != '':
     state = ckp.restore_checkpoint(checkpointer, path=config.resume_dir)
+  elif checkpoints_dir != '' and gfile.exists(checkpoints_dir):
+    state = ckp.restore_checkpoint(checkpointer, path=checkpoints_dir)
   elif config.pretrain_dir != '':
     raise NotImplementedError
   else:
