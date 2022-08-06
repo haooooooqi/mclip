@@ -277,7 +277,21 @@ class Encoder(nn.Module):
   prefix: str = 'encoder'
   torch_qkv: bool = False
 
-  @nn.compact
+  def setup(self):
+    self.blocks = tuple()
+    for lyr in range(self.num_layers):
+      blk = Encoder1DBlock(
+          mlp_dim=self.mlp_dim,
+          dropout_rate=self.dropout_rate,
+          attention_dropout_rate=self.attention_dropout_rate,
+          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
+          name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
+          num_heads=self.num_heads,
+          layer_id=lyr,
+          torch_qkv=self.torch_qkv)
+      self.blocks += (blk,)
+    self.norm = nn.LayerNorm(name=self.prefix + '_norm')
+
   def __call__(self, inputs, *, train):
     """Applies Transformer model on the inputs.
 
@@ -293,17 +307,9 @@ class Encoder(nn.Module):
     x = inputs
     # Input Encoder
     for lyr in range(self.num_layers):
-      x = Encoder1DBlock(
-          mlp_dim=self.mlp_dim,
-          dropout_rate=self.dropout_rate,
-          attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=self.prefix + 'block_{:02d}'.format(lyr),  # 'encoderblock_'
-          num_heads=self.num_heads,
-          layer_id=lyr,
-          torch_qkv=self.torch_qkv)(
-              x, deterministic=not train)
-    encoded = nn.LayerNorm(name=self.prefix + '_norm')(x)  # 'encoder_norm'
+      blk = self.blocks[lyr]
+      x = blk(x, deterministic=not train)
+    encoded = self.norm(x)  # 'encoder_norm'
 
     return encoded
 
@@ -329,6 +335,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  full_blocks: int = 0
 
   def random_mask(self, x):
     
@@ -443,14 +450,22 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
-
     # If we want to add a class token, add it here.
     if use_cls_token:
       cls = self.param('cls', clstoken_init, (1, 1, c))
       cls = jnp.tile(cls, [n, 1, 1])
+      x = jnp.concatenate([cls, x], axis=1)
+
+    # split the cls token before shuffle
+    if use_cls_token:
+      cls, x = jnp.split(x, [1,], axis=1)
+
+    # masking: length -> length * mask_ratio
+    x, mask, ids_restore = self.random_mask(x)
+    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+
+    # apend the cls token
+    if use_cls_token:
       x = jnp.concatenate([cls, x], axis=1)
 
     # apply the encoder

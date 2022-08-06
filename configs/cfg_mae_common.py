@@ -147,4 +147,7 @@ def get_config():
   config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
   config.torchload.num_workers = 32
 
+  # freeze
+  config.model.full_blocks = 0
+
   return config
