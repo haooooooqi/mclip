@@ -21,6 +21,8 @@ set -x
 
 ~/mae_jax/infra/wrapper.sh pretrain $salt 256 huge imagenet-1k
 ~/mae_jax/infra/wrapper.sh pretrain $salt 512 huge imagenet-1k --config.num_epochs=1600
+~/mae_jax/infra/wrapper.sh pretrain $salt 256 huge imagenet-1k --config.learning_rate=1.0e-4
+~/mae_jax/infra/wrapper.sh pretrain $salt 512 huge imagenet-1k --config.learning_rate=1.0e-4 --config.num_epochs=1600
 
 ######################################################################
 set +x
