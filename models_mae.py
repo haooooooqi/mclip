@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from re import X
+from absl import logging
 import functools
 from typing import Any, Callable, Optional, Tuple
 
@@ -292,7 +294,7 @@ class Encoder(nn.Module):
       self.blocks += (blk,)
     self.norm = nn.LayerNorm(name=self.prefix + '_norm')
 
-  def __call__(self, inputs, *, train):
+  def __call__(self, inputs, *, train, idx_start=0, idx_end=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -305,13 +307,19 @@ class Encoder(nn.Module):
     assert inputs.ndim == 3  # (batch, len, emb)
 
     x = inputs
-    # Input Encoder
-    for lyr in range(self.num_layers):
-      blk = self.blocks[lyr]
-      x = blk(x, deterministic=not train)
-    encoded = self.norm(x)  # 'encoder_norm'
 
-    return encoded
+    idx_end = self.num_layers if idx_end is None else idx_end
+    # Input Encoder
+    for lyr in range(idx_start, idx_end):
+      blk = self.blocks[lyr]
+      logging.info('Block: {}'.format(blk.name))
+      x = blk(x, deterministic=not train)
+
+    if idx_end == self.num_layers:
+      logging.info('Block: {}'.format(self.norm.name))
+      X = self.norm(x)  # 'encoder_norm'
+
+    return x
 
 
 def gather(x, ids):
@@ -456,6 +464,13 @@ class VisionTransformer(nn.Module):
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
 
+    # declare the encoder
+    encoder = Encoder(name='Transformer', **self.transformer, prefix='encoder')
+    # apply the full encoder
+    x = encoder(x, train=train, idx_start=0, idx_end=self.full_blocks)
+    x = jax.lax.stop_gradient(x)
+    logging.info('Shuffling...')
+
     # split the cls token before shuffle
     if use_cls_token:
       cls, x = jnp.split(x, [1,], axis=1)
@@ -468,8 +483,8 @@ class VisionTransformer(nn.Module):
     if use_cls_token:
       x = jnp.concatenate([cls, x], axis=1)
 
-    # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+    # apply the sparse encoder
+    x = encoder(x, train=train, idx_start=self.full_blocks)
 
     return x, mask, ids_restore
 
