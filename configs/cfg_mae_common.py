@@ -117,6 +117,8 @@ def get_config():
 
   # utils
   config.resume_dir = ''
+  config.pretrain_dir = ''
+
   config.vis_every_epochs = 20.
 
   config.seed_per_host = False
