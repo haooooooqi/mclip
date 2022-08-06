@@ -53,6 +53,30 @@ def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
+# filter layerwise
+# ---------------------------------------------------------
+def trainable_exclude_full_blocks(path: Tuple[Any], val: jnp.ndarray, config: Any):
+    """Filter for layerwise training."""
+    del val
+
+    if len(path) > 3 and path[1].startswith("encoderblock_"):
+        layer_id = path[1][len("encoderblock_"):]  # remove prefix
+        layer_id = int(layer_id)
+        if layer_id < config.model.full_blocks:
+            return False
+    
+    if config.model.full_blocks > 0:
+        if path[0] == 'posembed_encoder':
+            return False
+        if path[0] == 'cls':
+            return False
+        if path[0] == 'embedding':
+            return False
+
+    return True
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):

@@ -50,6 +50,7 @@ from utils import opt_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
+from utils import state_utils
 
 import torch
 
@@ -306,7 +307,14 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
   tx = tx(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
-  tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
+
+  if True:
+    mask_trainable = opt_util.filter_parameters(params, functools.partial(opt_util.trainable_exclude_full_blocks, config=config))
+    logging.info('Trainable: {}'.format(state_utils.str_flatten_dict(mask_trainable)))
+    tx = adamw_util.masked(inner=tx, mask=mask_trainable)
+  else:
+    tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
+
   if config.ema:
     ema_tx = optax.ema(decay=config.ema_decay, debias=False)
     ema_state = ema_tx.init(flax.core.frozen_dict.FrozenDict({'params': params, **variables_states}))
