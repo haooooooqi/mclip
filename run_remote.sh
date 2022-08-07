@@ -6,7 +6,7 @@ batch=4096
 mask=0.75
 
 full=8
-drop=0.25
+drop=0.75
 
 seed=100
 

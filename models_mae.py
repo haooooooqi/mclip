@@ -440,7 +440,7 @@ class VisionTransformer(nn.Module):
     N, L, C = x.shape
 
     rng = self.make_rng('dropout')
-    noise = random.uniform(rng, shape=(1, 1, C))
+    noise = random.uniform(rng, shape=(N, 1, C))
 
     mask = (noise > self.drop_channels).astype(jnp.float32)  # 1: keep; 0: remove
 
