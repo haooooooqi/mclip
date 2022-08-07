@@ -151,5 +151,6 @@ def get_config():
 
   # freeze
   config.model.full_blocks = 0
+  config.model.drop_channels = 0.0
 
   return config

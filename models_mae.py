@@ -344,6 +344,7 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
   full_blocks: int = 0
+  drop_channels: float = 0.
 
   def random_mask(self, x):
     
@@ -433,6 +434,21 @@ class VisionTransformer(nn.Module):
     axis=1)
     return imgs_vis
 
+  def apply_drop_channels(self, x):
+    self.drop_channels
+
+    N, L, C = x.shape
+
+    rng = self.make_rng('dropout')
+    noise = random.uniform(rng, shape=(1, 1, C))
+
+    mask = (noise > self.drop_channels).astype(jnp.float32)  # 1: keep; 0: remove
+
+    channel_token = self.param('channel_token', clstoken_init, (1, 1, C))
+
+    x = x * mask + channel_token * (1 - mask)
+    return x
+
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
@@ -478,6 +494,9 @@ class VisionTransformer(nn.Module):
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
     ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+
+    # drop channels
+    x = self.apply_drop_channels(x)
 
     # apend the cls token
     if use_cls_token:

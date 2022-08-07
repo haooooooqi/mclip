@@ -37,7 +37,7 @@ def load_from_pretrain(state, pretrain_dir):
   logging.info('Missing keys: {}'.format(missing_keys))
   logging.info('Ignored keys: {}'.format(ignored_keys))
 
-  assert len(missing_keys) == 0
+  assert len(missing_keys) <= 1  # channel_token
   assert len(ignored_keys) == 0
 
   named_params = {}
