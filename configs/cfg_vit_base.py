@@ -38,16 +38,20 @@ def get_config():
   config = cfg_common_ft.get_config()
 
   # model config
-  config.model.update(vit.get_b16_config())  # ViT-B/16
+  config.model.update(vit.get_b16_config())  # ViT-L/16
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.1
   config.model.classifier = 'tgap'  # 'token', 'tgap' (token + gap)
 
+  config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
+
   # opt config
-  config.opt_mu_dtype = 'float32'
+  config.opt_mu_dtype = 'float32'  # bfloat16, float32
 
   # finetune
   config.num_epochs = 100.0
+  config.learning_rate = 5e-4
   config.learning_rate_decay = 0.65
 
   return config

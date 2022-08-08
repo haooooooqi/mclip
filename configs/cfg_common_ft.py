@@ -50,7 +50,7 @@ def get_config():
 
   config.num_epochs = 100.0
   config.log_every_steps = 100
-  config.save_every_epochs = 10
+  config.save_every_epochs = 50
 
   # If num_train_steps==-1 then the number of training steps is calculated from
   # num_epochs using the entire dataset. Similarly for steps_per_eval.
@@ -59,7 +59,7 @@ def get_config():
 
   # Consider setting the batch size to max(tpu_chips * 256, 8 * 1024) if you
   # train on a larger pod slice.
-  config.batch_size = 4096
+  config.batch_size = 1024
   config.cache = True
 
   # model config
@@ -108,7 +108,7 @@ def get_config():
 
   config.aug.label_smoothing = 0.1
 
-  config.aug.autoaug = 'autoaug'  # autoaug, randaug, or None
+  config.aug.autoaug = 'randaugv2'  # v0, randaugv2, or rand-m9-mstd0.5-inc1
 
   config.aug.color_jit = None  # [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 
@@ -124,7 +124,7 @@ def get_config():
 
   # rand erase config
   config.aug.randerase = ml_collections.ConfigDict()
-  config.aug.randerase.on = False
+  config.aug.randerase.on = True
   config.aug.randerase.prob = 0.25
 
   # init config
@@ -133,25 +133,25 @@ def get_config():
 
   # memory
   config.profile_memory = False
-  config.donate = False
+  config.donate = True
   config.init_backend = 'tpu'
 
   # utils
   config.resume_dir = ''
 
   config.pretrain_dir = ''
-  config.pretrain_fmt = 'jax'  # 't5x'
+  config.pretrain_fmt = 't5x'  # 'jax'
 
   config.eval_only = False
 
   # seeds
-  config.seed_jax = 0
-  config.seed_tf = 0
-  config.seed_pt = 0
+  config.seed_jax = 27
+  config.seed_tf = 27
+  config.seed_pt = 27
 
   # torchload
   config.torchload = ml_collections.ConfigDict()
-  config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
+  config.torchload.data_dir = '/datasets/imagenet-1k'
   config.torchload.num_workers = 32
 
   # partitioning

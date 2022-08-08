@@ -38,11 +38,22 @@ def get_config():
   config = cfg_common_ft.get_config()
 
   # model config
-  config.model.update(vit.get_h14_config())  # ViT-H/14
+  config.model.update(vit.get_l16_config())  # ViT-L/16
+  config.model.hidden_size = 1280
+  config.model.transformer.mlp_dim = config.model.hidden_size * 4
   config.model.transformer.dropout_rate = 0.0
   config.model.transformer.droppath_rate = 0.3
+  config.model.transformer.num_layers = 32
+  config.model.classifier = 'tgap'  # 'token', 'tgap' (token + gap)
+
+  config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
 
   # opt config
   config.opt_mu_dtype = 'float32'  # bfloat16, float32
+
+  # finetune
+  config.num_epochs = 50.0
+  config.learning_rate_decay = 0.75
 
   return config

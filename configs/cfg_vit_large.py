@@ -43,6 +43,9 @@ def get_config():
   config.model.transformer.droppath_rate = 0.2
   config.model.classifier = 'tgap'  # 'token', 'tgap' (token + gap)
 
+  config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
+
   # opt config
   config.opt_mu_dtype = 'float32'  # bfloat16, float32
 
