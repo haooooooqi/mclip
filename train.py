@@ -367,6 +367,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # assert step == int(jnp.reshape(state.step, (-1,))[0])  # sanity when loading
   data_layout = partitioner.get_data_layout(config.batch_size)
   shard_id = data_layout.shard_id
+  start_time = time.time()
 
   for epoch in range(epoch_offset, int(config.num_epochs)):
     data_loader_train.sampler.set_epoch(epoch)  # reset random seed

@@ -103,7 +103,7 @@ def get_config():
 
   # torchload
   config.torchload = ml_collections.ConfigDict()
-  config.torchload.data_dir = '/checkpoint/imagenet-1k'
+  config.torchload.data_dir = '/datasets/imagenet-1k'
   config.torchload.num_workers = 32
 
   # partitioning
