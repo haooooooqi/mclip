@@ -9,6 +9,7 @@ warm=40
 
 vocab=8192
 beta=0.25
+mix=0.75
 
 seed=100
 
