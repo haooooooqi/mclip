@@ -86,8 +86,8 @@ python3 main.py \
     --config.model.stopgrad_blocks=${stopg} \
     --config.model.transformer.renew_layers=${renew} \
     --config.partitioning.partition_states=True \
-    --config.partitioning.activation_partitioning_dims=1 \
-    --config.partitioning.parameter_partitioning_dims=1 \
+    --config.partitioning.activation_partitioning_dims=2 \
+    --config.partitioning.parameter_partitioning_dims=2 \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
