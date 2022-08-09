@@ -16,7 +16,7 @@ partitions=4
 pft=0  # predictor layers for ft
 stopg=16  # number of stopgrad blocks
 
-renew=4
+renew=0
 
 vitsize=huge3x_p16
 CONFIG=cfg_vit_${vitsize}
