@@ -49,7 +49,7 @@ class VectorQuantizer(nn.Module):
     x_q = x + jax.lax.stop_gradient(x_q - x)  # straight-through estimator
     return x_q, ids
 
-  def __call__(self, inputs, train=True, split=False):
+  def __call__(self, inputs, train=True):
     """
     Input:
     inputs: [.., .., C]

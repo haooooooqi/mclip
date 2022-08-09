@@ -19,7 +19,8 @@ python3 main.py \
     --config.model.transformer.torch_qkv=False \
     --config.model.vqvae.on=True \
     --config.model.loss_all_patches=True \
-    --config.model.vqvae.split.on=True \
+    --config.model.vqvae.vq_mix_weight=0.8 \
+    
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
