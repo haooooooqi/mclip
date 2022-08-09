@@ -88,7 +88,7 @@ python3 main.py \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_ALL} \
     2>&1 | tee $LOG_DIR/pretrain_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
-" 2>&1 | tee $LOG_DIR/pretrain_${TAG_WITH_TIME}.log
+" 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 
 PRETRAIN_STATUS=${PIPESTATUS[0]}
 
