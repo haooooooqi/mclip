@@ -1,10 +1,10 @@
 # run remote
 
 lr=1.0e-4
-wd=0
-ep=100
+wd=0.05
+ep=800
 batch=4096
-mask=0.25
+mask=0.75
 warm=40
 
 vocab=8192
@@ -59,7 +59,7 @@ python3 main.py \
     --config.model.vqvae.vocab_size=${vocab} \
     --config.model.vqvae.split.on=True \
     --config.warmup_epochs=${warm} \
-    --config.model.loss_all_patches=True \
+    --config.model.loss_all_patches=False \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
