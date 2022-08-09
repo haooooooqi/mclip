@@ -114,7 +114,7 @@ class AddPositionEmbs(nn.Module):
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
     
-    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
+    pe = self.pe # still tuning if possible
 
     if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
       output = inputs + pe[:, 1:, :]

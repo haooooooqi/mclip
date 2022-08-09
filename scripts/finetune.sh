@@ -19,12 +19,14 @@ EXTRA_ARGS_COMMON=${array[@]:5:$len}
 FOLDER=vit_jax
 STORAGE_BUCKET=gs://xinleic
 DATASET=imagenet-1k
-TUNE_TAG=tune_${EXTRA_ARGS_COMMON_TAG}
+TUNE_TAG=finetune_${EXTRA_ARGS_COMMON_TAG}
 ################################################################
 # folders
 ################################################################
 WORK_DIR_PRETRAIN=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}
+# should be changed to: WORK_DIR_PRETRAIN=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}/pretrain
 WORK_DIR=${WORK_DIR_PRETRAIN}/${TUNE_TAG}
+# should be changed to: WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}/${TUNE_TAG}
 
 LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR_PRETRAIN}/${TUNE_TAG}
 sudo mkdir -p ${LOG_DIR} && sudo chmod -R 777 ${LOG_DIR}
@@ -58,7 +60,7 @@ python3 main.py \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_COMMON} \
     2>&1 | tee $LOG_DIR/finetune_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
-" 2>&1 | tee $LOG_DIR/finetune_${TAG_WITH_TIME}.log
+" 2>&1 | tee $LOG_DIR/finetune_main_${TAG_WITH_TIME}.log
 
 PRETRAIN_STATUS=${PIPESTATUS[0]}
 
