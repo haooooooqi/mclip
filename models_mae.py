@@ -323,22 +323,6 @@ def gather(x, ids):
 vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
 
 
-class ContrastiveLearner(nn.Module):
-  """ContrastiveLearner with Vision Transformer
-  """
-  config: Any = None  # model config
-  dtype: Any = jnp.float32
-
-  @nn.compact
-  def __call__(self, inputs, *, train):
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
-
-    encoder = VisionTransformer(**self.config)
-
-    return encoder(inputs, train=train)
-
-
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
   mask_ratio: float
@@ -470,10 +454,6 @@ class VisionTransformer(nn.Module):
     posembed = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')
     x = posembed(x)
 
-    # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
-
     # If we want to add a class token, add it here.
     if use_cls_token:
       clstoken = self.param('cls', clstoken_init, (1, 1, c))
@@ -486,9 +466,7 @@ class VisionTransformer(nn.Module):
     blocks = Encoder(name='Transformer', **self.transformer, prefix='encoder')
     x = blocks(x, train=train)
 
-    layers = (patch_embed, posembed, clstoken, blocks)
-
-    return x, mask, ids_restore, layers
+    return x
 
   def apply_decoder(self, x, ids_restore, train):
     use_cls_token=(self.classifier == 'token')
@@ -555,44 +533,45 @@ class VisionTransformer(nn.Module):
 
 
   @nn.compact
-  def __call__(self, inputs, *, train):    
-    imgs = inputs['image']
-    labels = inputs['label']
-
-    imgs, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
-    imgs = imgs.squeeze(axis=1)
-    imgs0 = imgs0.squeeze(axis=1)
-    imgs1 = imgs1.squeeze(axis=1)
-
+  def __call__(self, inputs, *, train):
+    """
+    inputs: [2*N, H, W, 3]
+    """
     # apply encoder
-    x, mask, ids_restore, encoder_layers = self.apply_encoder(imgs, train=train)
+    x = self.apply_encoder(inputs, train=train)
 
-    # apply contrastive learning
-    x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
+    # reduce the feature. TODO: add config here
+    x = x.mean(axis=1)  # [2*N, C]
 
-    # optionally apply knn
-    if self.clr.knn_clr:
-      labels_clr = labels[:round(self.clr.sample_rate * imgs0.shape[0])]
-      knn_accuracy = self.apply_knn(x_clr, labels_clr, train=train)
-    else:
-      knn_accuracy = self.apply_knn(x, labels, train=train)
+    # apply proj head
+    x_proj = self.apply_projection_head(x)  # [2*N, C]
 
-    # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
+    # # apply contrastive learning
+    # x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
 
-    # compute loss
-    loss_l2 = self.compute_loss(imgs, pred, mask)
+    # # optionally apply knn
+    # if self.clr.knn_clr:
+    #   labels_clr = labels[:round(self.clr.sample_rate * imgs0.shape[0])]
+    #   knn_accuracy = self.apply_knn(x_clr, labels_clr, train=train)
+    # else:
+    #   knn_accuracy = self.apply_knn(x, labels, train=train)
 
-    loss = loss_l2 + self.clr.loss_weight * loss_clr
+    # # apply decoder
+    # pred = self.apply_decoder(x, ids_restore, train=train)
 
-    if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, mask)
-    else:
-      outcome = pred  # not used
+    # # compute loss
+    # loss_l2 = self.compute_loss(imgs, pred, mask)
 
-    artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
+    # loss = loss_l2 + self.clr.loss_weight * loss_clr
 
-    return loss, outcome, knn_accuracy, artifacts
+    # if self.visualize and not train:
+    #   outcome = self.visualization(imgs, pred, mask)
+    # else:
+    #   outcome = pred  # not used
+
+    # artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
+
+    return x_proj
 
   # ----------------------------------------
   # contrastive learning
@@ -645,7 +624,7 @@ class VisionTransformer(nn.Module):
 
     return x_clr, loss_clr
 
-  def contrastive_heads(self, z):
+  def apply_projection_head(self, z):
     for i in range(self.clr.proj_layers - 1):
       z = nn.Dense(
         features=self.clr.proj_dim_hidden,
@@ -690,4 +669,39 @@ class VisionTransformer(nn.Module):
     loss *= 2 * self.clr.tau
     return loss
 
-    
+  
+class ContrastiveLearner(nn.Module):
+  """ContrastiveLearner with Vision Transformer
+  """
+  config: Any = None  # model config
+  dtype: Any = jnp.float32
+
+  @nn.compact
+  def __call__(self, inputs, *, train):
+    """
+    inputs['image']: [N, V, H, W, 3], V for viewss
+    """
+
+    imgs = inputs['image']
+    labels = inputs['label']  # not used
+
+    # split the images
+    imgs_, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
+    imgs_ = imgs_.squeeze(axis=1)
+    imgs0 = imgs0.squeeze(axis=1)
+    imgs1 = imgs1.squeeze(axis=1)
+
+    imgs = jnp.concatenate([imgs0, imgs1], axis=0)
+
+    base_config = self.config.copy_and_resolve_references()  # copy
+    base_config.name = 'base_encoder'
+    base_encoder = VisionTransformer(**base_config)
+
+    x = base_encoder(imgs, train=train)  # [2*N, C]
+
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+
+
+    return x_proj
+  

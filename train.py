@@ -50,6 +50,7 @@ from utils import opt_util
 from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
+from utils import state_utils
 
 import torch
 
@@ -281,7 +282,7 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
     )
   else:
     mask = None
-  # logging.info('Apply weight decay: {}'.format(mask))
+  logging.info('Apply weight decay: {}'.format(state_utils.str_flatten_dict(mask)))
 
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
