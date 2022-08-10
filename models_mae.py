@@ -498,13 +498,13 @@ class VisionTransformer(nn.Module):
     x: [2*N, L, D]
     """
     # apply encoder
-    x = self.apply_encoder(imgs, train=train)
+    x_enc = self.apply_encoder(imgs, train=train)
 
     # reduce the feature. TODO: add config here
-    z = x.mean(axis=1)  # [2*N, C]
+    x_proj = x_enc.mean(axis=1)  # [2*N, C]
 
     # apply proj head
-    z = self.apply_projection_head(z)  # [2*N, C]
+    x_proj = self.apply_projection_head(x_proj)  # [2*N, C]
 
     # # apply contrastive learning
     # x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
@@ -531,7 +531,7 @@ class VisionTransformer(nn.Module):
 
     # artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
 
-    return z, x
+    return x_proj, x_enc
 
   # ----------------------------------------
   # contrastive learning
@@ -631,15 +631,14 @@ class ContrastiveLearner(nn.Module):
     base_config.name = 'base_encoder'
     base_encoder = VisionTransformer(**base_config)
 
-    z, x = base_encoder(imgs, train=train)  # [2*N, C]
+    x_proj, x_enc = base_encoder(imgs, train=train)  # [2*N, C]
 
     # apply knn on x
-    knn_accuracy = self.apply_knn(
-      jnp.split(x, 2, axis=0)[0],
-      labels, train=train)
+    knn_accuracy = self.apply_knn(jnp.split(x_enc, 2, axis=0)[0], labels, train=train)
 
     # compute the loss
-    loss = self.compute_contrastive_loss(x, train=train)
+    loss = self.compute_contrastive_loss(x_proj)
+    # loss = z.sum()
 
     if self.config.visualize and not train:
       vis = self.visualization(imgs)
@@ -650,7 +649,7 @@ class ContrastiveLearner(nn.Module):
 
     return loss, vis, artifacts
   
-  def compute_contrastive_loss(self, z, train):
+  def compute_contrastive_loss(self, z):
     z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
 
     z0, z1 = jnp.split(z, 2, axis=0)
