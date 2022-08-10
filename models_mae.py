@@ -407,26 +407,6 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
-  def visualization(self, imgs, pred, mask):
-    """
-    imgs: [N, H, W, 3]
-    pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
-    """
-    imgs_pred = self.unpatchify(pred)
-
-    mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
-    mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
-    imgs_mask = imgs * (1 - mask)
-
-    imgs_plus = imgs * (1 - mask) + imgs_pred * mask
-
-    imgs_vis = jnp.concatenate(
-    [jnp.concatenate([imgs, imgs_mask], axis=2),
-     jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
-    axis=1)
-    return imgs_vis
-
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
@@ -509,42 +489,22 @@ class VisionTransformer(nn.Module):
     pred = x[:, num_clstokens:, :]
     return pred
 
-  def apply_knn(self, x, labels, train):
-    if not self.knn.on:
-      return
-    if self.knn.postprocess == 'tgap':
-      x = jnp.mean(x, axis=1)
-    else:
-      raise NotImplementedError
-
-    if self.knn.postnorm == 'LayerNorm':
-      x = nn.LayerNorm(use_bias=False, use_scale=False, name='knn_postnorm')(x)
-    elif self.knn.postnorm == 'SyncBatchNorm':  # no gamma/beta
-      x = dist_util.SyncBatchNorm(x, eps=1.e-6)
-    else:
-      raise NotImplementedError
-
-    if self.knn.l2norm:
-      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
-      x /= l2norm
-
-    knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
-    return knn_accuracy
-
-
   @nn.compact
-  def __call__(self, inputs, *, train):
+  def __call__(self, imgs, *, train):
     """
-    inputs: [2*N, H, W, 3]
+    imgs: [2*N, H, W, 3]
+    return:
+    z: [2*N, C]
+    x: [2*N, L, D]
     """
     # apply encoder
-    x = self.apply_encoder(inputs, train=train)
+    x = self.apply_encoder(imgs, train=train)
 
     # reduce the feature. TODO: add config here
-    x = x.mean(axis=1)  # [2*N, C]
+    z = x.mean(axis=1)  # [2*N, C]
 
     # apply proj head
-    x_proj = self.apply_projection_head(x)  # [2*N, C]
+    z = self.apply_projection_head(z)  # [2*N, C]
 
     # # apply contrastive learning
     # x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
@@ -571,7 +531,7 @@ class VisionTransformer(nn.Module):
 
     # artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
 
-    return x_proj
+    return z, x
 
   # ----------------------------------------
   # contrastive learning
@@ -657,7 +617,7 @@ class ContrastiveLearner(nn.Module):
     """
 
     imgs = inputs['image']
-    labels = inputs['label']  # not used
+    labels = inputs['label']
 
     # split the images
     imgs_, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
@@ -671,11 +631,24 @@ class ContrastiveLearner(nn.Module):
     base_config.name = 'base_encoder'
     base_encoder = VisionTransformer(**base_config)
 
-    x = base_encoder(imgs, train=train)  # [2*N, C]
+    z, x = base_encoder(imgs, train=train)  # [2*N, C]
 
+    # apply knn on x
+    knn_accuracy = self.apply_knn(
+      jnp.split(x, 2, axis=0)[0],
+      labels, train=train)
+
+    # compute the loss
     loss = self.compute_contrastive_loss(x, train=train)
 
-    return loss
+    if self.config.visualize and not train:
+      vis = self.visualization(imgs)
+    else:
+      vis = None  # not used
+
+    artifacts = {'knn_accuracy': knn_accuracy}
+
+    return loss, vis, artifacts
   
   def compute_contrastive_loss(self, z, train):
     z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
@@ -701,3 +674,33 @@ class ContrastiveLearner(nn.Module):
     loss = loss.mean()
     loss *= 2 * tau
     return loss
+
+  def apply_knn(self, x, labels, train):
+    if not self.config.knn.on:
+      return
+    if self.config.knn.postprocess == 'tgap':
+      x = jnp.mean(x, axis=1)
+    else:
+      raise NotImplementedError
+
+    if self.config.knn.postnorm == 'LayerNorm':
+      x = nn.LayerNorm(use_bias=False, use_scale=False, name='knn_postnorm')(x)
+    elif self.config.knn.postnorm == 'SyncBatchNorm':  # no gamma/beta
+      x = dist_util.SyncBatchNorm(x, eps=1.e-6)
+    else:
+      raise NotImplementedError
+
+    if self.config.knn.l2norm:
+      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
+      x /= l2norm
+
+    knn_accuracy = OnlineKNN(knn=self.config.knn)(x, labels, train=train)
+    return knn_accuracy
+
+  def visualization(self, imgs):
+    """
+    imgs: [2*N, H, W, 3]
+    """
+    imgs0, imgs1 = jnp.split(imgs, 2, axis=0)
+    imgs_vis = jnp.concatenate([imgs0, imgs1], axis=2)
+    return imgs_vis
