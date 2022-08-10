@@ -60,9 +60,11 @@ python3 main.py \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_COMMON} \
     2>&1 | tee $LOG_DIR/finetune_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
-" 2>&1 | tee $LOG_DIR/finetune_main_${TAG_WITH_TIME}.log
 
-PRETRAIN_STATUS=${PIPESTATUS[0]}
+if [ \${PIPESTATUS[0]} -eq 0 ]; then
+    touch $LOG_DIR/${TUNE_TAG}.flag
+fi
+" 2>&1 | tee $LOG_DIR/finetune_main_${TAG_WITH_TIME}.log
 
 ################################################################
 # cleanup on all nodes
@@ -74,10 +76,5 @@ sudo lsof -w /dev/accel0 | grep .py | awk '{print \"sudo kill -9 \" \$2}' | sh
 sudo rm -f /tmp/libtpu_lockfile
 mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 "
-
-if [ $PRETRAIN_STATUS -eq 0 ]; then
-    touch $LOG_DIR/${TUNE_TAG}.flag
-fi
-
 
 set +x
