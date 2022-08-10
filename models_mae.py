@@ -643,32 +643,6 @@ class VisionTransformer(nn.Module):
 
     return z
 
-  def contrastive_loss(self, z, train):
-
-    z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
-
-    z0, z1 = jnp.split(z, 2, axis=0)
-
-    # if 'batch' in jax.core.thread_local_state.trace_state.axis_env:
-    if train:
-      z0_all = jax.lax.all_gather(z0, axis_name='batch')
-      z1_all = jax.lax.all_gather(z1, axis_name='batch')
-
-      z0 = z0_all.reshape([-1, z0.shape[-1]])
-      z1 = z1_all.reshape([-1, z1.shape[-1]])
-
-    logits = jnp.einsum('nc,mc->nm', z0, z1)
-    logits /= self.clr.tau
-    labels_one_hot = jnp.eye(logits.shape[0])
-
-    # symmetric loss for simclr
-    loss01 = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
-    loss10 = optax.softmax_cross_entropy(logits=logits.transpose(), labels=labels_one_hot)
-    loss = (loss01 + loss10) / 2
-    loss = loss.mean()
-    loss *= 2 * self.clr.tau
-    return loss
-
   
 class ContrastiveLearner(nn.Module):
   """ContrastiveLearner with Vision Transformer
@@ -699,9 +673,31 @@ class ContrastiveLearner(nn.Module):
 
     x = base_encoder(imgs, train=train)  # [2*N, C]
 
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
+    loss = self.compute_contrastive_loss(x, train=train)
 
-
-    return x_proj
+    return loss
   
+  def compute_contrastive_loss(self, z, train):
+    z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
+
+    z0, z1 = jnp.split(z, 2, axis=0)
+
+    z0_all = dist_util.all_gather(z0, axis_name='batch')
+    z1_all = dist_util.all_gather(z1, axis_name='batch')
+
+    z0 = z0_all.reshape([-1, z0.shape[-1]])
+    z1 = z1_all.reshape([-1, z1.shape[-1]])
+
+    tau = self.config.clr.tau
+
+    logits = jnp.einsum('nc,mc->nm', z0, z1)
+    logits /= tau
+    labels_one_hot = jnp.eye(logits.shape[0])
+
+    # symmetric loss for simclr
+    loss01 = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    loss10 = optax.softmax_cross_entropy(logits=logits.transpose(), labels=labels_one_hot)
+    loss = (loss01 + loss10) / 2
+    loss = loss.mean()
+    loss *= 2 * tau
+    return loss
