@@ -392,7 +392,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
-  model = models_mae.VisionTransformer(num_classes=-1, **config.model)  # num_classes not used
+  model = models_mae.ContrastiveLearner(config=config.model)
 
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 

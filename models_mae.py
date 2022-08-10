@@ -323,10 +323,24 @@ def gather(x, ids):
 vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
 
 
+class ContrastiveLearner(nn.Module):
+  """ContrastiveLearner with Vision Transformer
+  """
+  config: Any = None  # model config
+  dtype: Any = jnp.float32
+
+  @nn.compact
+  def __call__(self, inputs, *, train):
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+
+    encoder = VisionTransformer(**self.config)
+
+    return encoder(inputs, train=train)
+
+
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
-
-  num_classes: int
   mask_ratio: float
   sincos: bool
   norm_pix_loss: bool
@@ -541,7 +555,7 @@ class VisionTransformer(nn.Module):
 
 
   @nn.compact
-  def __call__(self, inputs, *, train):
+  def __call__(self, inputs, *, train):    
     imgs = inputs['image']
     labels = inputs['label']
 
