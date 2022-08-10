@@ -5,7 +5,7 @@ rm -rf tmp
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 python3 main.py \
     --workdir=./tmp \
-    --config=configs/cfg_vit_large.py \
+    --config=configs/cfg_vit_base.py \
     --config.batch_size=128 \
     --config.log_every_steps=10 \
     --config.num_epochs=1 \
@@ -22,7 +22,7 @@ python3 main.py \
     --config.model.transformer.torch_qkv=False \
     --config.eval_only=False \
     --config.model.classifier=tgap \
-    --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220630_165012_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_100ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
+    --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220810_060227_kmh-tpuvm-v3-256-3_cfg_clr_base_simclr_300ep_b4096_lr1e-4_wd0.1_TorchLoader_wseed100_t0.2'
 
     # --config.aug.area_range=0.9,1 \
     # --config.aug.aspect_ratio_range=0.8,1.2 \

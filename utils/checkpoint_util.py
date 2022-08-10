@@ -26,7 +26,7 @@ def load_from_pretrain(state, pretrain_dir):
 
   state_params = flax.core.freeze(state.params)
 
-  named_load_params, _ = to_named_parameters(load_params)
+  named_load_params, _ = to_named_parameters(load_params, remove_prefix='base_encoder.')
   named_state_params, tree_ref = to_named_parameters(state_params)
 
   missing_keys = set(named_state_params.keys()) - set(named_load_params.keys())
@@ -83,7 +83,7 @@ def filter_parameters(params, filter_fn):
   return params_to_filter
 
 
-def to_named_parameters(params):
+def to_named_parameters(params, remove_prefix=''):
   """ Turn a PyTree params to a dict of named_parameters
   """
   names = filter_parameters(params, get_name)
@@ -91,5 +91,5 @@ def to_named_parameters(params):
   list_names, tree_names = tu.tree_flatten(names)
   assert tree_params == tree_names
   del tree_names
-  named_params = dict((x, y) for x, y in zip(list_names, list_params))
+  named_params = dict((x.lstrip(remove_prefix), y) for x, y in zip(list_names, list_params))
   return named_params, tree_params
