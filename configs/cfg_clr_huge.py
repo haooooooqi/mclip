@@ -30,16 +30,14 @@
 import ml_collections
 
 import configs.vit as vit
-import configs.cfg_mae_common as cfg_mae_common
+import configs.cfg_clr_common as cfg_clr_common
 
 
 def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
-  config = cfg_mae_common.get_config()
+  config = cfg_clr_common.get_config()
 
-  # mae config
-
-  config.model.update(vit.get_l16_config())
+  config.model.update(vit.get_h14_config())
   # config.model.hidden_size = 1024
   # config.model.transformer.mlp_dim = config.model.hidden_size * 4
   config.model.transformer.dropout_rate = 0.0

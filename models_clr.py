@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from re import X
 from absl import logging
 import functools
 from typing import Any, Callable, Optional, Tuple
@@ -316,11 +315,6 @@ class Encoder(nn.Module):
       logging.info('Block: {}/{}'.format(self.name, name))
 
     return x
-
-
-def gather(x, ids):
-  return x[ids]
-vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
 
 
 class VisionTransformer(nn.Module):

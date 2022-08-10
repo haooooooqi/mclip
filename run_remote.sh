@@ -1,16 +1,16 @@
 # run remote
 
-lr=1.0e-4
-ep=800
+lr=1e-4
+wd=0.1
+ep=300
 batch=4096
 
 tau=0.2
 
 seed=100
 
-CONFIG=cfg_mae_large
-# maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeclr_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed${seed}_t${tau}_r${rate}
+CONFIG=cfg_clr_large
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_simclr_${ep}ep_b${batch}_lr${lr}_wd${wd}_TorchLoader_wseed${seed}_t${tau}_r${rate}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -39,7 +39,8 @@ python3 main.py \
     --config.log_every_steps=100 \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
-    --config.save_every_epochs=50 \
+    --config.opt.weight_decay=${wd} \
+    --config.save_every_epochs=20 \
     --config.model.sincos=True \
     --config.donate=True \
     --config.seed_jax=${seed} \

@@ -29,7 +29,7 @@
 
 import ml_collections
 
-import configs.mae as mae
+import configs.clr as clr
 
 
 def get_config():
@@ -60,7 +60,7 @@ def get_config():
   config.cache = True
 
   # model config
-  config.model = mae.get_config()
+  config.model = clr.get_config()
   
   config.model.transformer.torch_qkv = False  # the torch qkv format (one conv for qkv); JAX default is torch_qkv=False
 

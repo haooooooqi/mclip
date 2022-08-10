@@ -1,4 +1,4 @@
-## MAE pre-training in JAX
+## SimCLR pre-training in JAX
 
-Written by Kaiming.
+Written by Kaiming. WIP.
 
