@@ -86,7 +86,6 @@ def get_config():
 
   config.aug.area_range = (0.08, 1)
   config.aug.aspect_ratio_range = (3. / 4, 4. / 3.)
-  config.aug.crop_ver = 'v4'  # v1, v3
 
   config.aug.label_smoothing = 0.1
 

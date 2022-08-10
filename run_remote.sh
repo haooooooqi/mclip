@@ -3,18 +3,14 @@
 lr=1.0e-4
 ep=800
 batch=4096
-mask=0.75
 
 tau=0.2
-lossw=1
-rate=0.25
-unshared=4
 
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeclr_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_un${unshared}_knnclr
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maeclr_${ep}ep_b${batch}_lr${lr}_TorchLoader_wseed${seed}_t${tau}_r${rate}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -44,20 +40,13 @@ python3 main.py \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
     --config.save_every_epochs=50 \
-    --config.model.norm_pix_loss=True \
     --config.model.sincos=True \
-    --config.model.mask_ratio=${mask} \
-    --config.aug.crop_ver=v2 \
     --config.donate=True \
     --config.seed_jax=${seed} \
     --config.seed_pt=${seed} \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
     --config.model.clr.tau=${tau} \
-    --config.model.clr.loss_weight=${lossw} \
-    --config.model.clr.sample_rate=${rate} \
-    --config.model.clr.num_unshared_layers=${unshared} \
-    --config.model.clr.knn_clr=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 

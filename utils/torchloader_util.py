@@ -30,9 +30,8 @@ AUTOAUGS = {'autoaug': 'v0', 'randaugv2': 'rand-m9-mstd0.5-inc1'}
 
 
 class GeneralImageFolder(datasets.ImageFolder):
-    def __init__(self, second_transform, **kwargs):
+    def __init__(self, **kwargs):
         super(GeneralImageFolder, self).__init__(**kwargs)
-        self.second_transform = second_transform
 
     def __repr__(self) -> str:
         head = "Dataset " + self.__class__.__name__
@@ -40,12 +39,9 @@ class GeneralImageFolder(datasets.ImageFolder):
         if self.root is not None:
             body.append("Root location: {}".format(self.root))
         body += self.extra_repr().splitlines()
-        body.append("First Transform: ")
+        body.append("Transform: ")
         if hasattr(self, "transform") and self.transform is not None:
             body += [repr(self.transforms)]
-        body.append("Second Transform: ")
-        if hasattr(self, "second_transform") and self.second_transform is not None:
-            body += [repr(self.second_transform)]
         lines = [head] + [" " * self._repr_indent + line for line in body]
         return '\n'.join(lines)
 
@@ -53,11 +49,10 @@ class GeneralImageFolder(datasets.ImageFolder):
         path, target = self.samples[index]
         img = self.loader(path)
 
-        sample = self.transform(img).unsqueeze(0)
-        sample_view0 = self.second_transform(img).unsqueeze(0)
-        sample_view1 = self.second_transform(img).unsqueeze(0)
+        sample0 = self.transform(img).unsqueeze(0)
+        sample1 = self.transform(img).unsqueeze(0)
 
-        sample = torch.cat([sample, sample_view0, sample_view1])
+        sample = torch.cat([sample0, sample1])
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -66,11 +61,10 @@ class GeneralImageFolder(datasets.ImageFolder):
 
 
 def build_dataset(is_train, data_dir, aug):
-    transform = build_transform(is_train, aug)
-    second_transform = build_transform(is_train, aug.aug_clr)
+    transform = build_transform(is_train, aug.aug_clr)
 
     root = os.path.join(data_dir, 'train' if is_train else 'val')
-    dataset = GeneralImageFolder(root=root, transform=transform, second_transform=second_transform)
+    dataset = GeneralImageFolder(root=root, transform=transform)
 
     logging.info(dataset)
 

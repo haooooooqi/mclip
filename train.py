@@ -41,8 +41,7 @@ import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import input_pipeline
-import models_mae
+import models_clr
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import opt_util
@@ -68,7 +67,8 @@ import random as _random
 
 def initialized(key, image_size, model, init_backend='tpu'):
   init_batch_size = 16
-  input_shape = (init_batch_size, 3, image_size, image_size, 3)
+  views = 2
+  input_shape = (init_batch_size, views, image_size, image_size, 3)
   # TODO{kaiming}: load a real batch
   init_batch = {'image': jax.random.normal(jax.random.PRNGKey(0), input_shape, dtype=model.dtype),
     'label': jnp.zeros((init_batch_size,), jnp.int32)}
@@ -393,7 +393,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
 
-  model = models_mae.ContrastiveLearner(config=config.model)
+  model = models_clr.ContrastiveLearner(config=config.model)
 
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 

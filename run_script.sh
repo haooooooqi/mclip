@@ -12,13 +12,9 @@ python3 main.py \
     --config.num_epochs=10 \
     --config.profile_memory=True \
     --config.donate=True \
-    --config.model.norm_pix_loss=True \
     --config.model.sincos=False \
-    --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
-    --config.model.clr.knn_clr=True \
-    --config.model.clr.num_unshared_layers=1 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

@@ -325,9 +325,7 @@ vmapped_gather = jax.jit(jax.vmap(gather, in_axes=(0, 0), out_axes=0))
 
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
-  mask_ratio: float
   sincos: bool
-  norm_pix_loss: bool
   patches: Any
   transformer: Any
   hidden_size: int
@@ -338,29 +336,6 @@ class VisionTransformer(nn.Module):
   visualize: bool = False
   knn: Any = None
   clr: Any = None
-
-  def random_mask(self, x):
-    
-    N, L, _ = x.shape  # batch, length, dim
-    len_keep = int(L * (1 - self.mask_ratio))
-
-    rng = self.make_rng('dropout')
-    noise = random.uniform(rng, shape=(N, L))
-
-    ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
-    ids_restore = jnp.argsort(ids_shuffle, axis=1)
-
-    # keep the first subset
-    ids_keep = ids_shuffle[:, :len_keep]    
-    x_masked = vmapped_gather(x, ids_keep)
-
-    # generate the binary mask: 0 is keep, 1 is remove
-    mask = jnp.ones([N, L])
-    mask = mask.at[:, :len_keep].set(0)
-    # unshuffle to get the binary mask
-    mask = vmapped_gather(mask, ids_restore)
-
-    return x_masked, mask, ids_restore
 
   def patchify(self, imgs):
       """
@@ -387,25 +362,6 @@ class VisionTransformer(nn.Module):
       x = jnp.einsum('nhwpqc->nhpwqc', x)
       imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
       return imgs
-
-  def compute_loss(self, imgs, pred, mask):
-    """
-    imgs: [N, H, W, 3]
-    pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
-    """
-    target = self.patchify(imgs)
-    if self.norm_pix_loss:
-      # target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
-      mean = jnp.mean(target, axis=-1, keepdims=True)
-      var = jnp.var(target, axis=-1, keepdims=True)
-      target = (target - mean) / (var + 1.e-6)**.5
-
-    loss = jnp.square(pred - target)
-    loss = jnp.mean(loss, axis=-1)  # [N, L], mean loss per patch
-
-    loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
-    return loss
 
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
@@ -448,47 +404,6 @@ class VisionTransformer(nn.Module):
 
     return x
 
-  def apply_decoder(self, x, ids_restore, train):
-    use_cls_token=(self.classifier == 'token')
-
-    n, h, w = ids_restore.shape
-    ids_restore = jnp.reshape(ids_restore, [n, h * w])
-
-    # apply the encoder-decoder bottleneck
-    x = nn.Dense(
-      features=self.decoder.hidden_size,
-      dtype=self.dtype,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      name='bottleneck')(x)    
-
-    # append mask token
-    num_clstokens = 1 if use_cls_token else 0
-    mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
-    mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
-    x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
-    x_ = vmapped_gather(x_, ids_restore)
-
-    # add decoder posembed (before cls token)
-    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
-
-    x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
-
-    # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
-
-    # apply the predictor
-    x = nn.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
-      dtype=self.dtype,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      name='pred')(x)
-
-    # remove cls token
-    pred = x[:, num_clstokens:, :]
-    return pred
-
   @nn.compact
   def __call__(self, imgs, *, train):
     """
@@ -506,83 +421,7 @@ class VisionTransformer(nn.Module):
     # apply proj head
     x_proj = self.apply_projection_head(x_proj)  # [2*N, C]
 
-    # # apply contrastive learning
-    # x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
-
-    # # optionally apply knn
-    # if self.clr.knn_clr:
-    #   labels_clr = labels[:round(self.clr.sample_rate * imgs0.shape[0])]
-    #   knn_accuracy = self.apply_knn(x_clr, labels_clr, train=train)
-    # else:
-    #   knn_accuracy = self.apply_knn(x, labels, train=train)
-
-    # # apply decoder
-    # pred = self.apply_decoder(x, ids_restore, train=train)
-
-    # # compute loss
-    # loss_l2 = self.compute_loss(imgs, pred, mask)
-
-    # loss = loss_l2 + self.clr.loss_weight * loss_clr
-
-    # if self.visualize and not train:
-    #   outcome = self.visualization(imgs, pred, mask)
-    # else:
-    #   outcome = pred  # not used
-
-    # artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
-
     return x_proj, x_enc
-
-  # ----------------------------------------
-  # contrastive learning
-  # ----------------------------------------
-  def apply_contrast(self, imgs0, imgs1, encoder_layers, train):
-    (patch_embed, posembed, clstoken, blocks) = encoder_layers
-
-    use_cls_token=(self.classifier == 'token')
-    assert use_cls_token  # kaiming: TODO: support both?
-
-    # subsample
-    assert imgs0.shape == imgs1.shape
-    imgs0 = imgs0[:round(self.clr.sample_rate * imgs0.shape[0]), :, :, :]
-    imgs1 = imgs1[:round(self.clr.sample_rate * imgs1.shape[0]), :, :, :]
-
-    x = jnp.concatenate([imgs0, imgs1], axis=0)
-
-    x = patch_embed(x)
-
-    n, h, w, c = x.shape
-    x = jnp.reshape(x, [n, h * w, c])
-
-    x = posembed(x)
-
-    # If we want to add a class token, add it here.
-    if use_cls_token:
-      cls = jnp.tile(clstoken, [n, 1, 1])
-      x = jnp.concatenate([cls, x], axis=1)
-    else:
-      clstoken = None
-
-    # apply the encoder
-    num_shared_layers = blocks.num_layers - self.clr.num_unshared_layers
-    x = blocks(x, train=train, num_layers=num_shared_layers)
-
-    # apply the unshared
-    if self.clr.num_unshared_layers > 0:
-      cfg = self.transformer.copy_and_resolve_references()
-      cfg.num_layers = self.clr.num_unshared_layers
-      blocks_clr = Encoder(name='TransformerCLR', **cfg, prefix='clrencoder', start_idx=num_shared_layers)
-      x = blocks_clr(x, train=train)
-
-    x_clr = jnp.split(x, 2, axis=0)[0]
-
-    # apply the head
-    x = x.mean(axis=1)  # [N, C]
-    z = self.contrastive_heads(x)
-
-    loss_clr = self.contrastive_loss(z, train=train)
-
-    return x_clr, loss_clr
 
   def apply_projection_head(self, z):
     for i in range(self.clr.proj_layers - 1):
@@ -619,18 +458,19 @@ class ContrastiveLearner(nn.Module):
     imgs = inputs['image']
     labels = inputs['label']
 
-    # split the images
-    imgs_, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
-    imgs_ = imgs_.squeeze(axis=1)
-    imgs0 = imgs0.squeeze(axis=1)
-    imgs1 = imgs1.squeeze(axis=1)
+    assert len(imgs.shape) == 5 and imgs.shape[1] == 2
 
+    # split the images
+    imgs0 = imgs[:, 0, :, :, :]
+    imgs1 = imgs[:, 1, :, :, :]
     imgs = jnp.concatenate([imgs0, imgs1], axis=0)
 
+    # define the encoder
     base_config = self.config.copy_and_resolve_references()  # copy
     base_config.name = 'base_encoder'
     base_encoder = VisionTransformer(**base_config)
 
+    # run the encoder
     x_proj, x_enc = base_encoder(imgs, train=train)  # [2*N, C]
 
     # apply knn on x
