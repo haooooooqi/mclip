@@ -9,8 +9,8 @@ tau=0.2
 
 seed=100
 
-CONFIG=cfg_clr_large
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_simclr_${ep}ep_b${batch}_lr${lr}_wd${wd}_TorchLoader_wseed${seed}_t${tau}_r${rate}
+CONFIG=cfg_clr_base
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_simclr_${ep}ep_b${batch}_lr${lr}_wd${wd}_TorchLoader_wseed${seed}_t${tau}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -40,6 +40,7 @@ python3 main.py \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
     --config.opt.weight_decay=${wd} \
+    --config.vis_every_epochs=100 \
     --config.save_every_epochs=20 \
     --config.model.sincos=True \
     --config.donate=True \

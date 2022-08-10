@@ -61,7 +61,7 @@ class GeneralImageFolder(datasets.ImageFolder):
 
 
 def build_dataset(is_train, data_dir, aug):
-    transform = build_transform(is_train, aug.aug_clr)
+    transform = build_transform(is_train=True, aug=aug.aug_clr)  # is_train=True for visualization
 
     root = os.path.join(data_dir, 'train' if is_train else 'val')
     dataset = GeneralImageFolder(root=root, transform=transform)
