@@ -8,7 +8,7 @@ ep=50
 dp=0.2
 ema=0.9999
 
-vitsize=large
+vitsize=base
 CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 

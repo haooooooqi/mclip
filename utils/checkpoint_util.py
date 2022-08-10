@@ -41,7 +41,7 @@ def load_from_pretrain(state, pretrain_dir):
   logging.info('Missing keys: {}'.format(state_utils.str_set(missing_keys)))
   logging.info('Ignored keys: {}'.format(state_utils.str_set(ignored_keys)))
 
-  # assert len(missing_keys) == 2 or len(missing_keys) == 4
+  assert len(missing_keys) == 2 or len(missing_keys) == 4
 
   named_params = {}
   for k in named_state_params.keys():
@@ -91,5 +91,8 @@ def to_named_parameters(params, remove_prefix=''):
   list_names, tree_names = tu.tree_flatten(names)
   assert tree_params == tree_names
   del tree_names
-  named_params = dict((x.lstrip(remove_prefix), y) for x, y in zip(list_names, list_params))
+  named_params = dict(
+      (x.replace(remove_prefix, '') if x.startswith(remove_prefix) else x,
+       y
+      ) for x, y in zip(list_names, list_params))
   return named_params, tree_params
