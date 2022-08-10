@@ -88,9 +88,11 @@ python3 main.py \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_ALL} \
     2>&1 | tee $LOG_DIR/pretrain_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
-" 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 
-PRETRAIN_STATUS=${PIPESTATUS[0]}
+if [ \${PIPESTATUS[0]} -eq 0 ]; then
+    touch $LOG_DIR/pretrain.flag
+fi
+" 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 
 ################################################################
 # cleanup on all nodes
@@ -103,8 +105,7 @@ sudo rm -f /tmp/libtpu_lockfile
 mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 "
 
-if [ $PRETRAIN_STATUS -eq 0 ]; then
-    touch $LOG_DIR/pretrain.flag
+if [ -f $LOG_DIR/pretrain.flag ]; then
     # actively call for fine-tuning
     LOG_TUNE_PREFIX="${HOME}/logs/`date +'%Y-%m-%d_%H-%M-%S'`_$$_${JOB_NAME}"
     nohup $HOME/vit_jax/scripts/finetune.sh $JOB_NAME $TPU_NAME $CONFIG $JOB_DIR \
