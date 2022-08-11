@@ -440,16 +440,29 @@ class ContrastiveLearner(nn.Module):
   dtype: Any = jnp.float32
 
   def get_base_config(self):
-    base_config = self.config.copy_and_resolve_references()  # copy
-    base_config.name = 'base_encoder'
+    cfg = self.config.copy_and_resolve_references()  # copy
+    cfg.name = 'base_encoder'
     
     # delete unused fields
-    base_config.unlock()
-    del base_config.decoder
-    del base_config.knn
-    del base_config.visualize
-    base_config.lock()
-    return base_config
+    cfg.unlock()
+    del cfg.decoder
+    del cfg.knn
+    del cfg.visualize
+    cfg.lock()
+    return cfg
+
+  def get_auxi_config(self):
+    cfg = self.config.copy_and_resolve_references()  # copy
+    cfg.name = 'auxi_encoder'
+    
+    # delete unused fields
+    cfg.unlock()
+    cfg.update(cfg.decoder)  # replace with the decoder cfg
+    del cfg.decoder
+    del cfg.knn
+    del cfg.visualize
+    cfg.lock()
+    return cfg
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -469,16 +482,17 @@ class ContrastiveLearner(nn.Module):
 
     # define the encoder
     base_encoder = VisionTransformer(**self.get_base_config())
+    auxi_encoder = VisionTransformer(**self.get_auxi_config())
 
-    # run the encoder
-    x_proj, x_enc = base_encoder(imgs, train=train)  # [2*N, C]
+    # run the encoders
+    x_base, x_enc = base_encoder(imgs, train=train)  # [2*N, C]
+    x_auxi, _ = auxi_encoder(imgs, train=train)  # [2*N, C]
 
     # apply knn on x
     knn_accuracy = self.apply_knn(jnp.split(x_enc, 2, axis=0)[0], labels, train=train)
 
     # compute the loss
-    loss = self.compute_contrastive_loss(x_proj)
-    # loss = z.sum()
+    loss = self.compute_auxi_contrastive_loss(x_base, x_auxi)
 
     if self.config.visualize and not train:
       vis = self.visualization(imgs)
@@ -488,8 +502,48 @@ class ContrastiveLearner(nn.Module):
     artifacts = {'knn_accuracy': knn_accuracy}
 
     return loss, vis, artifacts
-  
-  def compute_contrastive_loss(self, z):
+
+  def compute_auxi_contrastive_loss(self, x_base, x_auxi):
+    """
+    x_base: [2*N, C] of 2 views (source)
+    x_auxi: [2*N, C] of 2 views (target)
+    """
+    x_base /= jnp.linalg.norm(x_base, axis=1, keepdims=True) + 1e-8
+    x_auxi /= jnp.linalg.norm(x_auxi, axis=1, keepdims=True) + 1e-8
+
+
+    x_base0, x_base1 = jnp.split(x_base, 2, axis=0)
+    x_auxi0, x_auxi1 = jnp.split(x_auxi, 2, axis=0)
+
+    loss01 = self.compute_asymmetric_contrastive_loss(x_base0, x_auxi1)
+    loss10 = self.compute_asymmetric_contrastive_loss(x_base1, x_auxi0)
+    loss = (loss01 + loss10) / 2
+    return loss
+
+  def compute_asymmetric_contrastive_loss(self, z_src, z_tgt):
+    z0 = z_src
+    z1 = z_tgt
+
+    # for simplicity we gather both for now
+    z0_all = dist_util.all_gather(z0, axis_name='batch')
+    z1_all = dist_util.all_gather(z1, axis_name='batch')
+
+    z0 = z0_all.reshape([-1, z0.shape[-1]])
+    z1 = z1_all.reshape([-1, z1.shape[-1]])
+
+    tau = self.config.clr.tau
+
+    logits = jnp.einsum('nc,mc->nm', z0, z1)
+    logits /= tau
+    labels_one_hot = jnp.eye(logits.shape[0])
+
+    # asymmetric loss for simclr
+    loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)  # over the last axis
+    loss = loss.mean()
+    loss *= 2 * tau
+    return loss
+
+  def compute_symmetric_contrastive_loss(self, z):
     z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
 
     z0, z1 = jnp.split(z, 2, axis=0)
