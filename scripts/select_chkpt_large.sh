@@ -136,4 +136,5 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220809_065125_kmh-tpuvm-v3-256-2_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_wd0.05_mask0.75_TorchLoader_wseed100_warm40_vqvaeuvim8192_beta0.25_mix0.75'
 
 # SimCLR
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220810_055626_kmh-tpuvm-v3-256-2_cfg_clr_large_simclr_300ep_b4096_lr1e-4_wd0.1_TorchLoader_wseed100_t0.2'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220810_055626_kmh-tpuvm-v3-256-2_cfg_clr_large_simclr_300ep_b4096_lr1e-4_wd0.1_TorchLoader_wseed100_t0.2'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220811_063242_kmh-tpuvm-v3-256-2_cfg_clr_large_asymclr_300ep_b4096_lr1e-4_wd0.1_TorchLoader_wseed100_t0.2'
