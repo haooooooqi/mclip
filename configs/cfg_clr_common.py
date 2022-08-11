@@ -159,4 +159,7 @@ def get_config():
   config.model.clr.proj_dim_hidden = 4096
   config.model.clr.proj_dim_out = 256
 
+  # scale lr
+  config.lr_scale_auxi = 1.  # scale auxi encoder lr
+
   return config

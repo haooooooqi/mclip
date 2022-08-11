@@ -15,6 +15,7 @@ python3 main.py \
     --config.model.sincos=False \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
+    --config.lr_scale_auxi=0.1 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

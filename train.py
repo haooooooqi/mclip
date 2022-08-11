@@ -50,6 +50,7 @@ from utils import adamw_util
 from utils.transform_util import MEAN_RGB, STDDEV_RGB
 from utils import torchloader_util
 from utils import state_utils
+from utils import lrd_util
 
 import torch
 
@@ -287,6 +288,13 @@ def create_train_state(rng, config: ml_collections.ConfigDict,
   # tx = getattr(optax, config.opt_type)  # optax.adamw
   tx = getattr(adamw_util, config.opt_type)  # optax.adamw
   tx = tx(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+
+  if config.lr_scale_auxi != 1.:
+    lrd_func = functools.partial(lrd_util._namebased_lr_scale, name='auxi_encoder', lr_scale=config.lr_scale_auxi)
+    lrd = lrd_util.filter_parameters(params, lrd_func)
+    logging.info('Apply lrd: {}'.format(state_utils.str_flatten_dict(lrd)))
+    tx = optax._src.combine.chain(tx, lrd_util.scale_by_lrd(lrd))
+
   tx = optax.GradientTransformation(init=jax.jit(tx.init, backend=config.init_backend), update=tx.update)  # put to cpu
   if config.ema:
     ema_tx = optax.ema(decay=config.ema_decay, debias=False)
