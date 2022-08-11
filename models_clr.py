@@ -323,12 +323,8 @@ class VisionTransformer(nn.Module):
   patches: Any
   transformer: Any
   hidden_size: int
-  representation_size: Optional[int] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
-  decoder: Any = None
-  visualize: bool = False
-  knn: Any = None
   clr: Any = None
 
   def patchify(self, imgs):
@@ -443,6 +439,18 @@ class ContrastiveLearner(nn.Module):
   config: Any = None  # model config
   dtype: Any = jnp.float32
 
+  def get_base_config(self):
+    base_config = self.config.copy_and_resolve_references()  # copy
+    base_config.name = 'base_encoder'
+    
+    # delete unused fields
+    base_config.unlock()
+    del base_config.decoder
+    del base_config.knn
+    del base_config.visualize
+    base_config.lock()
+    return base_config
+
   @nn.compact
   def __call__(self, inputs, *, train):
     """
@@ -460,9 +468,7 @@ class ContrastiveLearner(nn.Module):
     imgs = jnp.concatenate([imgs0, imgs1], axis=0)
 
     # define the encoder
-    base_config = self.config.copy_and_resolve_references()  # copy
-    base_config.name = 'base_encoder'
-    base_encoder = VisionTransformer(**base_config)
+    base_encoder = VisionTransformer(**self.get_base_config())
 
     # run the encoder
     x_proj, x_enc = base_encoder(imgs, train=train)  # [2*N, C]
