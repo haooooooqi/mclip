@@ -392,6 +392,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
       with profiler_context if run_profiling else contextlib.nullcontext():
         batch = parse_batch(batch, local_batch_size)
+        if epoch == epoch_offset and i == 0:
+          costs = partitioned_train_step.lower(state, batch).compile().cost_analysis()
+          logging.info(f"flops: {costs[0].get('flops', None)}")
         state, metrics = partitioned_train_step(state, batch)
 
       if epoch == epoch_offset and i == 0 and partitioner._num_partitions > 8:
