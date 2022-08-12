@@ -371,7 +371,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   for epoch in range(epoch_offset, int(config.num_epochs)):
     data_loader_train.sampler.set_epoch(epoch)  # reset random seed
-    
+
     # ------------------------------------------------------------
     # train one epoch
     # ------------------------------------------------------------
@@ -415,7 +415,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           train_metrics = []
           train_metrics_last_t = time.time()
 
-      step += 1  
+      step += 1
 
     # ------------------------------------------------------------
     # finished one epoch: eval
