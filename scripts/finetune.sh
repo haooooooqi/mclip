@@ -46,8 +46,7 @@ sleep 5
 ################################################################
 # launch on all nodes
 ################################################################
-cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all \
-  --command "
+cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all --command "
 cd $STAGE_DIR
 
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
@@ -69,8 +68,7 @@ fi
 ################################################################
 # cleanup on all nodes
 ################################################################
-gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all \
-  --command "
+gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all --command "
 sudo pkill python
 sudo lsof -w /dev/accel0 | grep .py | awk '{print \"sudo kill -9 \" \$2}' | sh
 sudo rm -f /tmp/libtpu_lockfile

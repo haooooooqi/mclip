@@ -95,7 +95,7 @@ def build_dataloaders(config, partitioner, rng_torch):
     rank=shard_id, # jax.process_index(),
     shuffle=False,
   )
-  
+
   data_loader_train = torch.utils.data.DataLoader(
     dataset_train, sampler=sampler_train,
     batch_size=local_batch_size,
@@ -315,12 +315,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   mixup_fn = torchloader_util.get_mixup_fn(config.aug)
 
   steps_per_epoch = len(data_loader_train)
-  
+
   # ------------------------------------
   # Create model
   # ------------------------------------
   model = models_vit.VisionTransformer(**config.model)
-  
+
   p_init_fn, state_axes, state_shape = create_train_state(config, model, image_size, steps_per_epoch, partitioner)
   rng_init, rng = jax.random.split(rng)
 
@@ -330,15 +330,18 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # ------------------------------------
   # Create checkpointer
   # ------------------------------------
+  checkpoints_dir = os.environ.get('LOCAL_REDIRECT_CKPT_DIR', '')
   checkpointer = t5x.checkpoints.Checkpointer(
     train_state=state_shape,
     partitioner=partitioner,
     checkpoints_dir=workdir,
     keep=None,  # TODO: move to config
   )
-  
+
   if config.resume_dir != '':
     state = ckp.restore_checkpoint(checkpointer, path=config.resume_dir)
+  elif checkpoints_dir != '' and gfile.exists(checkpoints_dir):
+    state = ckp.restore_checkpoint(checkpointer, path=checkpoints_dir)
   elif config.pretrain_dir != '':
     # When fine-tuning, we run initialization anyway
     logging.info('Initializing train_state...')
@@ -407,7 +410,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   best_acc = 0.
   for epoch in range(epoch_offset, int(config.num_epochs)):
     data_loader_train.sampler.set_epoch(epoch)  # reset random seed
-    
+
     # ------------------------------------------------------------
     # train one epoch
     # ------------------------------------------------------------
