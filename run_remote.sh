@@ -11,14 +11,14 @@ dp=0.2
 pdp=0.0
 beta2=0.999
 
-partitions=4
+partitions=1
 
 pft=0  # predictor layers for ft
-stopg=16  # number of stopgrad blocks
+stopg=0  # number of stopgrad blocks
 
 renew=0
 
-vitsize=huge3x_p16
+vitsize=large
 CONFIG=cfg_vit_${vitsize}
 
 source scripts/select_chkpt_${vitsize}.sh
@@ -85,9 +85,9 @@ python3 main.py \
     --config.model.adapter.on_use=False \
     --config.model.stopgrad_blocks=${stopg} \
     --config.model.transformer.renew_layers=${renew} \
-    --config.partitioning.partition_states=True \
-    --config.partitioning.activation_partitioning_dims=2 \
-    --config.partitioning.parameter_partitioning_dims=2 \
+    --config.partitioning.partition_states=False \
+    --config.partitioning.activation_partitioning_dims=1 \
+    --config.partitioning.parameter_partitioning_dims=1 \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
