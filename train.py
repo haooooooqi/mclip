@@ -455,7 +455,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           train_metrics = []
           train_metrics_last_t = time.time()
 
-      step += 1  
+      step += 1
     # ------------------------------------------------------------
     # finished one epoch: eval
     # ------------------------------------------------------------

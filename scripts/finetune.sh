@@ -9,12 +9,13 @@ set -x
 JOB_NAME=$1
 TPU_NAME=$2
 CONFIG=$3
-JOB_DIR_PRETRAIN=$4
-EXTRA_ARGS_COMMON_TAG=$5
+JOB_DIR=$4
+WORK_DIR_PRETRAIN=$5
+EXTRA_ARGS_COMMON_TAG=$6
 
 array=( $@ )
 len=${#array[@]}
-EXTRA_ARGS_COMMON=${array[@]:5:$len}
+EXTRA_ARGS_COMMON=${array[@]:6:$len}
 
 FOLDER=vit_jax
 STORAGE_BUCKET=gs://xinleic
@@ -23,19 +24,16 @@ TUNE_TAG=finetune_${EXTRA_ARGS_COMMON_TAG}
 ################################################################
 # folders
 ################################################################
-WORK_DIR_PRETRAIN=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}
-# should be changed to: WORK_DIR_PRETRAIN=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}/pretrain
-WORK_DIR=${WORK_DIR_PRETRAIN}/${TUNE_TAG}
-# should be changed to: WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR_PRETRAIN}/${TUNE_TAG}
+WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR}/${TUNE_TAG}
 
-LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR_PRETRAIN}/${TUNE_TAG}
+LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR}/${TUNE_TAG}
 sudo mkdir -p ${LOG_DIR} && sudo chmod -R 777 ${LOG_DIR}
 
 ################################################################
 # staging
 ################################################################
 TAG_WITH_TIME=${JOB_NAME}_`date +'%Y-%m-%d_%H-%M-%S'`
-STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR_PRETRAIN}/${TAG_WITH_TIME}_${TUNE_TAG}
+STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${TAG_WITH_TIME}_${TUNE_TAG}
 echo $STAGE_DIR
 mkdir -p $STAGE_DIR
 rsync -avz $HOME/$FOLDER/ $STAGE_DIR/
