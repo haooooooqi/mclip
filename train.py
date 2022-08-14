@@ -38,7 +38,7 @@ from jax import random
 import ml_collections
 import optax
 import tensorflow as tf
-
+from tensorflow.io import gfile
 import models_vit
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
