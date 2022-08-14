@@ -51,5 +51,6 @@
 # t5x + TFDS loader
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220812_053350_maet5x_kmh-tpuvm-v3-256-7_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1st_re1.0_tfds'
 # t5x + LAION images
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220812_215528_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1st_re1.0_laion_area0.5'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220812_213444_maet5xlaion_kmh-tpuvm-v3-256-3_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1st_re1.0_tfds'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220812_215528_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75_s100_p1st_re1.0_laion_area0.5'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220813_042923_maet5x_kmh-tpuvm-v3-256-2_cfg_mae_large_1600ep_b4096_lr1e-4_mk0.75_s100_p1st_re1.0_laion_area0.5'
