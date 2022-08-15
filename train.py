@@ -20,8 +20,8 @@ The data is loaded using tensorflow_datasets.
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
-warnings.filterwarnings("ignore", category=FutureWarning) 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 import functools
 import time, datetime
@@ -100,7 +100,7 @@ def build_dataloaders(config, partitioner, rng_torch):
     rank=shard_id, # jax.process_index(),
     shuffle=False,
   )
-  
+
   data_loader_train = torch.utils.data.DataLoader(
     dataset_train, sampler=sampler_train,
     batch_size=local_batch_size,
@@ -156,14 +156,14 @@ def train_step(state, batch, model, rng):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    (loss, _), new_mutables = outcome
-    return loss, (new_mutables, loss)
+    (loss, _, knn_accuracy), new_mutables = outcome
+    return loss, (new_mutables, loss, knn_accuracy)
 
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   aux, grads = grad_fn(state.params)
 
-  new_mutables, loss = aux[1]
-  metrics = {'loss': loss}
+  new_mutables, loss, knn_accuracy = aux[1]
+  metrics = {'loss': loss, 'knn_accuracy': knn_accuracy}
 
   # only for metric logging
   lr = state._optimizer.optimizer_def.metric_learning_rate_fn(state.step)
@@ -182,7 +182,7 @@ def eval_step(state, batch, model, rng):
   dropout_rng = jax.random.fold_in(rng, state.step)
 
   outcome = model.apply(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=dropout_rng),)
-  loss, imgs_vis = outcome
+  loss, imgs_vis, _ = outcome
 
   metrics = {'test_loss': loss, 'imgs_vis': imgs_vis}
 
@@ -409,6 +409,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           # to make it consistent with PyTorch log
           summary['loss'] = summary['train_loss']  # add extra name
           summary['lr'] = summary.pop('train_learning_rate')  # rename
+          summary['knn_accuracy'] = summary.pop('train_knn_accuracy')  # rename
           summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
 
           writer.write_scalars(step + 1, summary)

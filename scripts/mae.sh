@@ -102,7 +102,7 @@ sudo rm -f /tmp/libtpu_lockfile
 mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 "
 
-if [ -f $LOG_DIR/pretrain.flag ]; then
+if [ -f $LOG_DIR/${PRETRAIN_TAG}.flag ]; then
     # actively call for fine-tuning
     LOG_TUNE_PREFIX="${HOME}/logs/`date +'%Y-%m-%d_%H-%M-%S'`_$$_${JOB_NAME}"
     nohup $HOME/vit_jax/scripts/finetune.sh $JOB_NAME $TPU_NAME $CONFIG $JOB_DIR $WORK_DIR \

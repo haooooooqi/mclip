@@ -702,8 +702,6 @@ def _normalize(mdl: nn.Module, x: Array, mean: Array, var: Array,
         reduced_feature_shape,
         param_dtype,
         axes=axes).reshape(feature_shape)
-    # scale = mdl.param('scale', scale_init, reduced_feature_shape,
-    #                   param_dtype).reshape(feature_shape)
     mul *= scale
   y *= mul
   if use_bias:
@@ -713,7 +711,5 @@ def _normalize(mdl: nn.Module, x: Array, mean: Array, var: Array,
         reduced_feature_shape,
         param_dtype,
         axes=axes).reshape(feature_shape)
-    # bias = mdl.param('bias', bias_init, reduced_feature_shape,
-    #                  param_dtype).reshape(feature_shape)
     y += bias
   return jnp.asarray(y, dtype)

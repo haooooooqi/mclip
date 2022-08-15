@@ -20,8 +20,8 @@ that can be easily tested and imported in Colab.
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
-warnings.filterwarnings("ignore", category=FutureWarning) 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 from absl import app
@@ -46,7 +46,7 @@ config_flags.DEFINE_config_file(
     None,
     'File path to the training hyperparameter configuration.',
     lock_config=True)
-  
+
 
 def main(argv):
   if jax.process_index() == 0:
@@ -54,7 +54,7 @@ def main(argv):
     os.system('git show -s --format=%h')
     logging.info('Current dir: ')
     os.system('pwd')
-  
+
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
@@ -77,7 +77,7 @@ def main(argv):
   if jax.local_devices()[0].platform != 'tpu':
     logging.error('Not using TPU. Exit.')
     exit()
-  
+
   train.train_and_evaluate(FLAGS.config, FLAGS.workdir)
 
 

@@ -96,6 +96,18 @@ def get_config():
   config.pretrain_dir = ''
   config.pretrain_fmt = 'jax'  # 't5x'
 
+  # knn
+  config.model.knn = ml_collections.ConfigDict()
+  config.model.knn.on = True
+
+  config.model.knn.postprocess = 'tgap'  # token + global average pool
+  config.model.knn.postnorm = 'SyncBatchNorm'  # apply norm after postprocess: LayerNorm, SyncBatchNorm
+  config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
+  config.model.knn.num_classes = 1000  # specifiy here for simplicity
+  config.model.knn.queue_size = 131072  # 128 * 1024
+  config.model.knn.num_knns = 200
+  config.model.knn.temperature = 0.2
+
   # seeds
   config.seed_jax = 2
   config.seed_tf = 2

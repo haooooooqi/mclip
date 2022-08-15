@@ -2,7 +2,7 @@
 
 DEST_DEV=mae_jax
 
-for i in configs scripts infra t5x utils; do 
+for i in configs scripts infra t5x utils; do
     rsync -aiz --delete --partial --progress $i/ devtpux4:$DEST_DEV/$i/
 done
 

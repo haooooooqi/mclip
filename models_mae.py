@@ -26,7 +26,7 @@ import t5x.layers
 
 from utils import posembed_util
 from utils import initializers_util
-
+from utils import onlineknn_util
 
 Array = Any
 PRNGKey = Any
@@ -41,7 +41,7 @@ if INIT_VER == 'mae_jax_v2':
   clstoken_init = fixed_gaussian_init
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init  # not used if sincos
-  
+
   # patch_kernel_init = fixed_gaussian_init
   patch_kernel_init = initializers_util.patch_kernel()
   patch_bias_init = nn.initializers.zeros  # different from PyTorch?
@@ -113,7 +113,7 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    
+
     pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
 
     if self.use_cls_token:
@@ -320,7 +320,6 @@ def gather_by_einsum(x, ids):
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
-  # num_classes: int
   mask_ratio: float
   sincos: bool
   norm_pix_loss: bool
@@ -331,6 +330,7 @@ class VisionTransformer(nn.Module):
   dtype: Any = jnp.float32
   decoder: Any = None
   visualize: bool = False
+  knn: Any = None
 
   def random_mask(self, x):
 
@@ -365,7 +365,7 @@ class VisionTransformer(nn.Module):
       x: (N, L, patch_size**2 *3)
       """
       p, q = self.patches.size
-      h, w = imgs.shape[1] // p, imgs.shape[2] // q 
+      h, w = imgs.shape[1] // p, imgs.shape[2] // q
 
       x = jnp.reshape(imgs, (imgs.shape[0], h, p, w, q, 3))
       x = jnp.einsum('nhpwqc->nhwpqc', x)
@@ -389,7 +389,7 @@ class VisionTransformer(nn.Module):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
+    mask: [N, L], 0 is keep, 1 is remove,
     """
     target = self.patchify(imgs)
     if self.norm_pix_loss:
@@ -408,7 +408,7 @@ class VisionTransformer(nn.Module):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
+    mask: [N, L], 0 is keep, 1 is remove,
     """
     imgs_pred = self.unpatchify(pred)
 
@@ -502,12 +502,42 @@ class VisionTransformer(nn.Module):
 
     return pred
 
+  def apply_knn(self, x, labels, train):
+    if not self.knn.on:
+      return
+    if self.knn.postprocess == 'tgap':
+      x = jnp.mean(x, axis=1)
+    else:
+      raise NotImplementedError
+
+    if self.knn.postnorm == 'LayerNorm':
+      x = t5x.layers.LayerNorm(use_bias=False, use_scale=False,
+                              dtype=self.dtype, axes=('embed',),
+                              name='knn_postnorm')(x)
+    elif self.knn.postnorm == 'SyncBatchNorm':
+      # TODO
+      x = dist_util.SyncBatchNorm(x, eps=1.e-6)
+    else:
+      raise NotImplementedError
+
+    if self.knn.l2norm:
+      # TODO
+      l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
+      x /= l2norm
+
+    knn_accuracy = onlineknn_util.OnlineKNN(knn=self.knn)(x, labels, train=train)
+    return knn_accuracy
+
   @nn.compact
   def __call__(self, inputs, *, train):
-    imgs = inputs
+    imgs = inputs['image']
+    labels = inputs['label']
 
     # apply encoder
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
+
+    # optionally apply knn
+    knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
@@ -521,4 +551,4 @@ class VisionTransformer(nn.Module):
     else:
       outcome = pred  # not used
 
-    return loss, outcome
+    return loss, outcome, knn_accuracy
