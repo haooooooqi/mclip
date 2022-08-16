@@ -113,7 +113,7 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    
+
     pe = self.pe # still tuning if possible
 
     if self.use_cls_token and inputs.shape[1] == pe.shape[1] - 1:
@@ -287,7 +287,7 @@ class Encoder(nn.Module):
           static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
 
     x = inputs
-    
+
     # Input Encoder
     for lyr in range(self.num_layers):
       dp = self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.
