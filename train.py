@@ -162,7 +162,9 @@ def train_step(state, batch, model, rng):
   aux, grads = grad_fn(state.params)
 
   new_mutables, loss, knn_accuracy = aux[1]
-  metrics = {'loss': loss, 'knn_accuracy': knn_accuracy}
+  metrics = {'loss': loss }
+  if knn_accuracy is not None:
+    metrics['knn_accuracy'] = knn_accuracy
 
   # only for metric logging
   lr = state._optimizer.optimizer_def.metric_learning_rate_fn(state.step)
@@ -401,13 +403,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
               f'train_{k}': float(v)
               for k, v in jax.tree_map(lambda x: x.mean(), train_metrics).items()
           }
-          summary['steps_per_second'] = config.log_every_steps / (
-              time.time() - train_metrics_last_t)
+          summary['steps_per_second'] = config.log_every_steps / (time.time() - train_metrics_last_t)
 
           # to make it consistent with PyTorch log
           summary['loss'] = summary['train_loss']  # add extra name
           summary['lr'] = summary.pop('train_learning_rate')  # rename
-          summary['knn_accuracy'] = summary.pop('train_knn_accuracy')  # rename
           summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
 
           writer.write_scalars(step + 1, summary)

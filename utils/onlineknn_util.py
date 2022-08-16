@@ -24,25 +24,25 @@ class OnlineKNN(nn.Module):
     queue_features = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_features',
-        initializers_util.normal_l2,
+        initializers_util.normal_l2(),
+        jax.random.PRNGKey(0),
         (K, D),
         jnp.float32,
-        axes=('queue', 'feature'))
+        axes=('embed', '_null0'))
 
     queue_labels = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_labels',
-        nn.initializers.zeros,
+        lambda s: jnp.zeros(s, jnp.int32),
         (K,),
-        jnp.int32,
-        axes=('queue'))
+        axes=('embed',))
 
     queue_ptr = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_ptr',
-        nn.initializers.zeros,
-        (),
-        jnp.int32)
+        lambda s: jnp.zeros(s, jnp.int32),
+        (1,),
+        axes=('_null1',))
 
     if not train:  # we only monitor the training set.
       return None
@@ -66,7 +66,7 @@ class OnlineKNN(nn.Module):
     sim_weight = jnp.exp(sim_weight / self.knn.temperature)
 
     # [N, t] => [N, t, K]
-    sim_indices = jax.nn.one_hot(sim_indices, queue_labels.value.shape[1])
+    sim_indices = jax.nn.one_hot(sim_indices, self.knn.queue_size)
 
     # [K] * [N, t, K] => [N, t]
     sim_labels = jnp.einsum('k,ntk->nt', queue_labels.value, sim_indices)
@@ -91,11 +91,12 @@ class OnlineKNN(nn.Module):
   def update_queue(self, features, labels, queue_features, queue_labels, queue_ptr):
     # assume it is from a single batch
     N = features.shape[0]
-
     assert self.knn.queue_size % N == 0
-    inds = jnp.arange(N) + queue_ptr.value
+
+    ptr = queue_ptr.value[0]
+    inds = jnp.arange(N) + ptr
 
     queue_features.value = queue_features.value.at[inds].set(features)
     queue_labels.value = queue_labels.value.at[inds].set(labels)
 
-    queue_ptr.value = (queue_ptr.value + N) % self.knn.queue_size
+    queue_ptr.value = queue_ptr.value.at[0].set((ptr + N) % self.knn.queue_size)
