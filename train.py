@@ -68,7 +68,6 @@ import torch.utils.data
 
 
 def build_dataloaders(config, partitioner, rng_torch):
-
   data_layout = partitioner.get_data_layout(config.batch_size)
   shard_id = data_layout.shard_id
   num_shards = data_layout.num_shards
@@ -84,8 +83,8 @@ def build_dataloaders(config, partitioner, rng_torch):
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // num_shards
 
-  dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
   dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
+  dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
 
   sampler_train = torch.utils.data.DistributedSampler(
     dataset_train,
@@ -152,7 +151,7 @@ def train_step(state, batch, model, rng):
     mutable = [k for k in state.flax_mutables]
     outcome = model.apply(
         {'params': params, **state.flax_mutables},
-        inputs=batch['image'],
+        inputs=batch,
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
@@ -181,7 +180,7 @@ def eval_step(state, batch, model, rng):
 
   dropout_rng = jax.random.fold_in(rng, state.step)
 
-  outcome = model.apply(variables, batch['image'], train=False, mutable=False, rngs=dict(dropout=dropout_rng),)
+  outcome = model.apply(variables, batch, train=False, mutable=False, rngs=dict(dropout=dropout_rng),)
   loss, imgs_vis, _ = outcome
 
   metrics = {'test_loss': loss, 'imgs_vis': imgs_vis}

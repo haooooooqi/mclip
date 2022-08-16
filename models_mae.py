@@ -42,11 +42,8 @@ if INIT_VER == 'mae_jax_v2':
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init  # not used if sincos
 
-  # patch_kernel_init = fixed_gaussian_init
   patch_kernel_init = initializers_util.patch_kernel()
   patch_bias_init = nn.initializers.zeros  # different from PyTorch?
-
-  # msa_kernel_init = fixed_gaussian_init
 
   # TF/PyTorch: qkv is [D, 3*D], fan_in + fan_out = 4*D.
   # JAX: q, k, v each is [D, D], fan_in + fan_out = 2*D. So we compensate by scale=0.5
@@ -83,7 +80,6 @@ class AddPositionEmbs(nn.Module):
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
     if not self.sincos:
-      raise NotImplementedError
       init_fn = posemb_init
     else:
       pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
@@ -299,13 +295,7 @@ class Encoder(nn.Module):
     return encoded
 
 
-# the implemention for pmap
-def gather(x, ids):
-  return x[ids, :]
-vmapped_gather = jax.vmap(gather, in_axes=(0, 0), out_axes=0, axis_name='batch')
-
-
-# the implemention for pjit
+# the implementation for pjit
 def gather_by_einsum(x, ids):
   """kaiming: vmap + gather is slow with pjit; use einsum instead
   Args:
@@ -442,14 +432,21 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
+    x = AddPositionEmbs(sincos=self.sincos,
+                        use_cls_token=use_cls_token,
+                        img_shape=(h, w, c),
+                        name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
     ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
 
     if use_cls_token:
-      cls = t5x.layers.param_with_axes('cls', clstoken_init, (1, 1, c), jnp.float32, axes=('_null0', '_null1', 'embed'))
+      cls = t5x.layers.param_with_axes('cls',
+                                      clstoken_init,
+                                      (1, 1, c),
+                                      jnp.float32,
+                                      axes=('_null0', '_null1', 'embed'))
       cls = jnp.tile(cls, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
 
@@ -474,15 +471,20 @@ class VisionTransformer(nn.Module):
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
-    mask_token = t5x.layers.param_with_axes(
-      'mask_token', masktoken_init, (1, 1, self.decoder.hidden_size),
-      jnp.float32, axes=('_null0', '_null1', 'embed'))
+    mask_token = t5x.layers.param_with_axes('mask_token',
+                                            masktoken_init,
+                                            (1, 1, self.decoder.hidden_size),
+                                            jnp.float32,
+                                            axes=('_null0', '_null1', 'embed'))
     mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
     x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
     x_ = gather_by_einsum(x_, ids_restore)
 
     # add decoder posembed (before cls token)
-    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
+    x_ = AddPositionEmbs(sincos=self.sincos,
+                        use_cls_token=use_cls_token,
+                        img_shape=(h, w, self.decoder.hidden_size),
+                        name='posembed_decoder')(x_)
 
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
@@ -505,6 +507,7 @@ class VisionTransformer(nn.Module):
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
       return
+
     if self.knn.postprocess == 'tgap':
       x = jnp.mean(x, axis=1)
     else:
@@ -517,7 +520,7 @@ class VisionTransformer(nn.Module):
     elif self.knn.postnorm == 'SyncBatchNorm':
       # TODO
       x = dist_util.SyncBatchNorm(x, eps=1.e-6)
-    else:
+    elif self.knn.postnorm != 'None':
       raise NotImplementedError
 
     if self.knn.l2norm:

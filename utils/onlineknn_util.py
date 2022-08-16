@@ -3,22 +3,11 @@ from typing import Any, Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
-
 import flax.linen as nn
 
-from utils import dist_util
+import t5x.layers
 
-
-# queue is not batched; ids is batched
-gather = jax.vmap(lambda queue, ids: queue[ids], in_axes=(None, 0), out_axes=0)
-
-
-# initialize queue
-def queue_features_init(shape):
-  x = jax.random.normal(jax.random.PRNGKey(0), shape)
-  l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
-  x /= l2norm
-  return x
+from utils import initializers_util
 
 
 class OnlineKNN(nn.Module):
@@ -32,9 +21,28 @@ class OnlineKNN(nn.Module):
     D = features.shape[-1]
 
     # create the queue
-    queue_features = self.variable('knn_vars', 'queue_features', queue_features_init, (K, D))
-    queue_labels = self.variable('knn_vars', 'queue_labels', lambda s: jnp.zeros(s, jnp.int32), (K,))
-    queue_ptr = self.variable('knn_vars', 'queue_ptr', lambda s: jnp.zeros(s, jnp.int32), ())
+    queue_features = t5x.layers.variable_with_axes(
+        'knn_vars',
+        'queue_features',
+        initializers_util.normal_l2,
+        (K, D),
+        jnp.float32,
+        axes=('queue', 'feature'))
+
+    queue_labels = t5x.layers.variable_with_axes(
+        'knn_vars',
+        'queue_labels',
+        nn.initializers.zeros,
+        (K,),
+        jnp.int32,
+        axes=('queue'))
+
+    queue_ptr = t5x.layers.variable_with_axes(
+        'knn_vars',
+        'queue_ptr',
+        nn.initializers.zeros,
+        (),
+        jnp.int32)
 
     if not train:  # we only monitor the training set.
       return None
@@ -48,40 +56,46 @@ class OnlineKNN(nn.Module):
     return knn_accuracy
 
   def compute_knn_accuracy(self, features, labels, queue_features, queue_labels):
-    # [N, C] * [K, C] => [N, K]
-    sim_matrix = jnp.einsum('nc,kc->nk', features, queue_features.value)
+    # [N, E] * [K, E] => [N, K]
+    sim_matrix = jnp.einsum('ne,ke->nk', features, queue_features.value)
 
-    # => [N, k] for top-k
+    # => [N, t] for top-k
     sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
 
-    # turn into scores: [N, k]
+    # turn into scores: [N, t]
     sim_weight = jnp.exp(sim_weight / self.knn.temperature)
 
-    # get labels: [N, k]
-    sim_labels = gather(queue_labels.value, sim_indices)
+    # [N, t] => [N, t, K]
+    sim_indices = jax.nn.one_hot(sim_indices, queue_labels.value.shape[1])
 
-    # compute scores
-    one_hot_labels = jax.nn.one_hot(sim_labels, self.knn.num_classes, dtype=sim_weight.dtype, axis=-1)  # [N, k, CLS]
-    pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)  # [N, k, CLS]
-    pred_scores = jnp.sum(pred_scores, axis=1)  # [N, CLS]
+    # [K] * [N, t, K] => [N, t]
+    sim_labels = jnp.einsum('k,ntk->nt', queue_labels.value, sim_indices)
 
-    pred_labels = jnp.argmax(pred_scores, axis=-1)  # [N,]
+    # compute scores, [N, t, C]
+    one_hot_labels = jax.nn.one_hot(sim_labels,
+                                    self.knn.num_classes,
+                                    dtype=sim_weight.dtype,
+                                    axis=-1)
+
+    # [N, t, C]
+    pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)
+    # [N, C]
+    pred_scores = jnp.sum(pred_scores, axis=1)
+    # [N,]
+    pred_labels = jnp.argmax(pred_scores, axis=-1)
 
     accuracy = jnp.mean(pred_labels == labels)
+
     return accuracy
 
   def update_queue(self, features, labels, queue_features, queue_labels, queue_ptr):
-    features_all = dist_util.all_gather(features, axis_name='batch')
-    labels_all = dist_util.all_gather(labels, axis_name='batch')
+    # assume it is from a single batch
+    N = features.shape[0]
 
-    features_all = jnp.reshape(features_all, [-1, features_all.shape[-1]])  # [MN, C]
-    labels_all = jnp.reshape(labels_all, [-1,])  # [MN,]
+    assert self.knn.queue_size % N == 0
+    inds = jnp.arange(N) + queue_ptr.value
 
-    batch_size = features_all.shape[0]
-    assert self.knn.queue_size % batch_size == 0
-    inds = jnp.arange(batch_size) + queue_ptr.value
+    queue_features.value = queue_features.value.at[inds].set(features)
+    queue_labels.value = queue_labels.value.at[inds].set(labels)
 
-    queue_features.value = queue_features.value.at[inds].set(features_all)
-    queue_labels.value = queue_labels.value.at[inds].set(labels_all)
-    queue_ptr.value = (queue_ptr.value + batch_size) % self.knn.queue_size
-    return
+    queue_ptr.value = (queue_ptr.value + N) % self.knn.queue_size
