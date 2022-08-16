@@ -49,7 +49,7 @@ def load_from_t5x_pretrain(state, checkpointer, path):
   new_state = checkpointer.restore(
     path=path_chkpt,
     fallback_state=state.state_dict(),
-    state_transformation_fns=[remove_optimizer_state, remove_head_state, remove_pos_embed])
+    state_transformation_fns=[remove_optimizer_state, remove_prefix, remove_head_state, remove_pos_embed])
   return new_state
 
 
@@ -79,6 +79,12 @@ def remove_pos_embed(ckpt_optimizer_state, optimizer_state):
       ckpt_optimizer_state['target'].pop('posembed_encoder')
   return ckpt_optimizer_state
 
+
+def remove_prefix(ckpt_optimizer_state, optimizer_state):
+  if 'img_encoder' in ckpt_optimizer_state['target']:
+    ckpt_optimizer_state['target'].pop('txt_encoder')
+    ckpt_optimizer_state['target'] = ckpt_optimizer_state['target']['img_encoder']
+  return ckpt_optimizer_state
 
 # --------------------------------------------
 # load JAX/pmap checkpoint from pre-training
