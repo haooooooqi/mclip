@@ -177,7 +177,6 @@ def train_step(state, batch, model, rng):
 
 def eval_step(state, batch, model, rng):
   variables = {'params': state.params, **state.flax_mutables}
-
   dropout_rng = jax.random.fold_in(rng, state.step)
 
   outcome = model.apply(variables, batch, train=False, mutable=False, rngs=dict(dropout=dropout_rng),)

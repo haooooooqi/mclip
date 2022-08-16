@@ -519,7 +519,6 @@ class VisionTransformer(nn.Module):
                               dtype=self.dtype, axes=('embed',),
                               name='knn_postnorm')(x)
     elif self.knn.postnorm == 'SBN0':
-      # TODO
       x = t5x.layers.TrainOnlyBatchNorm(use_bias=False, use_scale=False,
                               dtype=self.dtype, axes=('embed',),
                               name='knn_postnorm')(x)

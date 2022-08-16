@@ -654,7 +654,7 @@ class TrainOnlyBatchNorm(nn.Module):
   """Batch normalization with axis names but without running averages (only useful during train)."""
   epsilon: float = 1e-5
   dtype: Any = jnp.float32
-  param_dtype: Dtype = jnp.float32
+  param_dtype: DType = jnp.float32
   use_bias: bool = True
   use_scale: bool = True
   bias_init: Initializer = nn.initializers.zeros
@@ -663,8 +663,7 @@ class TrainOnlyBatchNorm(nn.Module):
 
   @nn.compact
   def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-    """Applies batch normalization on the input.
-    """
+    """Applies batch normalization on the input."""
     feature_axes = (x.ndim-1,)
     reduction_axes = tuple(i for i in range(x.ndim) if i not in feature_axes)
 
