@@ -508,23 +508,25 @@ class VisionTransformer(nn.Module):
     if not self.knn.on:
       return
 
+    # => [N, E]
     if self.knn.postprocess == 'tgap':
       x = jnp.mean(x, axis=1)
     else:
       raise NotImplementedError
 
-    if self.knn.postnorm == 'LayerNorm':
+    if self.knn.postnorm == 'LN0':
       x = t5x.layers.LayerNorm(use_bias=False, use_scale=False,
                               dtype=self.dtype, axes=('embed',),
                               name='knn_postnorm')(x)
-    elif self.knn.postnorm == 'SyncBatchNorm':
+    elif self.knn.postnorm == 'SBN0':
       # TODO
-      x = dist_util.SyncBatchNorm(x, eps=1.e-6)
+      x = t5x.layers.TrainOnlyBatchNorm(use_bias=False, use_scale=False,
+                              dtype=self.dtype, axes=('embed',),
+                              name='knn_postnorm')(x)
     elif self.knn.postnorm != 'None':
       raise NotImplementedError
 
     if self.knn.l2norm:
-      # TODO
       l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
       x /= l2norm
 

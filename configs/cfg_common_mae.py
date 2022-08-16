@@ -101,7 +101,7 @@ def get_config():
   config.model.knn.on = True
 
   config.model.knn.postprocess = 'tgap'  # token + global average pool
-  config.model.knn.postnorm = 'SyncBatchNorm'  # apply norm after postprocess: LayerNorm, SyncBatchNorm
+  config.model.knn.postnorm = 'SBN0'  # apply norm after postprocess: LayerNorm, SyncBatchNorm
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   config.model.knn.num_classes = 1000  # specifiy here for simplicity
   config.model.knn.queue_size = 131072  # 128 * 1024

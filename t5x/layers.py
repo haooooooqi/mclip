@@ -206,7 +206,7 @@ class MultiHeadDotProductAttention(nn.Module):
         features=(self.num_heads, head_dim),
         kernel_axes=('embed', 'joined_kv'),
         dtype=self.dtype)
-    # kaiming: the origial version;
+    # kaiming: the original version;
     # if we use this, the numerical results should be the same as original
     # projection = functools.partial(
     #     nn.DenseGeneral,
@@ -630,8 +630,8 @@ class LayerNorm(nn.Module):
   param_dtype: DType = jnp.float32
   use_bias: bool = True
   use_scale: bool = True
-  scale_init: Initializer = nn.initializers.ones
   bias_init: Initializer = nn.initializers.zeros
+  scale_init: Initializer = nn.initializers.ones
   axes: Tuple[str, ...] = ()
 
   @nn.compact
@@ -639,6 +639,34 @@ class LayerNorm(nn.Module):
     """Applies layer normalization on the input."""
     reduction_axes = (-1,)
     feature_axes = (-1,)
+
+    mean, var = nn.normalization._compute_stats(x, reduction_axes, None, None)
+
+    return _normalize(
+        self, x, mean, var, reduction_axes, feature_axes,
+        self.dtype, self.param_dtype, self.epsilon,
+        self.use_bias, self.use_scale,
+        self.bias_init, self.scale_init,
+        self.axes)
+
+
+class TrainOnlyBatchNorm(nn.Module):
+  """Batch normalization with axis names but without running averages (only useful during train)."""
+  epsilon: float = 1e-5
+  dtype: Any = jnp.float32
+  param_dtype: Dtype = jnp.float32
+  use_bias: bool = True
+  use_scale: bool = True
+  bias_init: Initializer = nn.initializers.zeros
+  scale_init: Initializer = nn.initializers.ones
+  axes: Tuple[str, ...] = ()
+
+  @nn.compact
+  def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+    """Applies batch normalization on the input.
+    """
+    feature_axes = (x.ndim-1,)
+    reduction_axes = tuple(i for i in range(x.ndim) if i not in feature_axes)
 
     mean, var = nn.normalization._compute_stats(x, reduction_axes, None, None)
 
