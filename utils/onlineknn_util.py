@@ -29,14 +29,14 @@ class OnlineKNN(nn.Module):
         jax.random.PRNGKey(0),
         (K, N, E),
         jnp.float32,
-        axes=('_null0', 'batch', '_null1'))
+        axes=('_null0', '_null1', '_null2'))
 
     queue_labels = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_labels',
         lambda s: jnp.zeros(s, jnp.int32),
         (K, N),
-        axes=('_null0', 'batch'))
+        axes=('_null0', '_null1'))
 
     queue_ptr = t5x.layers.variable_with_axes(
         'knn_vars',
@@ -72,11 +72,10 @@ class OnlineKNN(nn.Module):
     # [B, t] => [B, t, KxN]
     sim_indices = jax.nn.one_hot(sim_indices, self.knn.queue_size)
 
-    # [B, t, KxN] => [B, t, K, N]
-    sim_indices = jnp.reshape(sim_indices, (N, self.knn.num_knns, K, N))
-
-    # [K, N] * [B, t, K, N] => [B, t]
-    sim_labels = jnp.einsum('kn,btkn->bt', queue_labels.value, sim_indices)
+    # [KxN] * [B, t, KxN] => [B, t]
+    sim_labels = jnp.einsum('K,btK->bt',
+                            jnp.reshape(queue_labels.value, (self.knn.queue_size,)),
+                            sim_indices)
 
     # compute scores, [B, t, C]
     one_hot_labels = jax.nn.one_hot(sim_labels,
