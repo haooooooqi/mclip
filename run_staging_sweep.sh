@@ -25,13 +25,13 @@ for seed in 0 # 1 2 3
 do
 for ep in 100
 do
-for lrd in 0.7 # 0.8 0.6 0.9 0.95
+for lrd in 0.8 0.6 0.9 0.95 # 0.7
 do
-for lr in 1e-4 # 5e-4 1.25e-3 2.5e-3
+for lr in  2.5e-3 # 5e-4 1.25e-3 2.5e-3 1e-4
 do
-for dp in 0.1 # 0.2
+for dp in 0.1 0.2
 do
-for wep in 10
+for wep in 5 20
 do
 source run_remote_sweep.sh $lr $lrd $ep $dp $wep
 

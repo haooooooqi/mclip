@@ -3,12 +3,12 @@ echo 'code dir: '$STAGEDIR
 # seed=0
 batch=1024
 lr=1.25e-3
-mlr=2.5e-7
+mlr=1e-6
 wlr=2.5e-7
-lrd=0.8 #0.9
+lrd=0.9 #0.8 #0.9
 ep=100
-wep=10
-dp=0.1
+wep=5
+dp=0.2
 ema=0.9999
 
 vitsize=base
@@ -16,12 +16,12 @@ CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 
 # PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_large/20220707_235231_cx_512a_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
-PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_base/20220721_085120_cx_512a_cfg_mae_base_maetf_800ep_b4096_lr0.25e-4_mlr0.25e-5_wlr1.25e-7_psize32_lrsmultistep_TorchLoader_wseed100_simmim'
+PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_base_trial/20220816_081250_cx_256c_cfg_mae_base_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
 name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
 # finetune_torch_loader (fttl): randaugv2erase_TorchLoader
-JOBNAME=flax_dev_ft/mae_convnext_${vitsize}/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_${wep}wep_fttl_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_mlr${mlr}_wlr${wlr}_s${seed}_${ema}
+JOBNAME=flax_dev_ft/masked_convnext_${vitsize}/${name}_finetune/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_${ep}ep_${wep}wep_fttl_b${batch}_lr${lr}_lrd${lrd}_dp${dp}_mlr${mlr}_wlr${wlr}_s${seed}_${ema}
 
 WORKDIR=gs://shoubhikdn_storage/checkpoints/${JOBNAME}
 LOGDIR=/home/${USER}/logs/${JOBNAME}

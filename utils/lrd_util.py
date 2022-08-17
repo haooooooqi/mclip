@@ -20,7 +20,7 @@ def lrd_func(num_layers: int, lr_decay: float):
 
 def _layerwise_lr_decay(
         path: Tuple[Any], val: jnp.ndarray,
-        num_layers: int, lr_decay: float):
+        num_layers: int, lr_decay: float, pre_enc_stgs: int = 4):
     """Get the layerwise lr decay rate based on name."""
     del val
 
@@ -47,7 +47,41 @@ def _layerwise_lr_decay(
         elif stage_id == 3:
             layer_idx = 12
     else:
-        layer_idx = num_layers + 1
+        layer_idx = num_layers + 1 if pre_enc_stgs == 4 else num_layers
+
+    layer_lrd = lr_decay ** (num_layers + 1 - layer_idx)
+    return layer_lrd
+
+def _layerwise_lr_decay_masked_convnext(
+        path: Tuple[Any], val: jnp.ndarray,
+        num_layers: int, lr_decay: float, pre_enc_stgs: int = 4):
+    """Get the layerwise lr decay rate based on name."""
+    del val
+
+    layer_name = path[1]
+    # print("Layer Name: ", layer_name)
+    if layer_name.startswith("downsample_layers"):
+        stage_id = int((layer_name.split('downsample_layers'))[1][0])
+        # print("Stage ID: ", stage_id)
+        if stage_id == 0 or stage_id == 1:
+            layer_idx = 0
+        elif stage_id == 2:
+            layer_idx = stage_id - 1
+        elif stage_id == 3:
+            layer_idx = num_layers
+    elif layer_name.startswith("stages"):
+        stage_block_id = (layer_name.split('stages'))[1]
+        stage_id = int(stage_block_id[0])
+        block_id = int(stage_block_id[1:])
+        # print("Stage Block ID: ", stage_id, " : ", block_id)
+        if stage_id == 0 or stage_id == 1:
+            layer_idx = 0
+        elif stage_id == 2:
+            layer_idx = 1 + block_id // 3 
+        elif stage_id == 3:
+            layer_idx = num_layers
+    else:
+        layer_idx = num_layers + 1 if pre_enc_stgs == 4 else num_layers
 
     layer_lrd = lr_decay ** (num_layers + 1 - layer_idx)
     return layer_lrd
