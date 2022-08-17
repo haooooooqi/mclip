@@ -62,8 +62,6 @@ python3 main.py \
     --config.partitioning.partition_states=False \
     --config.resume_dir=${RESUME} \
     --config.aug.area_range=\(0.5\,1.0\) \
-    --config.model.model_txt.decoder.cross_attention=True \
-    --config.model.model_img.decoder.cross_attention=True \
 2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 

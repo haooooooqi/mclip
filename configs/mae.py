@@ -75,8 +75,6 @@ def get_config_img():
   config.decoder.transformer.dropout_rate = 0.0
   config.decoder.transformer.droppath_rate = 0.0
 
-  config.decoder.cross_attention = True
-
   return config
 
 
@@ -109,7 +107,5 @@ def get_config_txt():
   config.decoder.transformer.attention_dropout_rate = 0.0
   config.decoder.transformer.dropout_rate = 0.0
   config.decoder.transformer.droppath_rate = 0.0
-
-  config.decoder.cross_attention = True
 
   return config

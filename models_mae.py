@@ -556,17 +556,17 @@ class LanguageTransformer(nn.Module):
     decoder_layers['mask_token'] = t5x.layers.param_with_axes(
       'mask_token', masktoken_init, (1, 1, self.decoder.hidden_size),
       jnp.float32, axes=('_null0', '_null1', 'embed'))
+    decoder_layers['txt_modal_token'] = t5x.layers.param_with_axes(
+      'txt_modal_token', masktoken_init, (1, 1, self.decoder.hidden_size),
+      jnp.float32, axes=('_null0', '_null1', 'embed'))
     decoder_layers['posemb'] = Add1DPositionEmbs(sincos=self.sincos, posemb_init=fixed_gaussian_init, name='posembed_decoder')
-    if self.decoder.cross_attention:
-      decoder_layers['blocks'] = EncoderCross(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
-    else:
-      decoder_layers['blocks'] = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
-    decoder_layers['pred'] = t5x.layers.Dense(
-      features=self.vocab_size,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      kernel_axes=('embed', 'classes'),  # 'mlp' is split first
-      name='pred')
+    # decoder_layers['blocks'] = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
+    # decoder_layers['pred'] = t5x.layers.Dense(
+    #   features=self.vocab_size,
+    #   kernel_init=mlp_kernel_init,
+    #   bias_init=mlp_bias_init,
+    #   kernel_axes=('embed', 'classes'),  # 'mlp' is split first
+    #   name='pred')
     self.decoder_layers = decoder_layers
 
   def compute_loss(self, txt, pred, mask, is_valid):
@@ -641,6 +641,7 @@ class VisionTransformer(nn.Module):
   patches: Any
   transformer: Any
   hidden_size: int
+  vocab_size: int  # for joint decoder
   classifier: str = 'token'
   dtype: Any = jnp.float32
   decoder: Any = None
@@ -670,6 +671,13 @@ class VisionTransformer(nn.Module):
       x = jnp.einsum('nhwpqc->nhpwqc', x)
       imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
       return imgs
+
+  def remove_cls_token(self, x):
+    use_cls_token = (self.classifier == 'token')
+    num_clstokens = 1 if use_cls_token else 0
+    # remove cls token
+    x = x[:, num_clstokens:, :]
+    return x
 
   def compute_loss(self, imgs, pred, mask):
     """
@@ -760,8 +768,6 @@ class VisionTransformer(nn.Module):
     return x_full, x_part
 
   def apply_decoder(self, x, train):
-    use_cls_token = (self.classifier == 'token')
-    num_clstokens = 1 if use_cls_token else 0
 
     # apply the decoder
     x = self.decoder_layers['blocks'](x, train=train)
@@ -769,10 +775,12 @@ class VisionTransformer(nn.Module):
     # apply the predictor
     x = self.decoder_layers['pred'](x)
 
-    # remove cls token
-    pred = x[:, num_clstokens:, :]
+    # use_cls_token = (self.classifier == 'token')
+    # num_clstokens = 1 if use_cls_token else 0
+    # # remove cls token
+    # pred = x[:, num_clstokens:, :]
 
-    return pred
+    return x  # including cls token
 
   def setup(self):
     """
@@ -813,13 +821,13 @@ class VisionTransformer(nn.Module):
     decoder_layers['mask_token'] = t5x.layers.param_with_axes(
       'mask_token', masktoken_init, (1, 1, self.decoder.hidden_size),
       jnp.float32, axes=('_null0', '_null1', 'embed'))
+    decoder_layers['img_modal_token'] = t5x.layers.param_with_axes(
+      'img_modal_token', masktoken_init, (1, 1, self.decoder.hidden_size),
+      jnp.float32, axes=('_null0', '_null1', 'embed'))
     decoder_layers['pos_emb'] = Add2DPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, name='posembed_decoder')
-    if self.decoder.cross_attention:
-      decoder_layers['blocks'] = EncoderCross(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
-    else:
-      decoder_layers['blocks'] = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
+    decoder_layers['blocks'] = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
     decoder_layers['pred'] = t5x.layers.Dense(
-      features=self.patches.size[0] * self.patches.size[1] * 3,
+      features=self.patches.size[0] * self.patches.size[1] * 3 + self.vocab_size,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       kernel_axes=('embed', 'classes'),  # 'mlp' is split first
@@ -836,6 +844,9 @@ class ImageTextLearner(nn.Module):
   def get_config_img(self):
     cfg = self.config.model_img.copy_and_resolve_references()  # copy
     cfg.name = 'img_encoder'  # force name
+    cfg.unlock()
+    cfg.vocab_size = self.config.model_txt.vocab_size
+    cfg.lock()
     return cfg
 
   def get_config_txt(self):
@@ -871,8 +882,21 @@ class ImageTextLearner(nn.Module):
     x_img_full, x_img_part = self.img_encoder.apply_unshuffle(x_img, ids_restore_img)
     x_txt_full, x_txt_part = self.txt_encoder.apply_unshuffle(x_txt, ids_restore_txt)
 
-    pred_img = self.img_encoder.apply_decoder((x_img_full, x_txt_part) if self.img_encoder.decoder.cross_attention else x_img_full, train=train)
-    pred_txt = self.txt_encoder.apply_decoder((x_txt_full, x_img_part) if self.txt_encoder.decoder.cross_attention else x_txt_full, train=train)
+    # merge the sequence
+    x_img_full += self.img_encoder.decoder_layers['img_modal_token']
+    x_txt_full += self.txt_encoder.decoder_layers['txt_modal_token']
+    x_imgtxt_full = jnp.concatenate([x_img_full, x_txt_full], axis=1)
+
+    # joint decoder
+    pred_imgtxt = self.img_encoder.apply_decoder(x_imgtxt_full, train=train)
+
+    # split the sequences
+    pred_img, pred_txt = jnp.split(pred_imgtxt, (x_img_full.shape[1],), axis=1)
+    vocab_size = self.txt_encoder.vocab_size
+    pred_img = pred_img[:, :, :-vocab_size]  # first part of pred
+    pred_txt = pred_txt[:, :, -vocab_size:]  # second part of pred
+
+    pred_img = self.img_encoder.remove_cls_token(pred_img)
 
     # compute losses
     loss_img = self.img_encoder.compute_loss(img, pred_img, mask_img)
