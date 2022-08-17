@@ -105,10 +105,12 @@ def get_config():
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   config.model.knn.num_classes = 1000  # specifiy here for simplicity
   config.model.knn.queue_size = 131072  # 128 * 1024
+  config.model.knn.batch_size = 4096
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
 
   # seeds
+  config.seed = -1
   config.seed_jax = 2
   config.seed_tf = 2
   config.seed_pt = 2

@@ -530,10 +530,11 @@ class VisionTransformer(nn.Module):
       x /= l2norm
 
     knn_accuracy = onlineknn_util.OnlineKNN(knn=self.knn)(x, labels, train=train)
+
     return knn_accuracy
 
   @nn.compact
-  def __call__(self, inputs, *, train):
+  def __call__(self, inputs, *, train, train_knn=True):
     imgs = inputs['image']
     labels = inputs['label']
 
@@ -541,7 +542,7 @@ class VisionTransformer(nn.Module):
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x, labels, train=train)
+    knn_accuracy = self.apply_knn(x, labels, train=(train and train_knn))
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)

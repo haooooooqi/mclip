@@ -17,8 +17,9 @@ class OnlineKNN(nn.Module):
 
   @nn.compact
   def __call__(self, features, labels, train):
-    K = self.knn.queue_size
-    D = features.shape[-1]
+    N = self.knn.batch_size
+    K = self.knn.queue_size // N
+    E = features.shape[-1]
 
     # create the queue
     queue_features = t5x.layers.variable_with_axes(
@@ -26,77 +27,78 @@ class OnlineKNN(nn.Module):
         'queue_features',
         initializers_util.normal_l2(),
         jax.random.PRNGKey(0),
-        (K, D),
+        (K, N, E),
         jnp.float32,
-        axes=('embed', '_null0'))
+        axes=('_null0', 'batch', '_null1'))
 
     queue_labels = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_labels',
         lambda s: jnp.zeros(s, jnp.int32),
-        (K,),
-        axes=('embed',))
+        (K, N),
+        axes=('_null0', 'batch'))
 
     queue_ptr = t5x.layers.variable_with_axes(
         'knn_vars',
         'queue_ptr',
         lambda s: jnp.zeros(s, jnp.int32),
         (1,),
-        axes=('_null1',))
+        axes=('_null0',))
 
     if not train:  # we only monitor the training set.
       return None
 
     # compute knn accuracy
-    knn_accuracy = self.compute_knn_accuracy(features, labels, queue_features, queue_labels)
+    knn_accuracy = self.compute_knn_accuracy(features, labels, queue_features, queue_labels, N, K)
 
     # update queue with the current batch
-    self.update_queue(features, labels, queue_features, queue_labels, queue_ptr)
+    self.update_queue(features, labels, queue_features, queue_labels, queue_ptr, K)
 
     return knn_accuracy
 
-  def compute_knn_accuracy(self, features, labels, queue_features, queue_labels):
-    # [N, E] * [K, E] => [N, K]
-    sim_matrix = jnp.einsum('ne,ke->nk', features, queue_features.value)
+  def compute_knn_accuracy(self, features, labels, queue_features, queue_labels, N, K):
+    # [B, E] * [K, N, E] => [B, K, N]
+    sim_matrix = jnp.einsum('be,kne->bkn', features, queue_features.value)
 
-    # => [N, t] for top-k
+    # [B, K, N] => [B, KxN]
+    sim_matrix = jnp.reshape(sim_matrix, (N, self.knn.queue_size))
+
+    # => [B, t] for top-k
     sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
 
     # turn into scores: [N, t]
     sim_weight = jnp.exp(sim_weight / self.knn.temperature)
 
-    # [N, t] => [N, t, K]
+    # [B, t] => [B, t, KxN]
     sim_indices = jax.nn.one_hot(sim_indices, self.knn.queue_size)
 
-    # [K] * [N, t, K] => [N, t]
-    sim_labels = jnp.einsum('k,ntk->nt', queue_labels.value, sim_indices)
+    # [B, t, KxN] => [B, t, K, N]
+    sim_indices = jnp.reshape(sim_indices, (N, self.knn.num_knns, K, N))
 
-    # compute scores, [N, t, C]
+    # [K, N] * [B, t, K, N] => [B, t]
+    sim_labels = jnp.einsum('kn,btkn->bt', queue_labels.value, sim_indices)
+
+    # compute scores, [B, t, C]
     one_hot_labels = jax.nn.one_hot(sim_labels,
                                     self.knn.num_classes,
                                     dtype=sim_weight.dtype,
                                     axis=-1)
 
-    # [N, t, C]
+    # [B, t, C]
     pred_scores = one_hot_labels * jnp.expand_dims(sim_weight, -1)
-    # [N, C]
+    # [B, C]
     pred_scores = jnp.sum(pred_scores, axis=1)
-    # [N,]
+    # [B,]
     pred_labels = jnp.argmax(pred_scores, axis=-1)
 
     accuracy = jnp.mean(pred_labels == labels)
 
     return accuracy
 
-  def update_queue(self, features, labels, queue_features, queue_labels, queue_ptr):
-    # assume it is from a single batch
-    N = features.shape[0]
-    assert self.knn.queue_size % N == 0
-
+  def update_queue(self, features, labels, queue_features, queue_labels, queue_ptr, K):
     ptr = queue_ptr.value[0]
-    inds = jnp.arange(N) + ptr
 
-    queue_features.value = queue_features.value.at[inds].set(features)
-    queue_labels.value = queue_labels.value.at[inds].set(labels)
+    queue_features.value = queue_features.value.at[ptr].set(features)
+    queue_labels.value = queue_labels.value.at[ptr].set(labels)
 
-    queue_ptr.value = queue_ptr.value.at[0].set((ptr + N) % self.knn.queue_size)
+    queue_ptr.value = queue_ptr.value.at[0].set((ptr + 1) % K)

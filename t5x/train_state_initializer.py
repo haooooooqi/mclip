@@ -21,13 +21,13 @@ def init_fn(rng, image_size, model):
   input_shape = (1, image_size, image_size, 3)
   variables = model.init({'params': rng, 'dropout': jax.random.PRNGKey(0)},
                         {'image': jnp.ones(input_shape, model.dtype), 'label': jnp.zeros((1,), jnp.int32)},
-                        train=True)
+                        train=True, train_knn=False)
   return variables
 
 
 def init_shapes(rng, image_size, model):
   input_shape = (1, image_size, image_size, 3)
-  init = functools.partial(model.init, train=True)
+  init = functools.partial(model.init, train=True, train_knn=False)
   variables_shape = jax.eval_shape(init,
                                   {'params': rng, 'dropout': jax.random.PRNGKey(0)},
                                   {'image': jnp.ones(input_shape, model.dtype), 'label': jnp.zeros((1,), jnp.int32)})

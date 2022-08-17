@@ -244,6 +244,22 @@ def set_seed_torch(seed):
   return rng_torch
 
 
+def infer_and_verify_config(config):
+  """infer and verify some parameters in the config"""
+
+  # a common seed
+  if config.seed >= 0:
+    config.seed_jax = config.seed
+    config.seed_tf = config.seed
+    config.seed_pt = config.seed
+
+  # batch size for knn
+  assert config.model.knn.queue_size % config.batch_size == 0
+  config.model.knn.batch_size = config.batch_size
+
+  return config
+
+
 def train_and_evaluate(config: ml_collections.ConfigDict,
                        workdir: str) -> train_state.TrainState:
   """Execute model training and evaluation loop.
@@ -255,6 +271,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   Returns:
     Final TrainState.
   """
+
+  config = infer_and_verify_config(config)
+
   # ------------------------------------
   # Set random seeds
   # ------------------------------------
