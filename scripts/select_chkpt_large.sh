@@ -59,4 +59,5 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220816_010427_maet5x_kmh-tpuvm-v3-256-4_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75txt0.25_s100_p1st_re1.0_laion_a0.5_sanity_twoMAE_removecall'
 # t5x + LAION img+txt
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220816_035549_maet5x_kmh-tpuvm-v3-256-7_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75txt0.25_s100_p1st_re1.0_laion_a0.5_sanity_twoMAE_txtCross'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220816_055630_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75txt0.25_s100_p1st_re1.0_laion_a0.5_sanity_twoMAE_imgCross'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220816_055630_maet5x_kmh-tpuvm-v3-256-3_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75txt0.25_s100_p1st_re1.0_laion_a0.5_sanity_twoMAE_imgCross'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220816_174145_maet5x_kmh-tpuvm-v3-256-6_cfg_mae_large_800ep_b4096_lr1e-4_mk0.75txt0.25_s100_p1st_re1.0_laion_a0.5_sanity_twoMAE_twoCross'
