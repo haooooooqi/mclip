@@ -208,9 +208,6 @@ def prepare_pt_data(xs, batch_size):
       pads = -np.ones((batch_size - x.shape[0],) + x.shape[1:], dtype=x.dtype)
       x = np.concatenate([x, pads], axis=0)
 
-    # reshape (host_batch_size, height, width, 3) to
-    # (local_devices, device_batch_size, height, width, 3)
-    # return x.reshape((local_device_count, -1) + x.shape[1:])
     return x.reshape((-1,) + x.shape[1:])  # do not reshape into (local_devices, -1, ...)
 
   return jax.tree_map(_prepare, xs)
@@ -229,10 +226,6 @@ def seed_worker(worker_id, shard_id):
     worker_seed = worker_id + shard_id * 10000
     np.random.seed(worker_seed)
     _random.seed(worker_seed)
-
-    # logging_util.verbose_on()
-    # logging.info('worker_id: {}, shard_id: {}, worker_seed: {}'.format(worker_id, shard_id, worker_seed))
-    # logging_util.verbose_off()
 
 
 def set_seed_torch(seed):
@@ -336,15 +329,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     logging.info('Initializing train_state...')
     state = p_init_fn(rng_init)
     logging.info('Initializing train_state done.')
-    # stds = jax.tree_util.tree_map(lambda x: (x.shape, np.array(x).std()), state.params)
-    # logging.info('std: {}'.format(stds))
 
   t5x.model_info.log_state_info(state)
-
-  # --------------------------------------------------------
-  # logging.info('Saving debug checkpoint: {}'.format(workdir))
-  # checkpointer.save(state)
-  # --------------------------------------------------------
 
   # step_offset > 0 if restarting from checkpoint
   step_offset = int(state.step)
@@ -396,42 +382,37 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # ------------------------------------------------------------
     for i, batch in enumerate(data_loader_train):
       batch = parse_batch(batch, local_batch_size)
+      # stop here to debug
       state, metrics = partitioned_train_step(state, batch)
 
       if epoch == epoch_offset and i == 0 and partitioner._num_partitions > 8:
         print_sanity_check(batch, shard_id)
 
-      epoch_1000x = int(step * config.batch_size / 1281167 * 1000)  # normalize to IN1K epoch anyway
+      epoch_1000x = int(step / len(data_loader_train) * 1000)  # normalize based on epoch
 
       if epoch == epoch_offset and i == 0:
         logging.info('Initial compilation completed.')
         start_time = time.time()  # log the time after compilation
 
-      # if epoch == epoch_offset and i == 0:
-      #   jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
-      #   logging.info('Saving init debug checkpoint: {}'.format(workdir))
-      #   checkpointer.save(state)
+      train_metrics.append(metrics)
+      if (step + 1) % config.log_every_steps == 0:
+        # Wait until computations are done before exiting
+        jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
+        train_metrics = common_utils.get_metrics(jax.tree_map(lambda x: jnp.reshape(x, (-1,)), train_metrics))
+        summary = {
+            f'train_{k}': float(v)
+            for k, v in jax.tree_map(lambda x: x.mean(), train_metrics).items()
+        }
+        summary['steps_per_second'] = config.log_every_steps / (time.time() - train_metrics_last_t)
 
-      if config.get('log_every_steps'):
-        train_metrics.append(metrics)
-        if (step + 1) % config.log_every_steps == 0:
-          # Wait until computations are done before exiting
-          jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
-          train_metrics = common_utils.get_metrics(jax.tree_map(lambda x: jnp.reshape(x, (-1,)), train_metrics))
-          summary = {
-              f'train_{k}': float(v)
-              for k, v in jax.tree_map(lambda x: x.mean(), train_metrics).items()
-          }
-          summary['steps_per_second'] = config.log_every_steps / (time.time() - train_metrics_last_t)
+        # to make it consistent with PyTorch log
+        summary['loss'] = summary['train_loss']  # add extra name
+        summary['lr'] = summary.pop('train_learning_rate')  # rename
+        summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
 
-          # to make it consistent with PyTorch log
-          summary['loss'] = summary['train_loss']  # add extra name
-          summary['lr'] = summary.pop('train_learning_rate')  # rename
-          summary['step_tensorboard'] = epoch_1000x  # step for tensorboard
-
-          writer.write_scalars(step + 1, summary)
-          train_metrics = []
-          train_metrics_last_t = time.time()
+        writer.write_scalars(step + 1, summary)
+        train_metrics = []
+        train_metrics_last_t = time.time()
 
       step += 1
 
@@ -447,6 +428,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       imgs_vis = metrics.pop('imgs_vis')
       imgs_vis = imgs_vis * jnp.asarray(STDDEV_RGB) + jnp.asarray(MEAN_RGB)
       imgs_vis = jnp.uint8(jnp.clip(imgs_vis, 0, 255.))
+
       writer.write_images(step=epoch_1000x, images=dict(imgs_vis=imgs_vis))
 
       summary = jax.tree_map(lambda x: x.mean(), metrics)

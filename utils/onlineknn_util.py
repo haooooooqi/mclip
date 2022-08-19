@@ -63,11 +63,11 @@ class OnlineKNN(nn.Module):
     # [B, K, N] => [B, KxN]
     sim_matrix = jnp.reshape(sim_matrix, (N, self.knn.queue_size))
 
-    # => [B, t] for top-k
-    sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
+    # => [B, t] for top-k (internally may have gather, lax may not be compatible with t5x)
+    # sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
 
-    # turn into scores: [N, t]
-    sim_weight = jnp.exp(sim_weight / self.knn.temperature)
+    # => [B, t]
+    sim_indices = jnp.argsort(sim_matrix, axis=1)[:, :self.knn.num_knns]
 
     # [B, t] => [B, t, KxN]
     sim_indices = jax.nn.one_hot(sim_indices, self.knn.queue_size)
@@ -76,6 +76,11 @@ class OnlineKNN(nn.Module):
     sim_labels = jnp.einsum('K,btK->bt',
                             jnp.reshape(queue_labels.value, (self.knn.queue_size,)),
                             sim_indices)
+
+    sim_weight = jnp.einsum('bK,btK->bt', sim_matrix, sim_indices)
+
+    # turn into scores: [B, t]
+    sim_weight = jnp.exp(sim_weight / self.knn.temperature)
 
     # compute scores, [B, t, C]
     one_hot_labels = jax.nn.one_hot(sim_labels,
