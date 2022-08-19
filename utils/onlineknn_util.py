@@ -63,11 +63,8 @@ class OnlineKNN(nn.Module):
     # [B, K, N] => [B, KxN]
     sim_matrix = jnp.reshape(sim_matrix, (N, self.knn.queue_size))
 
-    # => [B, t] for top-k (internally may have gather, lax may not be compatible with t5x)
-    # sim_weight, sim_indices = jax.lax.top_k(sim_matrix, k=self.knn.num_knns)
-
     # => [B, t]
-    sim_indices = jnp.argsort(sim_matrix, axis=1)[:, :self.knn.num_knns]
+    sim_indices = jnp.argsort(sim_matrix, axis=1)[:, (self.knn.queue_size - self.knn.num_knns):]
 
     # [B, t] => [B, t, KxN]
     sim_indices = jax.nn.one_hot(sim_indices, self.knn.queue_size)
