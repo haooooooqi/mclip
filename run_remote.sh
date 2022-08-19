@@ -16,7 +16,7 @@ CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 
 # PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_large/20220707_235231_cx_512a_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
-PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_base_trial/20220816_081250_cx_256c_cfg_mae_base_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
+PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/masked_convmae_base/20220818_090550_cx_256d_cfg_convmae_base_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
 name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
