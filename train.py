@@ -134,8 +134,8 @@ def train_step(state, batch, learning_rate_fn, config):
         mutable=mutable,
         rngs=dict(dropout=dropout_rng),
         train=True)
-    (loss, pred, knn_accuracy), new_variables = outcome
-    return loss, (new_variables, loss, knn_accuracy)
+    (loss, vis, artifacts), new_variables = outcome
+    return loss, (new_variables, loss, artifacts)
 
   step = state.step
   lr = learning_rate_fn(step)
@@ -145,9 +145,10 @@ def train_step(state, batch, learning_rate_fn, config):
   # Re-use same axis_name as in the call to `pmap(...train_step...)` below.
   grads = lax.pmean(grads, axis_name='batch')
 
-  new_variables, loss, knn_accuracy = aux[1]
+  new_variables, loss, artifacts = aux[1]
 
-  metrics = {'loss': loss, 'learning_rate': lr, 'knn_accuracy': knn_accuracy}
+  metrics = {**artifacts}
+  metrics['learning_rate'] = lr
   metrics = lax.pmean(metrics, axis_name='batch')
 
   # ----------------------------------------------------------------------------

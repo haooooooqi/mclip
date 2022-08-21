@@ -524,8 +524,6 @@ class VisionTransformer(nn.Module):
     return knn_accuracy
 
   def apply_sup(self, x, labels, train):
-    from IPython import embed; embed();
-    if (0 == 0): raise NotImplementedError
     if not self.sup.on_use:
       return 0
 
@@ -570,11 +568,20 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    loss_img = self.compute_loss(imgs, pred, mask)
+
+    loss_tot = loss_img + loss_sup
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      vis = self.visualization(imgs, pred, mask)
     else:
-      outcome = pred  # not used
+      vis = None
 
-    return loss, outcome, knn_accuracy
+    artifacts = {
+      'knn_accuracy': knn_accuracy,
+      'loss': loss_img,  # back-comp
+      'loss_img': loss_img,
+      'loss_sup': loss_sup,
+    }
+
+    return loss_tot, vis, artifacts
