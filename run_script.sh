@@ -18,6 +18,7 @@ python3 main.py \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
     --config.model.sup.on_use=True \
+    --config.model.sup.loss_weight=0.01 \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

@@ -570,7 +570,7 @@ class VisionTransformer(nn.Module):
     # compute loss
     loss_img = self.compute_loss(imgs, pred, mask)
 
-    loss_tot = loss_img + loss_sup
+    loss_tot = loss_img + loss_sup * self.sup.loss_weight
 
     if self.visualize and not train:
       vis = self.visualization(imgs, pred, mask)

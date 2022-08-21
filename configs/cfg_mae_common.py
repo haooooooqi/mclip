@@ -152,5 +152,6 @@ def get_config():
   config.model.sup.on_use = False
   config.model.sup.mlp_layers = 2
   config.model.sup.mlp_dim = 2048
+  config.model.sup.loss_weight = 0.01
 
   return config
