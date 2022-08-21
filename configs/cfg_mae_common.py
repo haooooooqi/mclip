@@ -147,4 +147,10 @@ def get_config():
   config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
   config.torchload.num_workers = 32
 
+  # torchload
+  config.model.sup = ml_collections.ConfigDict()
+  config.model.sup.on_use = False
+  config.model.sup.mlp_layers = 2
+  config.model.sup.mlp_dim = 2048
+
   return config

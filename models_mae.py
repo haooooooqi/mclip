@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional, Tuple
 import jax
 import jax.numpy as jnp
 import jax.random as random
+import optax
 
 import flax.linen as nn
 from uritemplate import partial
@@ -329,6 +330,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  sup: Any = None
 
   def random_mask(self, x):
     
@@ -521,6 +523,34 @@ class VisionTransformer(nn.Module):
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
     return knn_accuracy
 
+  def apply_sup(self, x, labels, train):
+    from IPython import embed; embed();
+    if (0 == 0): raise NotImplementedError
+    if not self.sup.on_use:
+      return 0
+
+    x = x.mean(axis=1)
+    
+    for i in range(self.sup.mlp_layers - 1):
+      x = nn.Dense(
+        features=self.sup.mlp_dim,
+        dtype=self.dtype,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        name='mlp_cls{}'.format(i))(x)
+      x = nn.gelu(x)
+
+    x = nn.Dense(
+      features=self.knn.num_classes,  # hack
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='mlp_cls{}'.format(self.sup.mlp_layers))(x)
+
+    labels_one_hot = jax.nn.one_hot(labels, num_classes=self.knn.num_classes)
+    loss_sup = optax.softmax_cross_entropy(x, labels_one_hot).mean()
+
+    return loss_sup
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -532,6 +562,9 @@ class VisionTransformer(nn.Module):
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
+
+    # optionally apply sup head
+    loss_sup = self.apply_sup(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)

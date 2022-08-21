@@ -1,7 +1,7 @@
 # run remote
 
 lr=1.0e-4
-ep=1600
+ep=800
 batch=4096
 mask=0.75
 
@@ -9,7 +9,7 @@ seed=100
 
 CONFIG=cfg_mae_giant
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maetf_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_sup
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -48,6 +48,7 @@ python3 main.py \
     --config.seed_pt=${seed} \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
+    --config.model.sup.on_use=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
