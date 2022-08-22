@@ -6,9 +6,9 @@ batch=4096
 mask=0.75
 
 tau=0.2
-lossw=1
+lossw=0.01
 rate=0.25
-unshared=4
+unshared=0
 
 seed=100
 
