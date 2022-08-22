@@ -3,12 +3,12 @@ echo 'code dir: '$STAGEDIR
 # seed=0
 batch=1024
 lr=1e-3
-lrd=0.65  # 0.75
-ep=100  # 50
-dp=0.1  # 02
+lrd=0.75
+ep=50
+dp=0.2
 ema=0.9999
 
-vitsize=base
+vitsize=large
 CONFIG=cfg_vit_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 

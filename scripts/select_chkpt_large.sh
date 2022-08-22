@@ -137,3 +137,6 @@
 
 # explore: supervised + MAE
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220821_044917_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_sup'
+
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_014817_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_sup_dec1_w0.01'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_014930_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_sup_dec8_w0.01'
