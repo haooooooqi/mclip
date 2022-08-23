@@ -341,7 +341,6 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
-  clr: Any = None
 
   def random_mask(self, x):
     
@@ -411,7 +410,24 @@ class VisionTransformer(nn.Module):
     loss = jnp.sum(loss * mask) / jnp.sum(mask)  # mean loss on removed patches
     return loss
 
-  def visualization(self, imgs, pred, mask):
+  def compute_loss_without_mask(self, imgs, pred):
+    """
+    imgs: [N, H, W, 3]
+    pred: [N, L, p*p*3]
+    """
+    target = self.patchify(imgs)
+    if self.norm_pix_loss:
+      # target = jax.nn.normalize(target, axis=-1, epsilon=1.e-6)
+      mean = jnp.mean(target, axis=-1, keepdims=True)
+      var = jnp.var(target, axis=-1, keepdims=True)
+      target = (target - mean) / (var + 1.e-6)**.5
+
+    loss = jnp.square(pred - target)
+    loss = jnp.mean(loss)
+
+    return loss
+
+  def visualization(self, imgs_src, imgs_tgt, pred, mask):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
@@ -419,16 +435,15 @@ class VisionTransformer(nn.Module):
     """
     imgs_pred = self.unpatchify(pred)
 
-    mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
-    mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
-    imgs_mask = imgs * (1 - mask)
-
-    imgs_plus = imgs * (1 - mask) + imgs_pred * mask
-
-    imgs_vis = jnp.concatenate(
-    [jnp.concatenate([imgs, imgs_mask], axis=2),
-     jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
-    axis=1)
+    # mask = jnp.repeat(jnp.expand_dims(mask, axis=-1), repeats=pred.shape[-1], axis=-1)
+    # mask = self.unpatchify(mask)  # 0 is keep, 1 is remove
+    # imgs_mask = imgs_src * (1 - mask)
+    # imgs_plus = imgs_src * (1 - mask) + imgs_pred * mask
+    # imgs_vis = jnp.concatenate(
+    # [jnp.concatenate([imgs_src, imgs_mask], axis=2),
+    #  jnp.concatenate([imgs_pred, imgs_plus], axis=2)],
+    # axis=1)
+    imgs_vis = jnp.concatenate([imgs_src, imgs_tgt, imgs_pred], axis=2)
     return imgs_vis
 
   def apply_encoder(self, inputs, train):
@@ -547,132 +562,46 @@ class VisionTransformer(nn.Module):
     encoder_layers['blocks'] = Encoder(name='Transformer', **self.transformer, prefix='encoder')
     self.encoder_layers = encoder_layers
 
+  def parse_inputs(self, inputs):
+    """
+    Due to legacy reason, we implement this in a weird way
+    """
+    imgs = inputs[:, 0, :, :, :]
+    imgs0 = inputs[:, 1, :, :, :]
+    imgs1 = inputs[:, 2, :, :, :]
+
+    imgs_src = imgs
+    imgs_tgt = imgs0
+    return imgs_src, imgs_tgt
+
   @nn.compact
   def __call__(self, inputs, *, train):
     imgs = inputs['image']
     labels = inputs['label']
 
-    imgs, imgs0, imgs1 = jnp.split(imgs, 3, axis=1)
-    imgs = imgs.squeeze(axis=1)
-    imgs0 = imgs0.squeeze(axis=1)
-    imgs1 = imgs1.squeeze(axis=1)
+    imgs_src, imgs_tgt = self.parse_inputs(imgs)
+
+    assert self.mask_ratio == 0
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
-
-    # apply contrastive learning
-    x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, train=train)
+    x, mask, ids_restore = self.apply_encoder(imgs_src, train=train)
 
     # optionally apply knn
-    if self.clr.knn_clr:
-      labels_clr = labels[:round(self.clr.sample_rate * imgs0.shape[0])]
-      knn_accuracy = self.apply_knn(x_clr, labels_clr, train=train)
-    else:
-      knn_accuracy = self.apply_knn(x, labels, train=train)
+    knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
 
     # compute loss
-    loss_l2 = self.compute_loss(imgs, pred, mask)
+    loss_l2 = self.compute_loss_without_mask(imgs_tgt, pred)
 
-    loss = loss_l2 + self.clr.loss_weight * loss_clr
+    loss = loss_l2
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      vis = self.visualization(imgs_src, imgs_tgt, pred, mask)
     else:
-      outcome = pred  # not used
+      vis = None  # not used
 
-    artifacts = {'loss_l2': loss_l2, 'loss_clr': loss_clr}
+    artifacts = {'loss': loss, 'knn_accuracy': knn_accuracy}
 
-    return loss, outcome, knn_accuracy, artifacts
-
-  # ----------------------------------------
-  # contrastive learning
-  # ----------------------------------------
-  def apply_contrast(self, imgs0, imgs1, train):
-    use_cls_token=(self.classifier == 'token')
-    assert use_cls_token  # kaiming: TODO: support both?
-
-    # subsample
-    assert imgs0.shape == imgs1.shape
-    imgs0 = imgs0[:round(self.clr.sample_rate * imgs0.shape[0]), :, :, :]
-    imgs1 = imgs1[:round(self.clr.sample_rate * imgs1.shape[0]), :, :, :]
-
-    x = jnp.concatenate([imgs0, imgs1], axis=0)
-
-    x = self.encoder_layers['patch_emb'](x)
-
-    n, h, w, c = x.shape
-    x = jnp.reshape(x, [n, h * w, c])
-
-    x = self.encoder_layers['pos_emb'](x)
-
-    # If we want to add a class token, add it here.
-    if use_cls_token:
-      clstoken = self.encoder_layers['cls_token']
-      cls = jnp.tile(clstoken, [n, 1, 1])
-      x = jnp.concatenate([cls, x], axis=1)
-    else:
-      clstoken = None
-
-    # apply the encoder
-    blocks = self.encoder_layers['blocks']
-    x = blocks(x, train=train)
-
-    x_clr = jnp.split(x, 2, axis=0)[0]
-
-    # apply the head
-    x = x.mean(axis=1)  # [N, C]
-    z = self.contrastive_heads(x)
-
-    loss_clr = self.contrastive_loss(z, train=train)
-
-    return x_clr, loss_clr
-
-  def contrastive_heads(self, z):
-    for i in range(self.clr.proj_layers - 1):
-      z = nn.Dense(
-        features=self.clr.proj_dim_hidden,
-        dtype=self.dtype,
-        kernel_init=mlp_kernel_init,
-        bias_init=mlp_bias_init,
-        name='mlp_pred{}'.format(i))(z)
-      z = nn.gelu(z)
-
-    z = nn.Dense(
-      features=self.clr.proj_dim_out,
-      dtype=self.dtype,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      name='mlp_pred{}'.format(self.clr.proj_layers))(z)
-
-    return z
-
-  def contrastive_loss(self, z, train):
-
-    z /= jnp.linalg.norm(z, axis=1, keepdims=True) + 1e-8
-
-    z0, z1 = jnp.split(z, 2, axis=0)
-
-    # if 'batch' in jax.core.thread_local_state.trace_state.axis_env:
-    if train:
-      z0_all = jax.lax.all_gather(z0, axis_name='batch')
-      z1_all = jax.lax.all_gather(z1, axis_name='batch')
-
-      z0 = z0_all.reshape([-1, z0.shape[-1]])
-      z1 = z1_all.reshape([-1, z1.shape[-1]])
-
-    logits = jnp.einsum('nc,mc->nm', z0, z1)
-    logits /= self.clr.tau
-    labels_one_hot = jnp.eye(logits.shape[0])
-
-    # symmetric loss for simclr
-    loss01 = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
-    loss10 = optax.softmax_cross_entropy(logits=logits.transpose(), labels=labels_one_hot)
-    loss = (loss01 + loss10) / 2
-    loss = loss.mean()
-    loss *= 2 * self.clr.tau
-    return loss
-
-    
+    return loss, vis, artifacts    
