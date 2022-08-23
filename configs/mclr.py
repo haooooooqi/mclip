@@ -30,39 +30,19 @@
 import ml_collections
 
 import configs.vit as vit
-import configs.cfg_common_mae as cfg_common_mae
 
 
 def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
-  config = cfg_common_mae.get_config()
+  config = ml_collections.ConfigDict()
 
-  # mae config
-  config.model.mask_ratio = 0.75
-  config.model.norm_pix_loss = True
+  config.model_type = 'mclr'
+  config.mask_ratio = 0.75
 
-  config.model.update(vit.get_l16_config())
-  config.model.hidden_size = 128
-  config.model.transformer.mlp_dim = config.model.hidden_size * 4
-  config.model.transformer.dropout_rate = 0.0
-  config.model.transformer.droppath_rate = 0.0
-  config.model.transformer.num_layers = 3
-  config.model.transformer.rescale_init = 1.0
+  config.sincos = True
 
-  config.model.decoder = ml_collections.ConfigDict()
-  config.model.decoder.hidden_size = 64
-  config.model.decoder.transformer = ml_collections.ConfigDict()
-  config.model.decoder.transformer.mlp_dim = config.model.decoder.hidden_size * 4
-  config.model.decoder.transformer.num_heads = 16
-  config.model.decoder.transformer.num_layers = 3
-  config.model.decoder.transformer.attention_dropout_rate = 0.0
-  config.model.decoder.transformer.dropout_rate = 0.0
-  config.model.decoder.transformer.droppath_rate = 0.0
-
-  # opt config
-  config.opt_mu_dtype = 'float32'
-
-  # vis
-  # config.model.visualize = True
+  config.update(vit.get_b16_config())
+  config.transformer.dropout_rate = 0.0
+  config.transformer.droppath_rate = 0.0
 
   return config

@@ -17,16 +17,22 @@ from utils import opt_util
 from utils import adamw
 
 
-def init_fn(rng, image_size, model):
-  input_shape = (1, image_size, image_size, 3)
+def init_fn(rng, image_size, num_views, model):
+  if num_views == 1:
+    input_shape = (1, image_size, image_size, 3)
+  else:
+    input_shape = (1, num_views, image_size, image_size, 3)
   variables = model.init({'params': rng, 'dropout': jax.random.PRNGKey(0)},
                         {'image': jnp.ones(input_shape, model.dtype), 'label': jnp.zeros((1,), jnp.int32)},
                         train=True, train_knn=False)
   return variables
 
 
-def init_shapes(rng, image_size, model):
-  input_shape = (1, image_size, image_size, 3)
+def init_shapes(rng, image_size, num_views, model):
+  if num_views == 1:
+    input_shape = (1, image_size, image_size, 3)
+  else:
+    input_shape = (1, num_views, image_size, image_size, 3)
   init = functools.partial(model.init, train=True, train_knn=False)
   variables_shape = jax.eval_shape(init,
                                   {'params': rng, 'dropout': jax.random.PRNGKey(0)},
@@ -80,17 +86,17 @@ def create_optimizer(config, params_names, steps_per_epoch):
   return opt
 
 
-def create_train_state(config, model, image_size, steps_per_epoch, partitioner):
+def create_train_state(config, model, steps_per_epoch, partitioner):
   """Create initial training state."""
   rng = jax.random.PRNGKey(0)  # for shape reference only
   # create optimizer first
-  params_shapes = init_shapes(rng, image_size, model)
+  params_shapes = init_shapes(rng, config.image_size, config.num_views, model)
   opt = create_optimizer(config, params_shapes['params'], steps_per_epoch)
 
   # ---------------------------------------------------------------------------
   def initialize_train_state(rng_init):
     # split rng for init and for state
-    initial_variables = init_fn(rng=rng_init, image_size=image_size, model=model)
+    initial_variables = init_fn(rng_init, config.image_size, config.num_views, model)
     if opt:
       return train_state_lib.FlaxOptimTrainState.create(opt, initial_variables)
     return train_state_lib.InferenceState.create(initial_variables)

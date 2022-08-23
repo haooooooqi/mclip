@@ -29,7 +29,7 @@
 
 import ml_collections
 
-import configs.mae as mae
+import configs.mclr as mclr
 
 
 def get_config():
@@ -41,7 +41,7 @@ def get_config():
   # `name` argument of tensorflow_datasets.builder()
   config.dataset = 'imagenet2012:5.*.*'
   config.image_size = 224
-  config.num_views = 1
+  config.num_views = 2
 
   config.learning_rate = 1.0e-4  # this is the base lr
   config.warmup_epochs = 40.0

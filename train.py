@@ -26,30 +26,37 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import functools
 import time, datetime
 from typing import Any
-
+import numpy as np
+import os
+import random as _random
+import ml_collections
+import optax
 from absl import logging
 from clu import metric_writers
-import flax
-from flax.training import common_utils
-from flax.training import train_state
+
 import jax
 import jax.numpy as jnp
 from jax import random
+import jax.profiler
 try:
   from jax.interpreters.sharded_jit import PartitionSpec
 except ImportError:
   from jax.interpreters.pxla import PartitionSpec
-import ml_collections
-import optax
+
+import flax
+from flax.training import common_utils
+from flax.training import train_state
+
 import tensorflow as tf
 from tensorflow.io import gfile
-import models_mae
+
+import torch
+import torch.utils.data
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
 from utils import checkpoint_util as ckp
 from utils import torchloader_util
 from utils import logging_util
-from utils.torchloader_util import MEAN_RGB, STDDEV_RGB
 
 from t5x.train_state_initializer import create_train_state
 import t5x.partitioning
@@ -57,14 +64,7 @@ import t5x.rng
 import t5x.model_info
 import t5x.checkpoints
 
-import jax.profiler
-
-import numpy as np
-import os
-import random as _random
-
-import torch
-import torch.utils.data
+import models_mae, models_mclr
 
 
 def build_dataloaders(config, partitioner, rng_torch):
@@ -83,8 +83,8 @@ def build_dataloaders(config, partitioner, rng_torch):
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // num_shards
 
-  dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)
-  dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
+  dataset_train = torchloader_util.build_dataset(True, config.torchload.data_dir, config.image_size, config.num_views, config.aug)
+  dataset_val = torchloader_util.build_dataset(False, config.torchload.data_dir, config.image_size, config.num_views, config.aug)
 
   sampler_train = torch.utils.data.DistributedSampler(
     dataset_train,
@@ -190,9 +190,9 @@ def eval_step(state, batch, model, rng):
 
 
 def parse_batch(batch, local_batch_size):
-  images, labels, labels_one_hot = batch
+  images, labels = batch
   images = images.permute([0, 2, 3, 1])  # nchw -> nhwc
-  batch = {'image': images, 'label': labels, 'label_one_hot': labels_one_hot}
+  batch = {'image': images, 'label': labels}
   batch = prepare_pt_data(batch, local_batch_size)  # to (local_devices, device_batch_size, height, width, 3)
   return batch
 
@@ -280,8 +280,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   writer = metric_writers.create_default_writer(
       logdir=workdir, just_logging=jax.process_index() != 0)
 
-  image_size = 224  # TODO: move to config and model
-
   # ------------------------------------
   # Create partitioner
   # ------------------------------------
@@ -301,9 +299,14 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   # ------------------------------------
   # Create model
   # ------------------------------------
-  model = models_mae.VisionTransformer(**config.model)
+  if config.model_type == 'mae':
+    model = models_mae.VisionTransformer(**config.model)
+  elif config.model_type == 'mclr':
+    model = models_mclr.ContrastiveLearner(**config.model)
+  else:
+    raise NotImplementedError
 
-  p_init_fn, state_axes, state_shape = create_train_state(config, model, image_size, steps_per_epoch, partitioner)
+  p_init_fn, state_axes, state_shape = create_train_state(config, model, steps_per_epoch, partitioner)
   rng_init, rng = jax.random.split(rng)
 
   t5x.model_info.log_model_info(None, state_shape, partitioner)
@@ -426,7 +429,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
       metrics = partitioned_eval_step(state, eval_batch)
 
       imgs_vis = metrics.pop('imgs_vis')
-      imgs_vis = imgs_vis * jnp.asarray(STDDEV_RGB) + jnp.asarray(MEAN_RGB)
+      imgs_vis = imgs_vis * jnp.asarray(torchloader_util.STDDEV_RGB) + jnp.asarray(torchloader_util.MEAN_RGB)
       imgs_vis = jnp.uint8(jnp.clip(imgs_vis, 0, 255.))
 
       writer.write_images(step=epoch_1000x, images=dict(imgs_vis=imgs_vis))
