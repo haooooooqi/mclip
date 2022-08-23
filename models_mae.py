@@ -428,7 +428,7 @@ class VisionTransformer(nn.Module):
 
     return loss
 
-  def visualization(self, imgs_src, imgs_tgt, pred, mask):
+  def visualization(self, imgs_src, imgs_tgt, pred):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
@@ -447,6 +447,42 @@ class VisionTransformer(nn.Module):
     imgs_vis = jnp.concatenate([imgs_src, imgs_tgt, imgs_pred], axis=2)
     return imgs_vis
 
+  def apply_latent(self, x):
+    """
+    the latent/bottleneck
+    """
+    # proj to the lower decoder dim
+    x = nn.Dense(
+      features=self.decoder.hidden_size,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='latent_proj')(x)    
+
+    # collapse
+    n, l, c = x.shape
+
+    x = x.reshape([n, -1])  # [n, l*c]
+    x = nn.Dense(
+      features=self.vae.latent_dim,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='latent_fc0')(x)
+
+    x = nn.LayerNorm(use_bias=False, use_scale=False, name='latent_norm')(x)
+    x = self.add_noise(x)
+
+    x = nn.Dense(
+      features=l*c,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='latent_fc1')(x)
+
+    x = x.reshape([n, l, c])
+    return x
+
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
@@ -464,8 +500,8 @@ class VisionTransformer(nn.Module):
     x = self.encoder_layers['pos_emb'](x)
 
     # masking: length -> length * mask_ratio
-    x, mask, ids_restore = self.random_mask(x)
-    ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
+    # x, mask, ids_restore = self.random_mask(x)
+    # ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
 
     # If we want to add a class token, add it here.
     if use_cls_token:
@@ -478,13 +514,13 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder_layers['blocks'](x, train=train)
 
-    return x, mask, ids_restore
+    return x
 
-  def apply_decoder(self, x, ids_restore, train):
+  def apply_decoder(self, x, train):
     use_cls_token=(self.classifier == 'token')
 
-    n, h, w = ids_restore.shape
-    ids_restore = jnp.reshape(ids_restore, [n, h * w])
+    # n, h, w = ids_restore.shape
+    # ids_restore = jnp.reshape(ids_restore, [n, h * w])
 
     # apply the encoder-decoder bottleneck
     x = nn.Dense(
@@ -496,10 +532,11 @@ class VisionTransformer(nn.Module):
 
     # append mask token
     num_clstokens = 1 if use_cls_token else 0
-    mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
-    mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
-    x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
-    x_ = vmapped_gather(x_, ids_restore)
+    # mask_token = self.param('mask_token', masktoken_init, (1, 1, self.decoder.hidden_size))
+    # mask_tokens = jnp.tile(mask_token, [n, ids_restore.shape[1] + num_clstokens - x.shape[1], 1])
+    # x_ = jnp.concatenate([x[:, num_clstokens:, :], mask_tokens], axis=1)  # no cls token
+    # x_ = vmapped_gather(x_, ids_restore)
+    x_ = x[:, num_clstokens:, :]
 
     # add decoder posembed (before cls token)
     x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, name='posembed_decoder')(x_)
@@ -572,13 +609,13 @@ class VisionTransformer(nn.Module):
     imgs1 = inputs[:, 2, :, :, :]
 
     imgs_src = imgs
-    imgs_tgt = imgs0
+    imgs_tgt = imgs
     return imgs_src, imgs_tgt
 
   def add_noise(self, x):
     rng = self.make_rng('dropout')
-    n, l, c = x.shape
-    noise = random.uniform(rng, shape=(n, 1, c))
+    n, c = x.shape
+    noise = random.normal(rng, shape=(n, c))
     x += noise * self.vae.noise_scale
     return x
 
@@ -592,13 +629,16 @@ class VisionTransformer(nn.Module):
     assert self.mask_ratio == 0
 
     # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs_src, train=train)
+    x = self.apply_encoder(imgs_src, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
+    # apply latent
+    x = self.apply_latent(x)
+
     # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
+    pred = self.apply_decoder(x, train=train)
 
     # compute loss
     loss_l2 = self.compute_loss_without_mask(imgs_tgt, pred)
@@ -606,7 +646,7 @@ class VisionTransformer(nn.Module):
     loss = loss_l2
 
     if self.visualize and not train:
-      vis = self.visualization(imgs_src, imgs_tgt, pred, mask)
+      vis = self.visualization(imgs_src, imgs_tgt, pred)
     else:
       vis = None  # not used
 

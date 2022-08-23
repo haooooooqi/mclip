@@ -1,13 +1,12 @@
 # run remote
 
-lr=1.0e-5  # 1e-4
+lr=1.0e-4  # 1e-4
 ep=800
 batch=4096
 mask=0.0
 
 tau=0.2
 lossw=0.1
-rate=0.25
 
 noise=0.1
 
@@ -15,7 +14,7 @@ seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_NOnorm_noise${noise}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_NOnorm_addGnoise${noise}_sametgt
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}

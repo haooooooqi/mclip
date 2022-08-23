@@ -157,5 +157,6 @@ def get_config():
   # vae
   config.model.vae = ml_collections.ConfigDict()
   config.model.vae.noise_scale = 0.1
+  config.model.vae.latent_dim = 512  # the latent dim
 
   return config
