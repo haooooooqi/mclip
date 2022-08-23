@@ -6,7 +6,7 @@ batch=4096
 mask=0.75
 
 tau=0.2
-lossw=0.01
+lossw=0.1
 rate=0.25
 unshared=0
 
