@@ -341,6 +341,7 @@ class VisionTransformer(nn.Module):
   decoder: Any = None
   visualize: bool = False
   knn: Any = None
+  vae: Any = None
 
   def random_mask(self, x):
     
@@ -573,6 +574,13 @@ class VisionTransformer(nn.Module):
     imgs_src = imgs
     imgs_tgt = imgs0
     return imgs_src, imgs_tgt
+
+  def add_noise(self, x):
+    rng = self.make_rng('dropout')
+    n, l, c = x.shape
+    noise = random.uniform(rng, shape=(n, 1, c))
+    x += noise * self.vae.noise_scale
+    return x
 
   @nn.compact
   def __call__(self, inputs, *, train):

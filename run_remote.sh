@@ -9,11 +9,13 @@ tau=0.2
 lossw=0.1
 rate=0.25
 
+noise=0.1
+
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_NOnoise
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_r${rate}_NOnorm_noise${noise}
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -43,7 +45,7 @@ python3 main.py \
     --config.num_epochs=${ep} \
     --config.learning_rate=${lr} \
     --config.save_every_epochs=50 \
-    --config.model.norm_pix_loss=True \
+    --config.model.norm_pix_loss=False \
     --config.model.sincos=True \
     --config.model.mask_ratio=${mask} \
     --config.aug.crop_ver=v2 \
@@ -52,6 +54,7 @@ python3 main.py \
     --config.seed_pt=${seed} \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
+    --config.model.vae.noise_scale=${noise} \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 

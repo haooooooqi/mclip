@@ -66,6 +66,7 @@ class GeneralImageFolder(datasets.ImageFolder):
 
 
 def build_dataset(is_train, data_dir, aug):
+    is_train = True
     transform = build_transform(is_train, aug)
     second_transform = build_transform(is_train, aug.aug_clr)
 

@@ -154,4 +154,8 @@ def get_config():
   config.torchload.data_dir = '/kmh_data/imagenet_full_size/061417'
   config.torchload.num_workers = 32
 
+  # vae
+  config.model.vae = ml_collections.ConfigDict()
+  config.model.vae.noise_scale = 0.1
+
   return config
