@@ -96,27 +96,30 @@ class AddPositionEmbs(nn.Module):
   """
   sincos: bool
   use_cls_token: bool
-  img_shape: Shape  # [h, w, c]
   dtype: Any = jnp.float32
 
-  def setup(self):
-    h, w, c = self.img_shape
+  def get_pos_emb(self, x):
+    _, l, c = x.shape
+    h = w = int(l**.5)
+    assert h * w == l
 
     num_clstokens = 1 if self.use_cls_token else 0
     pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
 
     if not self.sincos:
-      self.pe = self.param('pos_embedding', posemb_init, pos_emb_shape)
+      init_fn = posemb_init
     else:
       pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
-
-      sincos_init = initializers_util.constant(value=pe_array, dtype=self.dtype)
-      self.pe = self.param('pos_embedding', sincos_init, pos_emb_shape)
+      init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
+    
+    pe = self.param('pos_embedding', init_fn, pos_emb_shape)
 
     # kaiming: in MAE, we should always set posembed for cls_token as zero.
     # when loading for finetuning, this zero posembed can be tuned.
     # but this is not addressed here if sincos=False
+    return pe
 
+  @nn.compact
   def __call__(self, inputs):
     """Applies AddPositionEmbs module.
 
@@ -130,8 +133,8 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-    
-    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
+    pe = self.get_pos_emb(inputs)
+    pe = jax.lax.stop_gradient(pe) if self.sincos else pe
 
     if self.use_cls_token:
       output = inputs + pe[:, 1:, :]
@@ -281,7 +284,7 @@ class Encoder(nn.Module):
   torch_qkv: bool = False
 
   @nn.compact
-  def __call__(self, inputs, *, train, num_layers=None):
+  def __call__(self, inputs, *, train):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -295,9 +298,7 @@ class Encoder(nn.Module):
 
     x = inputs
     # Input Encoder
-    if num_layers is None:
-      num_layers = self.num_layers
-    for lyr in range(num_layers):
+    for lyr in range(self.num_layers):
       name = self.prefix + 'block_{:02d}'.format(lyr + self.start_idx)
       x = Encoder1DBlock(
           mlp_dim=self.mlp_dim,
@@ -310,7 +311,8 @@ class Encoder(nn.Module):
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
       logging.info('Block: {}/{}'.format(self.name, name))
-    if num_layers == self.num_layers:
+
+    if True:  # apply norm
       name = self.prefix + '_norm'
       X = nn.LayerNorm(name=name)(x)  # 'encoder_norm'
       logging.info('Block: {}/{}'.format(self.name, name))
@@ -436,25 +438,14 @@ class VisionTransformer(nn.Module):
     x = inputs
 
     # We can merge s2d+emb into a single conv; it's the same.
-    patch_embed = nn.Conv(
-        features=self.hidden_size,
-        kernel_size=self.patches.size,
-        strides=self.patches.size,
-        padding='VALID',
-        name='embedding',
-        kernel_init=patch_kernel_init,
-        bias_init=patch_bias_init,
-        )
-    x = patch_embed(x)
+    x = self.encoder_layers['patch_emb'](x)
 
     # Here, x is a grid of embeddings.
-
     # Transformer.
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    posembed = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')
-    x = posembed(x)
+    x = self.encoder_layers['pos_emb'](x)
 
     # masking: length -> length * mask_ratio
     x, mask, ids_restore = self.random_mask(x)
@@ -462,19 +453,16 @@ class VisionTransformer(nn.Module):
 
     # If we want to add a class token, add it here.
     if use_cls_token:
-      clstoken = self.param('cls', clstoken_init, (1, 1, c))
+      clstoken = self.encoder_layers['cls_token']
       cls = jnp.tile(clstoken, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
     else:
       clstoken = None
 
     # apply the encoder
-    blocks = Encoder(name='Transformer', **self.transformer, prefix='encoder')
-    x = blocks(x, train=train)
+    x = self.encoder_layers['blocks'](x, train=train)
 
-    layers = (patch_embed, posembed, clstoken, blocks)
-
-    return x, mask, ids_restore, layers
+    return x, mask, ids_restore
 
   def apply_decoder(self, x, ids_restore, train):
     use_cls_token=(self.classifier == 'token')
@@ -498,7 +486,7 @@ class VisionTransformer(nn.Module):
     x_ = vmapped_gather(x_, ids_restore)
 
     # add decoder posembed (before cls token)
-    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, self.decoder.hidden_size), name='posembed_decoder')(x_)
+    x_ = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, name='posembed_decoder')(x_)
 
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
@@ -539,6 +527,25 @@ class VisionTransformer(nn.Module):
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
     return knn_accuracy
 
+  def setup(self):
+    use_cls_token=(self.classifier == 'token')
+    assert use_cls_token  # kaiming: TODO: support both?
+
+    encoder_layers = {}  # cannot directly declare self.encoder_layers
+    encoder_layers['patch_emb'] = nn.Conv(
+        features=self.hidden_size,
+        kernel_size=self.patches.size,
+        strides=self.patches.size,
+        padding='VALID',
+        name='embedding',
+        kernel_init=patch_kernel_init,
+        bias_init=patch_bias_init,
+        )
+    encoder_layers['pos_emb'] = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, name='posembed_encoder')
+    if use_cls_token:
+      encoder_layers['cls_token'] = self.param('cls', clstoken_init, (1, 1, self.hidden_size))
+    encoder_layers['blocks'] = Encoder(name='Transformer', **self.transformer, prefix='encoder')
+    self.encoder_layers = encoder_layers
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -551,10 +558,10 @@ class VisionTransformer(nn.Module):
     imgs1 = imgs1.squeeze(axis=1)
 
     # apply encoder
-    x, mask, ids_restore, encoder_layers = self.apply_encoder(imgs, train=train)
+    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # apply contrastive learning
-    x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, encoder_layers, train=train)
+    x_clr, loss_clr = self.apply_contrast(imgs0, imgs1, train=train)
 
     # optionally apply knn
     if self.clr.knn_clr:
@@ -583,9 +590,7 @@ class VisionTransformer(nn.Module):
   # ----------------------------------------
   # contrastive learning
   # ----------------------------------------
-  def apply_contrast(self, imgs0, imgs1, encoder_layers, train):
-    (patch_embed, posembed, clstoken, blocks) = encoder_layers
-
+  def apply_contrast(self, imgs0, imgs1, train):
     use_cls_token=(self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
@@ -596,30 +601,24 @@ class VisionTransformer(nn.Module):
 
     x = jnp.concatenate([imgs0, imgs1], axis=0)
 
-    x = patch_embed(x)
+    x = self.encoder_layers['patch_emb'](x)
 
     n, h, w, c = x.shape
     x = jnp.reshape(x, [n, h * w, c])
 
-    x = posembed(x)
+    x = self.encoder_layers['pos_emb'](x)
 
     # If we want to add a class token, add it here.
     if use_cls_token:
+      clstoken = self.encoder_layers['cls_token']
       cls = jnp.tile(clstoken, [n, 1, 1])
       x = jnp.concatenate([cls, x], axis=1)
     else:
       clstoken = None
 
     # apply the encoder
-    num_shared_layers = blocks.num_layers - self.clr.num_unshared_layers
-    x = blocks(x, train=train, num_layers=num_shared_layers)
-
-    # apply the unshared
-    if self.clr.num_unshared_layers > 0:
-      cfg = self.transformer.copy_and_resolve_references()
-      cfg.num_layers = self.clr.num_unshared_layers
-      blocks_clr = Encoder(name='TransformerCLR', **cfg, prefix='clrencoder', start_idx=num_shared_layers)
-      x = blocks_clr(x, train=train)
+    blocks = self.encoder_layers['blocks']
+    x = blocks(x, train=train)
 
     x_clr = jnp.split(x, 2, axis=0)[0]
 
