@@ -330,7 +330,6 @@ class VisionTransformer(nn.Module):
   patches: Any
   transformer: Any
   hidden_size: int
-  resnet: Optional[Any] = None
   classifier: str = 'token'
   dtype: Any = jnp.float32
   rescale_head_init: float = 1.
@@ -361,8 +360,6 @@ class VisionTransformer(nn.Module):
   @nn.compact
   def __call__(self, inputs, *, train):
     x = inputs
-    # (Possibly partial) ResNet root.
-    assert self.resnet == None
 
     n, h, w, c = x.shape
     # We can merge s2d+emb into a single conv; it's the same.
