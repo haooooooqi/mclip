@@ -31,8 +31,7 @@ def _register(get_config):
   config = get_config().lock()
   name = config.get('name')
   MODEL_CONFIGS[name] = config
-  if 'Mixer' not in name and name not in ('testing', 'ViT-L_32', 'R50+ViT-B_16',
-                                          'ViT-H_14'):
+  if 'Mixer' not in name and name not in ('testing', 'ViT-L_32', 'ViT-H_14'):
     # Note: we're using stricter filenames for AugReg checkpoints so they can be
     # used both as filesystem filenames and URIs without escaping.
     augreg_name = name.replace('ViT-', '').replace('+', '_')
@@ -60,8 +59,6 @@ def get_testing_config():
 
 # ViT-X/16 & ViT-H/14
 #####################
-
-
 @_register
 def get_ti16_config():
   """Returns the ViT-Ti/16 configuration."""
@@ -149,8 +146,6 @@ def get_h14_config():
 
 # ViT-X/8
 #########
-
-
 @_register
 def get_b8_config():
   """Returns the ViT-B/8 configuration."""
@@ -162,8 +157,6 @@ def get_b8_config():
 
 # ViT-X/32
 ##########
-
-
 @_register
 def get_s32_config():
   """Returns the ViT-S/32 configuration."""
@@ -194,8 +187,6 @@ def get_l32_config():
 
 # Mixers
 ########
-
-
 @_register
 def get_mixer_b16_config():
   """Returns Mixer-B/16 configuration."""
