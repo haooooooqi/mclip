@@ -71,21 +71,14 @@ def build_dataloaders(config, partitioner, rng_torch):
   data_layout = partitioner.get_data_layout(config.batch_size)
   shard_id = data_layout.shard_id
   num_shards = data_layout.num_shards
-
-  # ----------------------------------------
-  # logging_util.verbose_on()
-  # logging_util.sync_and_delay()
-  # logging.info(data_layout)
-  # logging_util.verbose_off()
-  # ----------------------------------------
+  data_dir = config.torchload.data_dir
+  image_size = config.image_size
 
   if config.batch_size % num_shards > 0:
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // num_shards
 
-  dataset_train = torchloader_util.build_dataset(True, config.torchload.data_dir, config.image_size, config.num_views, config.aug)
-  dataset_val = torchloader_util.build_dataset(False, config.torchload.data_dir, config.image_size, config.num_views, config.aug)
-
+  dataset_train = torchloader_util.build_dataset(True, data_dir, image_size, config.num_views, config.aug)
   sampler_train = torch.utils.data.DistributedSampler(
     dataset_train,
     num_replicas=num_shards, # jax.process_count(),
@@ -93,13 +86,6 @@ def build_dataloaders(config, partitioner, rng_torch):
     shuffle=True,
     seed=config.seed_pt,
   )
-  sampler_val = torch.utils.data.DistributedSampler(
-    dataset_val,
-    num_replicas=num_shards, # jax.process_count(),
-    rank=shard_id, # jax.process_index(),
-    shuffle=False,
-  )
-
   data_loader_train = torch.utils.data.DataLoader(
     dataset_train, sampler=sampler_train,
     batch_size=local_batch_size,
@@ -111,17 +97,27 @@ def build_dataloaders(config, partitioner, rng_torch):
     persistent_workers=True,
     timeout=60.,
   )
-  data_loader_val = torch.utils.data.DataLoader(
-    dataset_val, sampler=sampler_val,
-    batch_size=local_batch_size,
-    num_workers=config.torchload.num_workers,
-    pin_memory=True,
-    drop_last=False,
-    persistent_workers=True,
-    timeout=60.,
-  )
-
   assert len(data_loader_train) == len(dataset_train) // config.batch_size
+
+  # validation is only used for visualization, if needed
+  data_loader_val = None
+  if config.model.visualize:
+    dataset_val = torchloader_util.build_dataset(False, data_dir, image_size, config.num_views, config.aug)
+    sampler_val = torch.utils.data.DistributedSampler(
+      dataset_val,
+      num_replicas=num_shards, # jax.process_count(),
+      rank=shard_id, # jax.process_index(),
+      shuffle=False,
+    )
+    data_loader_val = torch.utils.data.DataLoader(
+      dataset_val, sampler=sampler_val,
+      batch_size=local_batch_size,
+      num_workers=config.torchload.num_workers,
+      pin_memory=True,
+      drop_last=False,
+      persistent_workers=True,
+      timeout=60.,
+    )
   return data_loader_train, data_loader_val, local_batch_size
 
 
@@ -302,7 +298,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   if config.model_type == 'mae':
     model = models_mae.VisionTransformer(**config.model)
   elif config.model_type == 'mclr':
-    model = models_mclr.ContrastiveLearner(**config.model)
+    model = models_mclr.VisionTransformer(**config.model)
   else:
     raise NotImplementedError
 
@@ -353,15 +349,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
         eval_step_fn,
         in_axis_resources=(state_axes, partitioner.data_partition_spec),
         out_axis_resources=eval_axes)
-
-  # ------------------------------------------
-  # debug
-  # batch = next(iter(data_loader_val))
-  # batch = parse_batch(batch, local_batch_size)
-  # logging.info('To run partitioned_eval_step:')
-  # outcome = partitioned_eval_step(state, batch)
-  # logging.info(jax.tree_map(lambda x: x.shape, outcome))
-  # ------------------------------------------
 
   train_metrics = []
 

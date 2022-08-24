@@ -36,13 +36,15 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = ml_collections.ConfigDict()
 
-  config.model_type = 'mclr'
   config.mask_ratio = 0.75
+  config.pool = 'token'
 
   config.sincos = True
 
   config.update(vit.get_b16_config())
   config.transformer.dropout_rate = 0.0
   config.transformer.droppath_rate = 0.0
+
+  config.visualize = False
 
   return config

@@ -415,7 +415,7 @@ class VisionTransformer(nn.Module):
     return imgs_vis
 
   def apply_encoder(self, inputs, train):
-    use_cls_token = (self.classifier == 'token')
+    use_cls_token = (self.classifier in {'token', 'tgap'})
     assert use_cls_token  # kaiming: TODO: support both?
 
     x = t5x.layers.Conv(
@@ -509,7 +509,7 @@ class VisionTransformer(nn.Module):
       return
 
     # => [N, E]
-    if self.knn.postprocess == 'tgap':
+    if self.knn.pool == 'gap':
       x = jnp.mean(x, axis=1)
     else:
       raise NotImplementedError

@@ -310,14 +310,16 @@ def gather_by_einsum(x, ids):
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
+  mask_ratio: float
   sincos: bool
   patches: Any
   transformer: Any
   hidden_size: int
   classifier: str = 'token'
   dtype: Any = jnp.float32
-  projector: Any = None
   visualize: bool = False
+  knn: Any = None
+  clr: Any = None
 
   def random_mask(self, x, mask_ratio):
 
@@ -364,9 +366,8 @@ class VisionTransformer(nn.Module):
       imgs = jnp.reshape(x, (x.shape[0], h * p, w * q, 3))
       return imgs
 
-  @nn.compact
-  def __call__(self, inputs, train):
-    use_cls_token = (self.classifier == 'token')
+  def apply_encoder(self, inputs, train, mask_ratio=0.):
+    use_cls_token = (self.classifier in {'token', 'tgap'})
     assert use_cls_token  # kaiming: TODO: support both?
 
     x = t5x.layers.Conv(
@@ -389,7 +390,7 @@ class VisionTransformer(nn.Module):
                         name='posembed_encoder')(x)
 
     # masking: length -> length * mask_ratio
-    x = self.random_mask(x)
+    x = self.random_mask(x, mask_ratio)
 
     if use_cls_token:
       cls = t5x.layers.param_with_axes('cls',
@@ -405,27 +406,13 @@ class VisionTransformer(nn.Module):
 
     return x
 
-
-class ContrastiveLearner(nn.Module):
-  """Contrastive Learner with VisionTransformer."""
-
-  mask_ratio: float
-  sincos: bool
-  patches: Any
-  transformer: Any
-  hidden_size: int
-  classifier: str = 'token'
-  dtype: Any = jnp.float32
-  projector: Any = None
-  visualize: bool = False
-  knn: Any = None
-
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
       return
 
+    x = jax.lax.stop_gradient(x)
     # => [N, E]
-    if self.knn.postprocess == 'tgap':
+    if self.knn.pool == 'gap':
       x = jnp.mean(x, axis=1)
     else:
       raise NotImplementedError
@@ -445,27 +432,85 @@ class ContrastiveLearner(nn.Module):
 
     return knn_accuracy
 
+  def apply_projector(self, x):
+    flip = False
+    for i in range(self.clr.proj_layers):
+      kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
+      if i < self.clr.proj_layers - 1:
+        dim = self.clr.proj_dim_hidden
+        post_relu = True
+      else:
+        dim = self.clr.proj_dim_out
+        post_relu = False
+
+      x = t5x.layers.Dense(
+          features=dim,
+          dtype=self.dtype,
+          kernel_init=mlp_kernel_init,
+          bias_init=mlp_bias_init,
+          kernel_axes=kernel_axes,
+          name='proj{}'.format(i),
+      )(x)
+      if post_relu:
+        x = nn.relu(x)
+
+      flip = not flip
+
+    return x
+
+  def compute_loss(self, source, target):
+    # l2 normalization
+    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
+    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
+
+    logits = jnp.einsum('nc,mc->nm', source, target) / self.clr.tau
+    labels_one_hot = jnp.eye(logits.shape[0])
+
+    # asymmetric loss
+    xent = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    xent = xent.mean() * self.clr.tau
+    return xent
+
   @nn.compact
   def __call__(self, inputs, *, train, train_knn=True):
     imgs = inputs['image']
     labels = inputs['label']
 
-    # apply encoder
-    x, mask, ids_restore = self.apply_encoder(imgs, train=train)
+    # split the images
+    assert len(imgs.shape) == 5 and imgs.shape[1] == 2
+    imgs0 = imgs[:, 0, :, :, :]
+    imgs1 = imgs[:, 1, :, :, :]
+
+    # apply encoder to masked imgs0
+    x0 = self.apply_encoder(imgs0, train, self.mask_ratio)
+    x1 = self.apply_encoder(imgs1, train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x, labels, train=(train and train_knn))
+    knn_accuracy = self.apply_knn(x1, labels, train=(train and train_knn))
 
-    # apply decoder
-    pred = self.apply_decoder(x, ids_restore, train=train)
-    x = pred
+    # get the feature for contrastive learning
+    if self.classifier == 'token':
+      x0 = x0[:, 0]
+      x1 = x1[:, 0]
+    elif classifier == 'tgap':
+      x0 = jnp.mean(x0[:, 1:], axis=1)
+      x1 = jnp.mean(x1[:, 1:], axis=1)
+    elif classifier == 'gap':
+      x0 = jnp.mean(x0, axis=1)
+      x1 = jnp.mean(x1, axis=1)
+    else:
+      raise NotImplementedError
+
+    # apply projector
+    x0 = self.apply_projector(x0)
+    x1 = self.apply_projector(x1)
 
     # compute loss
-    loss = self.compute_loss(imgs, pred, mask)
+    loss = self.compute_loss(x0, x1)
 
     if self.visualize: # and not train:
-      outcome = self.visualization(imgs, pred, mask)
+      raise NotImplementedError
     else:
-      outcome = pred  # not used
+      outcome = None  # not used
 
     return loss, outcome, knn_accuracy

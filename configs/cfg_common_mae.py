@@ -92,13 +92,14 @@ def get_config():
   config.pretrain_fmt = 'jax'  # 't5x'
 
   # model config
+  config.model_type = 'mae'
   config.model = mae.get_config()  # ViT-B/16
 
   # knn
   config.model.knn = ml_collections.ConfigDict()
   config.model.knn.on = False
 
-  config.model.knn.postprocess = 'tgap'  # token + global average pool
+  config.model.knn.pool = 'gap'  # token + global average pool
   config.model.knn.postnorm = 'SBN0'  # apply norm after postprocess: LayerNorm, SyncBatchNorm
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   config.model.knn.num_classes = 1000  # specifiy here for simplicity

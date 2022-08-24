@@ -92,13 +92,14 @@ def get_config():
   config.pretrain_fmt = 'jax'  # 't5x'
 
   # model config
+  config.model_type = 'mclr'
   config.model = mae.get_config()  # ViT-B/16
 
   # knn
   config.model.knn = ml_collections.ConfigDict()
   config.model.knn.on = False
 
-  config.model.knn.postprocess = 'tgap'  # token + global average pool
+  config.model.knn.pool = 'gap'  # token + global average pool
   config.model.knn.postnorm = 'SBN0'  # apply norm after postprocess: LayerNorm, SyncBatchNorm
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   config.model.knn.num_classes = 1000  # specifiy here for simplicity
@@ -106,6 +107,13 @@ def get_config():
   config.model.knn.batch_size = 4096
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
+
+  # contrastive objective
+  config.model.clr = ml_collections.ConfigDict()
+  config.model.clr.tau = 0.1
+  config.model.clr.proj_layers = 3
+  config.model.clr.proj_dim_hidden = 4096
+  config.model.clr.proj_dim_out = 256
 
   # seeds
   config.seed = -1

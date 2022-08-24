@@ -37,10 +37,6 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = cfg_common_mae.get_config()
 
-  # mae config
-  config.model.mask_ratio = 0.75
-  config.model.norm_pix_loss = True
-
   config.model.update(vit.get_l16_config())
   config.model.hidden_size = 1280
   config.model.transformer.mlp_dim = config.model.hidden_size * 4
@@ -57,8 +53,5 @@ def get_config():
 
   # opt config
   config.opt_mu_dtype = 'float32'
-
-  # vis
-  config.model.visualize = False
 
   return config

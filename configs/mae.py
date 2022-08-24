@@ -36,7 +36,6 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = ml_collections.ConfigDict()
 
-  config.model_type = 'mae'
   config.mask_ratio = 0.75
   config.norm_pix_loss = True
 
@@ -49,5 +48,7 @@ def get_config():
   config.decoder = vit.get_decoder_config()
   config.decoder.transformer.dropout_rate = 0.0
   config.decoder.transformer.droppath_rate = 0.0
+
+  config.visualize = True
 
   return config
