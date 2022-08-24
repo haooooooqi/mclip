@@ -57,14 +57,6 @@ else:
   raise NotImplementedError
 
 
-class IdentityLayer(nn.Module):
-  """Identity layer, convenient for giving a name to an array."""
-
-  @nn.compact
-  def __call__(self, x):
-    return x
-
-
 class AddPositionEmbs(nn.Module):
   """Adds (optionally learned) positional embeddings to the inputs.
   """

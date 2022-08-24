@@ -53,17 +53,17 @@ STORAGE_BUCKET=gs://xinleic
 ################################################################
 # folders
 ################################################################
-JOB_DIR=$FOLDER/${DATASET}/${CONFIG}/${EXTRA_ARGS_ALL_TAG}
-WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR}/${PRETRAIN_TAG}
+JOB_DIR=${DATASET}/${PRETRAIN_TAG}/${CONFIG}/${EXTRA_ARGS_ALL_TAG}
+WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR}/pretrain
 
-LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR}/${PRETRAIN_TAG}
+LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR}/pretrain
 sudo mkdir -p ${LOG_DIR} && sudo chmod -R 777 ${LOG_DIR}
 
 ################################################################
 # staging
 ################################################################
 TAG_WITH_TIME=${JOB_NAME}_`date +'%Y-%m-%d_%H-%M-%S'`
-STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${TAG_WITH_TIME}_${PRETRAIN_TAG}
+STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${FOLDER}_${TAG_WITH_TIME}
 mkdir -p $STAGE_DIR
 rsync -avz $HOME/$FOLDER/ $STAGE_DIR/
 
@@ -88,7 +88,7 @@ python3 main.py \
     2>&1 | tee $LOG_DIR/pretrain_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
 
 if [ \${PIPESTATUS[0]} -eq 0 ]; then
-    touch $LOG_DIR/${PRETRAIN_TAG}.flag
+    touch $LOG_DIR/pretrain.flag
 fi
 " 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 
@@ -102,7 +102,7 @@ sudo rm -f /tmp/libtpu_lockfile
 mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 "
 
-if [ -f $LOG_DIR/${PRETRAIN_TAG}.flag ]; then
+if [ -f $LOG_DIR/pretrain.flag ]; then
     # actively call for fine-tuning
     LOG_TUNE_PREFIX="${HOME}/logs/`date +'%Y-%m-%d_%H-%M-%S'`_$$_${JOB_NAME}"
     nohup $HOME/vit_jax/scripts/finetune.sh $JOB_NAME $TPU_NAME $CONFIG $JOB_DIR $WORK_DIR \

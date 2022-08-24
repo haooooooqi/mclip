@@ -93,7 +93,7 @@ def get_config():
 
   # model config
   config.model_type = 'mclr'
-  config.model = mae.get_config()  # ViT-B/16
+  config.model = mclr.get_config()  # ViT-B/16
 
   # knn
   config.model.knn = ml_collections.ConfigDict()

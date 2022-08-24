@@ -187,7 +187,10 @@ def eval_step(state, batch, model, rng):
 
 def parse_batch(batch, local_batch_size):
   images, labels = batch
-  images = images.permute([0, 2, 3, 1])  # nchw -> nhwc
+  if len(images.shape) == 5:
+    images = images.permute([0, 1, 3, 4, 2]) # nvchw -> nvhwc
+  else:
+    images = images.permute([0, 2, 3, 1])  # nchw -> nhwc
   batch = {'image': images, 'label': labels}
   batch = prepare_pt_data(batch, local_batch_size)  # to (local_devices, device_batch_size, height, width, 3)
   return batch
@@ -298,7 +301,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   if config.model_type == 'mae':
     model = models_mae.VisionTransformer(**config.model)
   elif config.model_type == 'mclr':
-    model = models_mclr.VisionTransformer(**config.model)
+    model = models_mclr.VisionTransformer(image_size=config.image_size, **config.model)
   else:
     raise NotImplementedError
 

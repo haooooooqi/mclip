@@ -52,7 +52,7 @@ def get_testing_config():
   config.transformer.num_heads = 2
   config.transformer.num_layers = 1
   config.transformer.attention_dropout_rate = 0.0
-  config.transformer.dropout_rate = 0.1
+  config.transformer.dropout_rate = 0.0
   config.classifier = 'token'
   return config
 
@@ -139,7 +139,7 @@ def get_l16_config():
   config.transformer.num_heads = 16
   config.transformer.num_layers = 24
   config.transformer.attention_dropout_rate = 0.0
-  config.transformer.dropout_rate = 0.1
+  config.transformer.dropout_rate = 0.0
   config.classifier = 'token'
   return config
 
@@ -156,7 +156,7 @@ def get_h14_config():
   config.transformer.num_heads = 16
   config.transformer.num_layers = 32
   config.transformer.attention_dropout_rate = 0.0
-  config.transformer.dropout_rate = 0.1
+  config.transformer.dropout_rate = 0.0
   config.classifier = 'token'
   return config
 

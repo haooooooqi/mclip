@@ -37,7 +37,6 @@ def get_config():
   config = ml_collections.ConfigDict()
 
   config.mask_ratio = 0.75
-  config.pool = 'token'
 
   config.sincos = True
 

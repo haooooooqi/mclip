@@ -40,18 +40,10 @@ def get_config():
   config.model.update(vit.get_l16_config())
   config.model.hidden_size = 1024
   config.model.transformer.mlp_dim = config.model.hidden_size * 4
-  config.model.transformer.dropout_rate = 0.0
-  config.model.transformer.droppath_rate = 0.0
   config.model.transformer.num_layers = 24
   config.model.transformer.rescale_init = 1.0
 
-  config.model.decoder.transformer.dropout_rate = 0.0
-  config.model.decoder.transformer.droppath_rate = 0.0
-
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False
-
-  # opt config
-  config.opt_mu_dtype = 'float32'
 
   return config
