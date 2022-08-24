@@ -457,7 +457,7 @@ class VisionTransformer(nn.Module):
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='latent_proj')(x)    
+      name='latent_down')(x)    
 
     # collapse
     n, l, c = x.shape
@@ -471,7 +471,8 @@ class VisionTransformer(nn.Module):
       name='latent_fc0')(x)
 
     x = nn.LayerNorm(use_bias=False, use_scale=False, name='latent_norm')(x)
-    x = self.add_noise(x)
+    latent = x
+    # x = self.add_noise(x)
 
     x = nn.Dense(
       features=l*c,
@@ -481,7 +482,29 @@ class VisionTransformer(nn.Module):
       name='latent_fc1')(x)
 
     x = x.reshape([n, l, c])
+    return x, latent
+
+  def project_latent(self, x):
+    x = nn.Dense(
+      features=self.decoder.hidden_size,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='latent_proj0')(x)    
+    x = nn.gelu(x)
+    x = nn.Dense(
+      features=self.decoder.hidden_size,
+      dtype=self.dtype,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      name='latent_proj1')(x)
     return x
+
+  def compute_delta(self, proj):
+    proj /= jnp.linalg.norm(proj, axis=-1, keepdims=True) + 1e-8
+    proj_src, proj_tgt = jnp.split(proj, 2, axis=0)
+    deltas = jnp.concatenate((proj_tgt - proj_src, proj_src - proj_tgt), axis=0)
+    return deltas[:, None, :]
 
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
@@ -609,7 +632,7 @@ class VisionTransformer(nn.Module):
     imgs1 = inputs[:, 2, :, :, :]
 
     imgs_src = imgs
-    imgs_tgt = imgs
+    imgs_tgt = imgs0
     return imgs_src, imgs_tgt
 
   def add_noise(self, x):
@@ -626,27 +649,33 @@ class VisionTransformer(nn.Module):
 
     imgs_src, imgs_tgt = self.parse_inputs(imgs)
 
+    imgs_cat = jnp.concatenate([imgs_src, imgs_tgt], axis=0)
+    imgs_cat_rev = jnp.concatenate([imgs_tgt, imgs_src], axis=0)  # as the tgt
+
     assert self.mask_ratio == 0
 
     # apply encoder
-    x = self.apply_encoder(imgs_src, train=train)
+    x = self.apply_encoder(imgs_cat, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
 
     # apply latent
-    x = self.apply_latent(x)
+    x, latent = self.apply_latent(x)
+
+    # project latent
+    proj = self.project_latent(latent)
 
     # apply decoder
     pred = self.apply_decoder(x, train=train)
 
     # compute loss
-    loss_l2 = self.compute_loss_without_mask(imgs_tgt, pred)
+    loss_l2 = self.compute_loss_without_mask(imgs_cat_rev, pred)
 
     loss = loss_l2
 
     if self.visualize and not train:
-      vis = self.visualization(imgs_src, imgs_tgt, pred)
+      vis = self.visualization(imgs_cat, imgs_cat_rev, pred)
     else:
       vis = None  # not used
 
