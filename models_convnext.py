@@ -94,7 +94,7 @@ class ConvNeXtBlock(nn.Module):
             )
             x = gamma * x
         
-        x = nn.Dropout(rate=self.drop_path, broadcast_dims=(1, 2), name='droppath_block')(x, deterministic=deterministic)
+        x = nn.Dropout(rate=self.drop_path, broadcast_dims=(1, 2, 3), name='droppath_block')(x, deterministic=deterministic)
         x = x + inputs
         # x = inputs + DropPath(self.drop_path)(x, deterministic)
         return x
