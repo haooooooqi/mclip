@@ -6,10 +6,11 @@ set -x
 ################################################################
 # arguments
 ################################################################
-JOB_NAME=$1
-TPU_NAME=$2
-CONFIG=$3
-DATASET=$4
+PRETRAIN_TAG=$1
+JOB_NAME=$2
+TPU_NAME=$3
+CONFIG=$4
+DATASET=$5
 
 array=( $@ )
 len=${#array[@]}
@@ -19,16 +20,16 @@ cnt=0; for el in "${array[@]}"; do
     ((++cnt))
 done
 
-EXTRA_ARGS=${array[@]:4:$len}
-if [ $len -eq 4 ]; then
+EXTRA_ARGS=${array[@]:5:$len}
+if [ $len -eq 5 ]; then
     declare EXTRA_ARGS_ALL=()
     declare EXTRA_ARGS_COMMON=()
 elif [ $cnt -eq $len ]; then
-    EXTRA_ARGS_ALL=${array[@]:4:$len}
+    EXTRA_ARGS_ALL=${array[@]:5:$len}
     declare EXTRA_ARGS_COMMON=()
 else
-    let "train_len = $cnt - 4"
-    EXTRA_ARGS_ALL=${array[@]:4:$train_len}
+    let "train_len = $cnt - 5"
+    EXTRA_ARGS_ALL=${array[@]:5:$train_len}
     EXTRA_ARGS_COMMON=${array[@]:$cnt+1:$len}
     EXTRA_ARGS_ALL+=${array[@]:$cnt+1:$len}
 fi
@@ -47,7 +48,6 @@ else
     EXTRA_ARGS_COMMON_TAG=default
 fi
 
-PRETRAIN_TAG=mae
 FOLDER=mae_jax
 STORAGE_BUCKET=gs://xinleic
 ################################################################
@@ -81,7 +81,7 @@ export LOCAL_REDIRECT_CKPT_DIR=${WORK_DIR}
 
 python3 main.py \
     --workdir=${LOG_DIR} \
-    --config=configs/cfg_mae_${CONFIG}.py \
+    --config=configs/cfg_${PRETRAIN_TAG}_${CONFIG}.py \
     --config.resume_dir='' \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_ALL} \
