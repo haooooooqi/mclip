@@ -262,6 +262,101 @@ class Encoder1DBlock(nn.Module):
     return x + y
 
 
+class Encoder1DBlockCross(nn.Module):
+  """Transformer encoder layer.
+
+  Attributes:
+    inputs: input data.
+    mlp_dim: dimension of the mlp on top of attention block.
+    dtype: the dtype of the computation (default: float32).
+    dropout_rate: dropout rate.
+    attention_dropout_rate: dropout for attention heads.
+    deterministic: bool, deterministic or not (to apply dropout).
+    num_heads: Number of heads in nn.MultiHeadDotProductAttention
+  """
+
+  mlp_dim: int
+  num_heads: int
+  dtype: Dtype = jnp.float32
+  dropout_rate: float = 0.1
+  attention_dropout_rate: float = 0.1
+  droppath_rate: float = 0.0
+  layer_id: int = None
+  torch_qkv: bool = False
+
+  @nn.compact
+  def __call__(self, q, kv, *, deterministic):
+    """Applies Encoder1DBlock module.
+
+    Args:
+      inputs: Inputs to the layer.
+      deterministic: Dropout will not be applied when set to true.
+
+    Returns:
+      output after transformer encoder block.
+    """
+    assert self.dropout_rate == 0  # for now
+    assert self.droppath_rate == 0  # for now
+
+    # Attention block.
+    # assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
+    assert q.ndim == 3, f'Expected (batch, seq, hidden) got {q.shape}'
+    assert kv.ndim == 3, f'Expected (batch, seq, hidden) got {kv.shape}'
+
+    # ----------------------------------------------------
+    if self.torch_qkv:
+      raise NotImplementedError
+      # revised, QKV
+      MsaBlock = functools.partial(
+        attention_util.MultiHeadDotProductAttentionQKV,
+        out_kernel_init=out_kernel_init)
+    else:
+      # revised
+      MsaBlock = functools.partial(
+        attention_util.MultiHeadDotProductAttention,
+        qkv_kernel_init=qkv_kernel_init,
+        out_kernel_init=out_kernel_init)
+    # ----------------------------------------------------
+
+    # first block: self-attention
+    identity = q
+    x = nn.LayerNorm(dtype=self.dtype)(q)
+    x = MsaBlock(
+        dtype=self.dtype,
+        broadcast_dropout=False,
+        deterministic=deterministic,
+        dropout_rate=self.attention_dropout_rate,
+        num_heads=self.num_heads,
+        name='SelfAtt')(
+            x, x)
+    x = x + identity
+
+    # second block: cross-attention
+    identity = x
+    x = nn.LayerNorm(dtype=self.dtype)(x)
+    kv = nn.LayerNorm(dtype=self.dtype)(kv)
+    x = MsaBlock(
+        dtype=self.dtype,
+        broadcast_dropout=False,
+        deterministic=deterministic,
+        dropout_rate=self.attention_dropout_rate,
+        num_heads=self.num_heads,
+        name='CrossAtt')(
+            x, kv)
+    x = x + identity
+
+    # MLP block.
+    identity = x
+    y = nn.LayerNorm(dtype=self.dtype)(x)
+    y = MlpBlock(
+        mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        )(y, deterministic=deterministic)
+    y = y + identity
+    return y
+
+
 class Encoder(nn.Module):
   """Transformer Model Encoder for sequence to sequence translation.
 
@@ -310,6 +405,67 @@ class Encoder(nn.Module):
           layer_id=lyr,
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
+      logging.info('Block: {}/{}'.format(self.name, name))
+
+    if True:  # apply norm
+      name = self.prefix + '_norm'
+      X = nn.LayerNorm(name=name)(x)  # 'encoder_norm'
+      logging.info('Block: {}/{}'.format(self.name, name))
+
+    return x
+
+
+class EncoderCross(nn.Module):
+  """Transformer Model Encoder for sequence to sequence translation.
+
+  Attributes:
+    num_layers: number of layers
+    mlp_dim: dimension of the mlp on top of attention block
+    num_heads: Number of heads in nn.MultiHeadDotProductAttention
+    dropout_rate: dropout rate.
+    attention_dropout_rate: dropout rate in self attention.
+  """
+
+  num_layers: int
+  mlp_dim: int
+  num_heads: int
+  dropout_rate: float = 0.1
+  attention_dropout_rate: float = 0.1
+  droppath_rate: float = 0.0
+  prefix: str = 'encoder'
+  start_idx: int = 0
+  torch_qkv: bool = False
+
+  @nn.compact
+  def __call__(self, inputs, *, train):
+    """Applies Transformer model on the inputs.
+
+    Args:
+      inputs: Inputs to the layer.
+      train: Set to `True` when training.
+
+    Returns:
+      output of a transformer encoder.
+    """
+
+    q, kv = inputs
+    assert q.ndim == 3  # (batch, len, emb)
+    assert kv.ndim == 3  # (batch, len, emb)
+
+    x = q
+    # Input Encoder
+    for lyr in range(self.num_layers):
+      name = self.prefix + 'block_{:02d}'.format(lyr + self.start_idx)
+      x = Encoder1DBlockCross(
+          mlp_dim=self.mlp_dim,
+          dropout_rate=self.dropout_rate,
+          attention_dropout_rate=self.attention_dropout_rate,
+          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
+          name=name,  # 'encoderblock_'
+          num_heads=self.num_heads,
+          layer_id=lyr,
+          torch_qkv=self.torch_qkv)(
+              x, kv, deterministic=not train)
       logging.info('Block: {}/{}'.format(self.name, name))
 
     if True:  # apply norm
@@ -539,7 +695,7 @@ class VisionTransformer(nn.Module):
 
     return x
 
-  def apply_decoder(self, x, train):
+  def apply_decoder(self, x, deltas, train):
     use_cls_token=(self.classifier == 'token')
 
     # n, h, w = ids_restore.shape
@@ -567,7 +723,7 @@ class VisionTransformer(nn.Module):
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+    x = EncoderCross(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')((x, deltas), train=train)
 
     # apply the predictor
     x = nn.Dense(
@@ -658,16 +814,17 @@ class VisionTransformer(nn.Module):
     x = self.apply_encoder(imgs_cat, train=train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x, labels, train=train)
+    knn_accuracy = self.apply_knn(jnp.split(x, 2, axis=0)[0], labels, train=train)
 
     # apply latent
     x, latent = self.apply_latent(x)
 
     # project latent
     proj = self.project_latent(latent)
+    deltas = self.compute_delta(proj)
 
     # apply decoder
-    pred = self.apply_decoder(x, train=train)
+    pred = self.apply_decoder(x, deltas, train=train)
 
     # compute loss
     loss_l2 = self.compute_loss_without_mask(imgs_cat_rev, pred)
