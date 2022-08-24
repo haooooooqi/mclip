@@ -377,14 +377,6 @@ class Encoder(nn.Module):
   prefix: str = 'encoder'
   start_idx: int = 0
   torch_qkv: bool = False
-  noise_scale: float = 0.0
-
-  def add_noise(self, x):
-    rng = self.make_rng('dropout')
-    n, l, c = x.shape
-    noise = random.normal(rng, shape=(n, l, c))
-    x += noise * self.noise_scale
-    return x
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -413,7 +405,6 @@ class Encoder(nn.Module):
           layer_id=lyr,
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
-      x = self.add_noise(x)
       logging.info('Block: {}/{}'.format(self.name, name))
 
     if True:  # apply norm
@@ -623,31 +614,40 @@ class VisionTransformer(nn.Module):
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
       name='latent_down')(x)    
+    x = nn.gelu(x)
 
     # collapse
     n, l, c = x.shape
 
     x = x.reshape([n, -1])  # [n, l*c]
-    x = nn.Dense(
-      features=self.vae.latent_dim,
+    mu_log_var = nn.Dense(
+      features=self.vae.latent_dim * 2,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='latent_fc0')(x)
+      name='enc_latent_fc0')(x)
+    
+    mu, log_var = jnp.split(mu_log_var, 2, axis=-1)
 
-    x = nn.LayerNorm(use_bias=False, use_scale=False, name='latent_norm')(x)
-    latent = x
-    x = self.add_noise(x)
+    def sample(mu, log_var):
+      rng = self.make_rng('dropout')
+      noise = random.normal(rng, shape=mu.shape)
+      
+      std = jnp.exp(log_var / 2.) + 1e-6
+      z = noise * std + mu
+      return z
+
+    z = sample(mu, log_var)
 
     x = nn.Dense(
       features=l*c,
       dtype=self.dtype,
       kernel_init=mlp_kernel_init,
       bias_init=mlp_bias_init,
-      name='latent_fc1')(x)
+      name='dec_latent_fc0')(z)
 
     x = x.reshape([n, l, c])
-    return x, latent
+    return x
 
   def project_latent(self, x):
     x = nn.Dense(
@@ -704,7 +704,7 @@ class VisionTransformer(nn.Module):
 
     return x
 
-  def apply_decoder(self, x, deltas, train):
+  def apply_decoder(self, x, train):
     use_cls_token=(self.classifier == 'token')
 
     # n, h, w = ids_restore.shape
@@ -732,7 +732,7 @@ class VisionTransformer(nn.Module):
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
-    x = EncoderCross(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')((x, deltas), train=train)
+    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
 
     # apply the predictor
     x = nn.Dense(
@@ -800,13 +800,6 @@ class VisionTransformer(nn.Module):
     imgs_tgt = imgs
     return imgs_src, imgs_tgt
 
-  def add_noise(self, x):
-    rng = self.make_rng('dropout')
-    n, c = x.shape
-    noise = random.normal(rng, shape=(n, c))
-    x += noise * self.vae.noise_scale
-    return x
-
   @nn.compact
   def __call__(self, inputs, *, train):
     imgs = inputs['image']
@@ -826,14 +819,10 @@ class VisionTransformer(nn.Module):
     knn_accuracy = self.apply_knn(jnp.split(x, 2, axis=0)[0], labels, train=train)
 
     # apply latent
-    x, latent = self.apply_latent(x)
-
-    # project latent
-    proj = self.project_latent(latent)
-    deltas = self.compute_delta(proj)
+    x = self.apply_latent(x)
 
     # apply decoder
-    pred = self.apply_decoder(x, deltas, train=train)
+    pred = self.apply_decoder(x, train=train)
 
     # compute loss
     loss_l2 = self.compute_loss_without_mask(imgs_cat_rev, pred)
