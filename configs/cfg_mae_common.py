@@ -159,4 +159,7 @@ def get_config():
   config.model.vae.noise_scale = 0.1
   config.model.vae.latent_dim = 512  # the latent dim
 
+  # encoder noise
+  config.model.transformer.noise_scale = 0.1
+
   return config

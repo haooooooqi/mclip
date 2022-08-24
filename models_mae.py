@@ -377,6 +377,14 @@ class Encoder(nn.Module):
   prefix: str = 'encoder'
   start_idx: int = 0
   torch_qkv: bool = False
+  noise_scale: float = 0.0
+
+  def add_noise(self, x):
+    rng = self.make_rng('dropout')
+    n, l, c = x.shape
+    noise = random.normal(rng, shape=(n, l, c))
+    x += noise * self.noise_scale
+    return x
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -405,6 +413,7 @@ class Encoder(nn.Module):
           layer_id=lyr,
           torch_qkv=self.torch_qkv)(
               x, deterministic=not train)
+      x = self.add_noise(x)
       logging.info('Block: {}/{}'.format(self.name, name))
 
     if True:  # apply norm
@@ -628,7 +637,7 @@ class VisionTransformer(nn.Module):
 
     x = nn.LayerNorm(use_bias=False, use_scale=False, name='latent_norm')(x)
     latent = x
-    # x = self.add_noise(x)
+    x = self.add_noise(x)
 
     x = nn.Dense(
       features=l*c,
@@ -788,7 +797,7 @@ class VisionTransformer(nn.Module):
     imgs1 = inputs[:, 2, :, :, :]
 
     imgs_src = imgs
-    imgs_tgt = imgs0
+    imgs_tgt = imgs
     return imgs_src, imgs_tgt
 
   def add_noise(self, x):
