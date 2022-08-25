@@ -48,7 +48,7 @@ def get_config():
   config.min_abs_lr = 0.  # this is abs lr
   config.warmup_abs_lr = 0.  # this is abs lr
 
-  config.num_epochs = 800.0
+  config.num_epochs = 300.0
   config.log_every_steps = 100
   config.save_every_epochs = 50
 
@@ -97,7 +97,7 @@ def get_config():
 
   # knn
   config.model.knn = ml_collections.ConfigDict()
-  config.model.knn.on = False
+  config.model.knn.on = True
 
   config.model.knn.pool = 'gap'  # token + global average pool
   config.model.knn.postnorm = 'SBN0'  # apply norm after postprocess: LayerNorm, SyncBatchNorm

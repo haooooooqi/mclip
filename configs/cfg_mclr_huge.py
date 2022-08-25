@@ -30,17 +30,17 @@
 import ml_collections
 
 import configs.vit as vit
-import configs.cfg_common_mae as cfg_common_mae
+import configs.cfg_common_mclr as cfg_common_mclr
 
 
 def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
-  config = cfg_common_mae.get_config()
+  config = cfg_common_mclr.get_config()
 
-  config.model.update(vit.get_b16_config())
-  config.model.hidden_size = 768
+  config.model.update(vit.get_l16_config())
+  config.model.hidden_size = 1280
   config.model.transformer.mlp_dim = config.model.hidden_size * 4
-  config.model.transformer.num_layers = 12
+  config.model.transformer.num_layers = 32
   config.model.transformer.rescale_init = 1.0
 
   config.partitioning.num_partitions = 1

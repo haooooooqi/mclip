@@ -97,7 +97,7 @@ def get_config():
 
   # knn
   config.model.knn = ml_collections.ConfigDict()
-  config.model.knn.on = False
+  config.model.knn.on = True
 
   config.model.knn.pool = 'gap'  # token + global average pool
   config.model.knn.postnorm = 'SBN0'  # apply norm after postprocess: LayerNorm, SyncBatchNorm

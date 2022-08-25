@@ -540,7 +540,7 @@ class VisionTransformer(nn.Module):
     return xent
 
   @nn.compact
-  def __call__(self, inputs, *, train, train_knn=True):
+  def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
     labels = inputs['label']
 
@@ -554,7 +554,7 @@ class VisionTransformer(nn.Module):
     x1 = self.apply_encoder(imgs1, train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x1, labels, train=(train and train_knn))
+    knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
     # get the feature for contrastive learning
     if self.classifier == 'token':

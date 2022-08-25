@@ -30,12 +30,12 @@
 import ml_collections
 
 import configs.vit as vit
-import configs.cfg_common_mae as cfg_common_mae
+import configs.cfg_common_mclr as cfg_common_mclr
 
 
 def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
-  config = cfg_common_mae.get_config()
+  config = cfg_common_mclr.get_config()
 
   config.model.update(vit.get_b16_config())
   config.model.hidden_size = 768

@@ -28,6 +28,8 @@ from utils import posembed_util
 from utils import initializers_util
 from utils import onlineknn_util
 
+from models_mclr import AddPositionEmbs, MlpBlock, gather_by_einsum, Encoder
+
 Array = Any
 PRNGKey = Any
 Shape = Tuple[int]
@@ -55,248 +57,6 @@ if INIT_VER == 'mae_jax_v2':
 
 else:
   raise NotImplementedError
-
-
-class AddPositionEmbs(nn.Module):
-  """Adds (optionally learned) positional embeddings to the inputs.
-  """
-  sincos: bool
-  use_cls_token: bool
-  img_shape: Shape  # [h, w, c]
-  dtype: Any = jnp.float32
-
-  def setup(self):
-    h, w, c = self.img_shape
-
-    num_clstokens = 1 if self.use_cls_token else 0
-    pos_emb_shape = (1, num_clstokens + h * w, c)  # (batch_size, seq_len, emb_dim).
-
-    if not self.sincos:
-      init_fn = posemb_init
-    else:
-      pe_array = posembed_util.get_2d_sincos_pos_embed(c, (h, w), cls_token=self.use_cls_token)  # in numpy array
-      init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
-
-    self.pe = t5x.layers.param_with_axes(
-        'pos_embedding',
-        init_fn,
-        pos_emb_shape,
-        jnp.float32,
-        axes=('_null0', 'length', 'embed'))
-
-    # kaiming: in MAE, we should always set posembed for cls_token as zero.
-    # when loading for finetuning, this zero posembed can be tuned.
-    # but this is not addressed here if sincos=False
-
-  def __call__(self, inputs):
-    """Applies AddPositionEmbs module.
-
-    By default this layer uses a fixed sinusoidal embedding table. If a
-    learned position embedding is desired, pass an initializer to
-    posemb_init.
-
-    Args:
-      inputs: Inputs to the layer.
-
-    Returns:
-      Output tensor with shape `(bs, timesteps, in_dim)`.
-    """
-
-    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
-
-    if self.use_cls_token:
-      output = inputs + pe[:, 1:, :]
-    else:
-      output = inputs + pe
-
-    return output
-
-
-class MlpBlock(nn.Module):
-  """Transformer MLP / feed-forward block."""
-
-  mlp_dim: int
-  dtype: Dtype = jnp.float32
-  out_dim: Optional[int] = None
-  dropout_rate: float = 0.1
-  kernel_init: Callable[[PRNGKey, Shape, Dtype],
-                        Array] = nn.initializers.xavier_uniform()
-  bias_init: Callable[[PRNGKey, Shape, Dtype],
-                      Array] = nn.initializers.normal(stddev=1e-6)
-
-  @nn.compact
-  def __call__(self, inputs, *, deterministic):
-    """Applies Transformer MlpBlock module."""
-    actual_out_dim = inputs.shape[-1] if self.out_dim is None else self.out_dim
-    x = t5x.layers.Dense(
-        features=self.mlp_dim,
-        dtype=self.dtype,
-        kernel_init=self.kernel_init,
-        bias_init=self.bias_init,
-        kernel_axes=('embed', 'mlp'),
-        name='Dense_0',
-    )(inputs)
-    x = nn.gelu(x)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
-    x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'mlp'))
-    output = t5x.layers.Dense(
-        features=actual_out_dim,
-        dtype=self.dtype,
-        kernel_init=self.kernel_init,
-        bias_init=self.bias_init,
-        kernel_axes=('mlp', 'embed'),
-        name='Dense_1',
-    )(x)
-    output = nn.Dropout(
-        rate=self.dropout_rate)(
-            output, deterministic=deterministic)
-    return output
-
-
-class Encoder1DBlock(nn.Module):
-  """Transformer encoder layer.
-
-  Attributes:
-    inputs: input data.
-    mlp_dim: dimension of the mlp on top of attention block.
-    dtype: the dtype of the computation (default: float32).
-    dropout_rate: dropout rate.
-    attention_dropout_rate: dropout for attention heads.
-    deterministic: bool, deterministic or not (to apply dropout).
-    num_heads: Number of heads in nn.MultiHeadDotProductAttention
-  """
-
-  mlp_dim: int
-  num_heads: int
-  dtype: Dtype = jnp.float32
-  dropout_rate: float = 0.1
-  attention_dropout_rate: float = 0.1
-  droppath_rate: float = 0.0
-  layer_id: int = None
-  rescale_init: float = 1.
-
-  @nn.compact
-  def __call__(self, inputs, deterministic):
-    """Applies Encoder1DBlock module.
-
-    Args:
-      inputs: Inputs to the layer.
-      deterministic: Dropout will not be applied when set to true.
-
-    Returns:
-      output after transformer encoder block.
-    """
-
-    # Attention block.
-    assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
-    x = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(inputs)
-
-    # ----------------------------------------------------
-    # t5x
-    MsaBlock = functools.partial(
-      t5x.layers.MultiHeadDotProductAttention,
-      qkv_kernel_init=lambda *args: qkv_kernel_init(*args) * self.rescale_init,
-      out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_init,
-    )
-    # ----------------------------------------------------
-
-    x = MsaBlock(
-        dtype=self.dtype,
-        dropout_rate=self.attention_dropout_rate,
-        num_heads=self.num_heads,
-    )(x, x)
-    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
-    # droppath
-    x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
-    x = x + inputs
-
-    # MLP block.
-    y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(x)
-    y = MlpBlock(
-        mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
-        kernel_init=lambda *args: mlp_kernel_init(*args) * self.rescale_init,
-        bias_init=mlp_bias_init,
-        )(y, deterministic=deterministic)
-    # droppath
-    y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
-
-    return x + y
-
-
-class Encoder(nn.Module):
-  """Transformer Model Encoder for sequence to sequence translation.
-
-  Attributes:
-    num_layers: number of layers
-    mlp_dim: dimension of the mlp on top of attention block
-    num_heads: Number of heads in nn.MultiHeadDotProductAttention
-    dropout_rate: dropout rate.
-    attention_dropout_rate: dropout rate in self attention.
-  """
-
-  num_layers: int
-  mlp_dim: int
-  num_heads: int
-  dropout_rate: float = 0.1
-  attention_dropout_rate: float = 0.1
-  droppath_rate: float = 0.0
-  prefix: str = 'encoder'
-  rescale_init: float = 1.0
-  remat_policy: str = 'none'
-
-  @nn.compact
-  def __call__(self, inputs, *, train):
-    """Applies Transformer model on the inputs.
-
-    Args:
-      inputs: Inputs to the layer.
-      train: Set to `True` when training.
-
-    Returns:
-      output of a transformer encoder.
-    """
-    assert inputs.ndim == 3  # (batch, len, emb)
-
-    BlockLayer = Encoder1DBlock
-    if self.remat_policy not in (None, 'none'):
-      if self.remat_policy == 'minimal':
-        policy = jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
-      else:
-        policy = None
-      BlockLayer = remat(  # pylint: disable=invalid-name
-          Encoder1DBlock,
-          prevent_cse=True,
-          policy=policy,
-          static_argnums=(1,))  # "deterministic" is a static argument in Encoder1DBlock
-
-    x = inputs
-    for lyr in range(self.num_layers):
-      deterministic = not train
-      x = BlockLayer(
-          mlp_dim=self.mlp_dim,
-          dropout_rate=self.dropout_rate,
-          attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
-          name=self.prefix + 'block_{:02d}'.format(lyr),
-          num_heads=self.num_heads,
-          layer_id=lyr,
-          rescale_init=self.rescale_init,
-        )(x, deterministic)
-    encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
-
-    return encoded
-
-
-# the implementation for pjit
-def gather_by_einsum(x, ids):
-  """kaiming: vmap + gather is slow with pjit; use einsum instead
-  Args:
-    x: [N, L, ...]
-    ids: [N, K]
-  """
-  mat = jax.nn.one_hot(ids, x.shape[1])  # [N, K, L]
-  x = jnp.einsum('nl...,nkl->nk...', x, mat)
-  return x
 
 
 class VisionTransformer(nn.Module):
@@ -443,7 +203,8 @@ class VisionTransformer(nn.Module):
       x = jnp.concatenate([cls, x], axis=1)
 
     # apply the encoder
-    x = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x, train=train)
+    x = Encoder(name='Transformer', hidden_size=self.hidden_size,
+                **self.transformer, prefix='encoder')(x, train=train)
 
     return x, mask, ids_restore
 
@@ -481,7 +242,8 @@ class VisionTransformer(nn.Module):
     x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+    x = Encoder(name='TransformerDecoder', hidden_size=self.decoder.hidden_size,
+                **self.decoder.transformer, prefix='decoder')(x, train=train)
 
     # apply the predictor
     x = t5x.layers.Dense(
@@ -522,7 +284,7 @@ class VisionTransformer(nn.Module):
     return knn_accuracy
 
   @nn.compact
-  def __call__(self, inputs, *, train, train_knn=True):
+  def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
     labels = inputs['label']
 
@@ -530,7 +292,7 @@ class VisionTransformer(nn.Module):
     x, mask, ids_restore = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x, labels, train=(train and train_knn))
+    knn_accuracy = self.apply_knn(x, labels, train=(train and update))
 
     # apply decoder
     pred = self.apply_decoder(x, ids_restore, train=train)
