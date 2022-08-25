@@ -17,7 +17,7 @@ python3 main.py \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
-    --config.model.mask_ratio=0.0 \
+    --config.model.mask_ratio=0.875 \
 
 
     # --config.model.transformer.num_layers=2 \
