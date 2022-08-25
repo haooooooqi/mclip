@@ -634,7 +634,9 @@ class VisionTransformer(nn.Module):
       noise = random.normal(rng, shape=mu.shape)
       
       std = jnp.exp(log_var / 2.) + 1e-6
-      z = noise * std + mu
+      # z = noise * std + mu
+      # z = noise + mu
+      z = mu
       return z
 
     z = sample(mu, log_var)
@@ -797,7 +799,7 @@ class VisionTransformer(nn.Module):
     imgs1 = inputs[:, 2, :, :, :]
 
     imgs_src = imgs
-    imgs_tgt = imgs
+    imgs_tgt = imgs0
     return imgs_src, imgs_tgt
 
   @nn.compact

@@ -9,13 +9,12 @@ tau=0.2
 lossw=0.1
 
 noise=0.1
-enoise=0.1  # encoder
 
 seed=100
 
 CONFIG=cfg_mae_large
 # maetf: normpix_sincos_initmaev2_cropv2ALTER_donate_olkNN_NOexClsDBG_buf16x1024 (torch loader: crop v4)
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_NOnorm_sametgt_latentbot_delta_addGnoise${noise}_encnoise${enoise}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_maevae_${ep}ep_b${batch}_lr${lr}_mask${mask}_TorchLoader_wseed${seed}_t${tau}_lw${lossw}_NOnorm_difftgt_vae_nonoise
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -55,7 +54,6 @@ python3 main.py \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
     --config.model.vae.noise_scale=${noise} \
-    --config.model.transformer.noise_scale=${enoise} \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 
