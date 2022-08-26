@@ -15,8 +15,8 @@ def layer_rescale(path: Tuple[Any], val: jnp.ndarray):
     del val
     # path[0] = 'Transformer'
     if len(path) > 3 and path[1].startswith("encoderblock_") and path[-1] == 'kernel':
-        if (path[-3] == 'MultiHeadDotProductAttention_0' and path[-2] == 'out') or \
-                (path[-3] == 'MlpBlock_0' and path[-2] == 'Dense_1'):
+        if (path[-3] == 'self_attention' and path[-2] == 'out') or \
+                (path[-3] == 'mlp' and path[-2] == 'Dense_1'):
             layer_id = path[1][len("encoderblock_"):]  # remove prefix
             layer_id = int(layer_id) + 1
             rescale = (2.0 * layer_id) ** -.5
