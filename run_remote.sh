@@ -2,10 +2,10 @@ echo 'code dir: '$STAGEDIR
 
 seed=100
 batch=1024
-lr=1.25e-3
+lr=5e-4
 mlr=1e-6
-wlr=2.5e-7
-lrd=0.9 #0.8 #0.9
+wlr=0.
+lrd=0.65
 ep=100
 wep=5
 dp=0.2
