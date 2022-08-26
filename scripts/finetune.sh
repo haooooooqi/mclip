@@ -33,7 +33,7 @@ sudo mkdir -p ${LOG_DIR} && sudo chmod -R 777 ${LOG_DIR}
 # staging
 ################################################################
 TAG_WITH_TIME=${JOB_NAME}_`date +'%Y-%m-%d_%H-%M-%S'`
-STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${TAG_WITH_TIME}_${TUNE_TAG}
+STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${FOLDER}_${TAG_WITH_TIME}_${TUNE_TAG}
 echo $STAGE_DIR
 mkdir -p $STAGE_DIR
 rsync -avz $HOME/$FOLDER/ $STAGE_DIR/

@@ -201,7 +201,7 @@ class Encoder1DBlock(nn.Module):
 
     # Attention block.
     assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
-    x = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(inputs)
+    x = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',), name='ln_0')(inputs)
 
     # ----------------------------------------------------
     # t5x
@@ -222,6 +222,7 @@ class Encoder1DBlock(nn.Module):
         dtype=self.dtype,
         dropout_rate=self.attention_dropout_rate,
         num_heads=self.num_heads,
+        name='self_attention',
     )(x, x)
     x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
     # droppath
@@ -229,11 +230,12 @@ class Encoder1DBlock(nn.Module):
     x = x + inputs
 
     # MLP block.
-    y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(x)
+    y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',), name='ln_1')(x)
     y = MlpBlock(
         mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
+        name='mlp',
         )(y, deterministic=deterministic)
     # droppath
     y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
@@ -362,16 +364,6 @@ class VisionTransformer(nn.Module):
     x = inputs
 
     n, h, w, c = x.shape
-    # We can merge s2d+emb into a single conv; it's the same.
-    # x = nn.Conv(
-    #     features=self.hidden_size,
-    #     kernel_size=self.patches.size,
-    #     strides=self.patches.size,
-    #     padding='VALID',
-    #     name='embedding',
-    #     kernel_init=patch_kernel_init,
-    #     bias_init=patch_bias_init,
-    #     )(x)
     x = t5x.layers.Conv(
         features=self.hidden_size,
         kernel_size=self.patches.size,

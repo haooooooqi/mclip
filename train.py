@@ -138,7 +138,6 @@ def print_sanity_check(batch, shard_id):
   return
 
 
-
 def cross_entropy_loss(logits, labels_one_hot):
   xentropy = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
   return jnp.mean(xentropy)
@@ -434,7 +433,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           # Wait until computations are done before exiting
           jax.random.normal(jax.random.PRNGKey(0), ()).block_until_ready()
 
-          # x = state.params['Transformer']['encoderblock_01']['MlpBlock_0']['Dense_0']['kernel'][:5, 0]
+          # x = state.params['Transformer']['encoderblock_01']['mlp']['Dense_0']['kernel'][:5, 0]
           # logging.info(x)
 
           train_metrics = common_utils.get_metrics(jax.tree_map(lambda x: jnp.reshape(x, (-1,)), train_metrics))
