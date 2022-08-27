@@ -271,6 +271,7 @@ class VisionTransformer(nn.Module):
   patches: Any
   transformer: Any
   hidden_size: int
+  encoder: Any = None
   resnet: Optional[Any] = None
   representation_size: Optional[int] = None
   classifier: str = 'token'
@@ -285,6 +286,14 @@ class VisionTransformer(nn.Module):
     n, h, w, c = x.shape
 
     # apply the encoder
-    x = ConvNeXt(depths=(3,3,27,3), dims=(128, 256, 512, 1024), drop_path=self.drop_path)(x, train=train)
+    if self.encoder.name == 'convnext':
+      x = ConvNeXt(
+        depths=self.encoder.depths,
+        dims=self.encoder.dims,
+        drop_path=self.encoder.drop_path,
+        layer_scale_init_value=self.encoder.layer_scale_init_value,
+        head_init_scale=self.encoder.head_init_scale,
+        attach_head=self.encoder.attach_head,
+        num_classes=self.encoder.num_classes)(x, train=train)
 
     return x

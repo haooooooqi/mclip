@@ -2,21 +2,21 @@ echo 'code dir: '$STAGEDIR
 
 seed=100
 batch=1024
-lr=5e-4
+lr=1e-3
 mlr=1e-6
 wlr=0.
-lrd=0.65
-ep=100
+lrd=0.75 #0.8 #0.9
+ep=50
 wep=5
 dp=0.2
 ema=0.9999
 
-vitsize=base
+vitsize=large
 CONFIG=cfg_convmae_${vitsize}
 source scripts/select_chkpt_${vitsize}.sh
 
 # PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/mae_convnext_large/20220707_235231_cx_512a_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
-PRETRAIN_DIR='gs://shoubhikdn_storage/checkpoints/flax/masked_convmae_base/20220818_090550_cx_256d_cfg_convmae_base_maetf_800ep_b4096_lr1.0e-4_TorchLoader_wseed100'
+PRETRAIN_DIR='gs://shw-storage/checkpoint/flax/mae_base_trial/20220825_052810_cx_256f_cfg_mae_base_maetf_1600ep_b4096_lr1.5e-4_mask0.5_large_TorchLoader_wseed100'
 name=`basename ${PRETRAIN_DIR}`
 
 # finetune_pytorch_recipe (ftpy): lb0.1_b0.999_cropv4_exwd_initv2_headinit0.001_tgap_dp_mixup32_cutmix32_noerase_warmlr_minlr_autoaug
