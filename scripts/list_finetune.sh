@@ -46,7 +46,7 @@ for dir in $INCLUDE; do
     fi
     echo $dir
     has_res=false
-    for i in "$dir"/${PHRASE}_default/${PHRASE}_main_*.log; do
+    for i in "$dir"/${PHRASE}/${PHRASE}_main_*.log; do
         if [ ! -f $i ]; then
             continue
         fi
@@ -89,7 +89,7 @@ for dir in $INCLUDE; do
     fi
 
     has_res=false
-    for i in "$dir"/${PHRASE}_default/${PHRASE}_main_*.log; do
+    for i in "$dir"/${PHRASE}/${PHRASE}_main_*.log; do
         if [ ! -f $i ]; then
             continue
         fi

@@ -20,7 +20,11 @@ EXTRA_ARGS_COMMON=${array[@]:6:$len}
 FOLDER=vit_jax
 STORAGE_BUCKET=gs://xinleic
 DATASET=imagenet-1k
-TUNE_TAG=finetune_${EXTRA_ARGS_COMMON_TAG}
+if [ ${EXTRA_ARGS_COMMON_TAG} = "default" ]; then
+    TUNE_TAG=finetune
+else
+    TUNE_TAG=finetune_${EXTRA_ARGS_COMMON_TAG}
+fi
 ################################################################
 # folders
 ################################################################
