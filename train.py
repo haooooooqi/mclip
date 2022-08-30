@@ -137,25 +137,31 @@ def print_sanity_check(batch, shard_id):
   return
 
 
+# this function takes a state (not sure what's this), a batch, a model, and random number generator
 def train_step(state, batch, model, rng):
   """Perform a single training step."""
   dropout_rng = jax.random.fold_in(rng, state.step)
 
   def loss_fn(params):
     """loss function used for training."""
+    # some parameters are considered as mutables here
     mutable = [k for k in state.flax_mutables]
+    # has "method" to specify the function to call, default __call__
     outcome = model.apply(
         {'params': params, **state.flax_mutables},
         inputs=batch,
-        mutable=mutable,
+        mutable=mutable, # this is shown as * in the __call__ function
         rngs=dict(dropout=dropout_rng),
         train=True)
+    # is the new_mutables gradients or variables?
     (loss, _, knn_accuracy), new_mutables = outcome
     return loss, (new_mutables, loss, knn_accuracy)
 
+  # loss_fn return loss (to be computed grad on); the later 3 are considered variables
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+  # the parameters must have been passed to the loss functions, grads is gradients w.r.t. the loss
   aux, grads = grad_fn(state.params)
-
+  # aux[0] is loss, aux[1] is unpacked here
   new_mutables, loss, knn_accuracy = aux[1]
   metrics = {'loss': loss }
   if knn_accuracy is not None:
@@ -172,6 +178,7 @@ def train_step(state, batch, model, rng):
   return new_state, metrics
 
 
+# all the step functions are like this
 def eval_step(state, batch, model, rng):
   variables = {'params': state.params, **state.flax_mutables}
   dropout_rng = jax.random.fold_in(rng, state.step)

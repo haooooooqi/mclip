@@ -13,7 +13,6 @@ from optax._src import transform
 from optax._src.transform import update_moment, bias_correction, ScaleByAdamState
 
 
-
 ScalarOrSchedule = Union[float, base.Schedule]
 
 

@@ -60,7 +60,6 @@ def create_learning_rate_fn(
 
 
 def create_optimizer(config, params_names, steps_per_epoch):
-
   # create the lr schedule function
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
@@ -69,15 +68,19 @@ def create_optimizer(config, params_names, steps_per_epoch):
     # optional: exclude some wd
     mask = None
     if config.exclude_wd:
-      mask = jax.tree_util.tree_map(lambda x, y: bool(x and y), 
+      mask = jax.tree_util.tree_map(lambda x, y: bool(x and y),
         opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
         opt_util.filter_parameters(params_names, opt_util.filter_posembed)  # Note: we must exclude posembed wd in adamw
       )
     # logging.info('Apply wd: {}'.format(mask))
 
     opt = getattr(adamw, config.opt_type)  # optax.adamw
+    # t5x will wrap the optimizer
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
-    opt = opt(learning_rate=learning_rate_fn, **config.opt, mask=mask, mu_dtype=getattr(jnp, config.opt_mu_dtype))
+    opt = opt(learning_rate=learning_rate_fn,
+              **config.opt,
+              mask=mask,
+              mu_dtype=getattr(jnp, config.opt_mu_dtype))
     opt.metric_learning_rate_fn = learning_rate_fn  # hack for metric
 
   else:
@@ -90,7 +93,9 @@ def create_train_state(config, model, steps_per_epoch, partitioner):
   """Create initial training state."""
   rng = jax.random.PRNGKey(0)  # for shape reference only
   # create optimizer first
+  # shape of the parameters
   params_shapes = init_shapes(rng, config.image_size, config.num_views, model)
+  # created the optimizer
   opt = create_optimizer(config, params_shapes['params'], steps_per_epoch)
 
   # ---------------------------------------------------------------------------
