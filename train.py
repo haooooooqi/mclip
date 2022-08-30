@@ -30,7 +30,6 @@ import numpy as np
 import os
 import random as _random
 import ml_collections
-import optax
 from absl import logging
 from clu import metric_writers
 

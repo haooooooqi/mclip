@@ -15,6 +15,14 @@ set -x
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.num_epochs=$ep" >> $queue_file
 # done
 
+# for ratio in .7 .9; do
+#     for tau in .1 .2; do
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau" >> $queue_file
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau" >> $queue_file
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau" >> $queue_file
+#     done
+# done
+
 # for lr in 1.5e-4 1e-4; do
 #     for wd in .3 .5; do
 #         echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.learning_rate=$lr --config.opt.weight_decay=$wd" >> $queue_file
