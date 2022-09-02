@@ -163,7 +163,7 @@ def train_step(state, batch, model, rng):
   aux, grads = grad_fn(state.params)
   # aux[0] is loss, aux[1] is unpacked here
   new_mutables, loss, knn_accuracy = aux[1]
-  metrics = {'loss': loss }
+  metrics = {'loss': loss}
   if knn_accuracy is not None:
     metrics['knn_accuracy'] = knn_accuracy
 

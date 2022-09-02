@@ -102,9 +102,11 @@ def create_train_state(config, model, steps_per_epoch, partitioner):
   def initialize_train_state(rng_init):
     # split rng for init and for state
     initial_variables = init_fn(rng_init, config.image_size, config.num_views, model)
-    if opt:
+    if opt: # train
       return train_state_lib.FlaxOptimTrainState.create(opt, initial_variables)
-    return train_state_lib.InferenceState.create(initial_variables)
+    else: # test
+      return train_state_lib.InferenceState.create(initial_variables)
+
   train_state_shape = jax.eval_shape(initialize_train_state, rng_init=rng)
   train_state_axes = partitioner.get_mesh_axes(train_state_shape)
 

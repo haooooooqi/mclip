@@ -102,8 +102,8 @@ class AddPositionEmbs(nn.Module):
     Returns:
       Output tensor with shape `(bs, timesteps, in_dim)`.
     """
-
-    pe = jax.lax.stop_gradient(self.pe) if self.sincos else self.pe
+    # PE is always fixed in this case, directly excluded in the optimizer
+    pe = self.pe
 
     if self.use_cls_token:
       output = inputs + pe[:, 1:, :]
@@ -504,7 +504,6 @@ class VisionTransformer(nn.Module):
     if not self.knn.on:
       return
 
-    x = jax.lax.stop_gradient(x)
     # => [N, E]
     if self.knn.pool == 'gap':
       x = jnp.mean(x, axis=1)

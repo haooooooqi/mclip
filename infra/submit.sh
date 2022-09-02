@@ -9,10 +9,24 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
+for tau in .1 .2; do
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.learning_rate=5.0e-5 --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.learning_rate=5.0e-5 --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.learning_rate=5.0e-5 --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+done
+
 # for ep in 100 300; do
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.num_epochs=$ep" >> $queue_file
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.num_epochs=$ep" >> $queue_file
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.num_epochs=$ep" >> $queue_file
+# done
+
+# for ratio in .75; do
+#     for tau in .1 .2; do
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.model.mask_ratio=$ratio --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file
+#     done
 # done
 
 # for ratio in .7 .9; do
