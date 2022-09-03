@@ -44,6 +44,7 @@ def get_config():
   config.num_views = 1
 
   config.learning_rate = 1.0e-4  # this is the base lr
+  config.lr_schedule = 'cos'
   config.warmup_epochs = 40.0
   config.min_abs_lr = 0.  # this is abs lr
   config.warmup_abs_lr = 0.  # this is abs lr

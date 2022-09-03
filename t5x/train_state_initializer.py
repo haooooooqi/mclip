@@ -48,13 +48,21 @@ def create_learning_rate_fn(
   warmup_fn = optax.linear_schedule(
       init_value=config.warmup_abs_lr, end_value=base_learning_rate,
       transition_steps=config.warmup_epochs * steps_per_epoch)
-  cosine_epochs = max(config.num_epochs - config.warmup_epochs, 1)
-  cosine_fn = optax.cosine_decay_schedule(
-      init_value=base_learning_rate,
-      decay_steps=cosine_epochs * steps_per_epoch,
-      alpha=config.min_abs_lr / base_learning_rate)
+  main_epochs = max(config.num_epochs - config.warmup_epochs, 1)
+  if config.lr_schedule == 'cos':
+    main_fn = optax.cosine_decay_schedule(
+        init_value=base_learning_rate,
+        decay_steps=main_epochs * steps_per_epoch,
+        alpha=config.min_abs_lr / base_learning_rate)
+  elif config.lr_schedule == 'linear':
+    main_fn = optax.linear_schedule(
+        init_value=base_learning_rate,
+        transition_steps=main_epochs * steps_per_epoch,
+        end_value=config.min_abs_lr)
+  else:
+    raise NotImplementedError
   schedule_fn = optax.join_schedules(
-      schedules=[warmup_fn, cosine_fn],
+      schedules=[warmup_fn, main_fn],
       boundaries=[config.warmup_epochs * steps_per_epoch])
   return schedule_fn
 
