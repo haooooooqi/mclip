@@ -307,7 +307,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   if config.model_type == 'mae':
     model = models_mae.VisionTransformer(**config.model)
   elif config.model_type == 'mclr':
-    model = models_mclr.VisionTransformer(image_size=config.image_size, **config.model)
+    model = models_mclr.SiameseLearner(image_size=config.image_size, **config.model)
   else:
     raise NotImplementedError
 

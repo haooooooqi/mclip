@@ -1,4 +1,6 @@
+from termcolor import colored
 from absl import logging
+
 import jax
 import jax.numpy as jnp
 import optax
@@ -72,7 +74,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
   abs_learning_rate = config.learning_rate * config.batch_size / 256.
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
-  if config.opt_type in {'adamw', 'adarows'}:
+  if config.opt_type in {'adamw',}:
     # optional: exclude some wd
     mask = None
     if config.exclude_wd:
@@ -82,7 +84,23 @@ def create_optimizer(config, params_names, steps_per_epoch):
       )
     # logging.info('Apply wd: {}'.format(mask))
 
-    opt = getattr(adamw, config.opt_type)  # optax.adamw
+    if config.model_type in {'mclr',}:
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_momentum_encoder)
+      # logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
+
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    elif config.model_type in {'mae',}:
+      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
+      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_posembed)
+      # logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
+
+      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+    else:
+      opt = getattr(adamw, config.opt_type)
+
     # t5x will wrap the optimizer
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
     opt = opt(learning_rate=learning_rate_fn,

@@ -152,7 +152,6 @@ class MsaBlock(nn.Module):
         dtype=self.dtype,
         name='out')
 
-  @nn.compact
   def __call__(self, inputs_q, inputs_kv, *, deterministic):
     query = self.query_proj(inputs_q)
     key = self.key_proj(inputs_kv)
@@ -215,7 +214,6 @@ class MlpBlock(nn.Module):
     )
     self.dropout_1 = nn.Dropout(rate=self.dropout_rate)
 
-  @nn.compact
   def __call__(self, inputs, *, deterministic):
     """Applies Transformer MlpBlock module."""
     x = self.dense_0(inputs)
@@ -272,7 +270,6 @@ class Encoder1DBlock(nn.Module):
     )
     self.droppath_1 = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')
 
-  @nn.compact
   def __call__(self, inputs, deterministic):
     """Applies Encoder1DBlock module.
 
@@ -353,7 +350,6 @@ class Encoder(nn.Module):
 
     self.ln = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))
 
-  @nn.compact
   def __call__(self, inputs, *, train):
     """Applies Transformer model on the inputs.
 
@@ -396,11 +392,11 @@ class VisionTransformer(nn.Module):
   transformer: Any
   image_size: int
   hidden_size: int
+  proj_layers: int
+  proj_dim_hidden: int
+  proj_dim_out: int
   classifier: str = 'token'
   dtype: Any = jnp.float32
-  visualize: bool = False
-  knn: Any = None
-  clr: Any = None
 
   def setup(self):
     self.use_cls_token = (self.classifier in {'token', 'tgap'})
@@ -438,13 +434,13 @@ class VisionTransformer(nn.Module):
 
     flip = False
     projector = []
-    for i in range(self.clr.proj_layers):
+    for i in range(self.proj_layers):
       kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
-      if i < self.clr.proj_layers - 1:
-        dim = self.clr.proj_dim_hidden
+      if i < self.proj_layers - 1:
+        dim = self.proj_dim_hidden
         post_relu = True
       else:
-        dim = self.clr.proj_dim_out
+        dim = self.proj_dim_out
         post_relu = False
 
       projector.append(t5x.layers.Dense(
@@ -480,7 +476,7 @@ class VisionTransformer(nn.Module):
 
     return x
 
-  def apply_encoder(self, inputs, train, mask_ratio=0.):
+  def __call__(self, inputs, train, mask_ratio=0.):
     x = self.conv_0(inputs)
 
     n, h, w, c = x.shape
@@ -498,7 +494,35 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
-    return x
+    # get the feature for contrastive learning
+    if self.classifier == 'token':
+      p = x[:, 0]
+    elif classifier == 'tgap':
+      p = jnp.mean(x[:, 1:], axis=1)
+    elif classifier == 'gap':
+      p = jnp.mean(x, axis=1)
+    else:
+      raise NotImplementedError
+
+    # apply projector
+    p = self.projector(p)
+
+    return x, p
+
+
+class SiameseLearner(nn.Module):
+  """SiameseLearner."""
+
+  encoder: Any
+  image_size: int
+  visualize: bool = False
+  knn: Any = None
+  clr: Any = None
+
+  def setup(self):
+    self.source_encoder = VisionTransformer(name='Source', image_size=self.image_size, **self.encoder)
+    self.target_encoder = VisionTransformer(name='Target', image_size=self.image_size, **self.encoder)
+    self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -521,7 +545,7 @@ class VisionTransformer(nn.Module):
       l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
       x /= l2norm
 
-    knn_accuracy = onlineknn_util.OnlineKNN(knn=self.knn)(x, labels, train=train)
+    knn_accuracy = self.online_knn(x, labels, train=train)
 
     return knn_accuracy
 
@@ -538,7 +562,6 @@ class VisionTransformer(nn.Module):
     xent = xent.mean() * self.clr.tau
     return xent
 
-  @nn.compact
   def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
     labels = inputs['label']
@@ -549,31 +572,14 @@ class VisionTransformer(nn.Module):
     imgs1 = imgs[:, 1, :, :, :]
 
     # apply encoder to masked imgs0
-    x0 = self.apply_encoder(imgs0, train, self.mask_ratio)
-    x1 = self.apply_encoder(imgs1, train)
+    _, p0 = self.source_encoder(imgs0, train, self.clr.mask_ratio)
+    x1, p1 = self.target_encoder(imgs1, train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
-    # get the feature for contrastive learning
-    if self.classifier == 'token':
-      x0 = x0[:, 0]
-      x1 = x1[:, 0]
-    elif classifier == 'tgap':
-      x0 = jnp.mean(x0[:, 1:], axis=1)
-      x1 = jnp.mean(x1[:, 1:], axis=1)
-    elif classifier == 'gap':
-      x0 = jnp.mean(x0, axis=1)
-      x1 = jnp.mean(x1, axis=1)
-    else:
-      raise NotImplementedError
-
-    # apply projector
-    x0 = self.projector(x0)
-    x1 = self.projector(x1)
-
     # compute loss
-    loss = self.compute_loss(x0, x1)
+    loss = self.compute_loss(p0, p1)
 
     if self.visualize: # and not train:
       raise NotImplementedError

@@ -94,7 +94,13 @@ def get_config():
 
   # model config
   config.model_type = 'mclr'
-  config.model = mclr.get_config()  # ViT-B/16
+  config.model = ml_collections.ConfigDict()
+
+  # encoder
+  config.model.encoder = mclr.get_config()  # ViT-B/16
+  config.model.encoder.proj_layers = 3
+  config.model.encoder.proj_dim_hidden = 4096
+  config.model.encoder.proj_dim_out = 256
 
   # knn
   config.model.knn = ml_collections.ConfigDict()
@@ -109,12 +115,10 @@ def get_config():
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
 
-  # contrastive objective
+  # contrastive loss
   config.model.clr = ml_collections.ConfigDict()
+  config.model.clr.mask_ratio = 0.75 # for extrema
   config.model.clr.tau = 0.1
-  config.model.clr.proj_layers = 3
-  config.model.clr.proj_dim_hidden = 4096
-  config.model.clr.proj_dim_out = 256
 
   # seeds
   config.seed = -1

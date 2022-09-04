@@ -37,11 +37,11 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = cfg_common_mclr.get_config()
 
-  config.model.update(vit.get_l16_config())
-  config.model.hidden_size = 1280
-  config.model.transformer.mlp_dim = config.model.hidden_size * 4
-  config.model.transformer.num_layers = 32
-  config.model.transformer.rescale_init = 1.0
+  config.model.encoder.update(vit.get_l16_config())
+  config.model.encoder.hidden_size = 1280
+  config.model.encoder.transformer.mlp_dim = config.model.hidden_size * 4
+  config.model.encoder.transformer.num_layers = 32
+  config.model.encoder.transformer.rescale_init = 1.0
 
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False

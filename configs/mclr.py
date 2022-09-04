@@ -36,8 +36,6 @@ def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
   config = ml_collections.ConfigDict()
 
-  config.mask_ratio = 0.75
-
   config.sincos = True
 
   config.update(vit.get_b16_config())
