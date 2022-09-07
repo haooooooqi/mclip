@@ -78,23 +78,17 @@ def create_optimizer(config, params_names, steps_per_epoch):
     # optional: exclude some wd
     mask = None
     if config.exclude_wd:
-      mask = jax.tree_util.tree_map(lambda x, y: bool(x and y),
-        opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm),
-        opt_util.filter_parameters(params_names, opt_util.filter_posembed)  # Note: we must exclude posembed wd in adamw
+      mask = jax.tree_map(lambda x: x,
+        opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm)
       )
-    # logging.info('Apply wd: {}'.format(mask))
+    logging.info(colored('Apply wd: {}'.format(mask), "blue"))
 
-    if config.model_type in {'mclr',}:
-      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
-      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_momentum_encoder)
-      # logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
-
-      def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
-        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
-    elif config.model_type in {'mae',}:
-      opt_inner = getattr(adamw, config.opt_type)  # optax.adamw
-      mask_trainable = opt_util.filter_parameters(params_names, opt_util.filter_posembed)
-      # logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
+    if len(config.freeze_keywords) > 0:
+      opt_inner = getattr(adamw, config.opt_type)
+      mask_trainable = opt_util.filter_parameters(params_names,
+                                                  functools.partial(opt_util.filter_by_keywords,
+                                                  keywords=config.freeze_keywords))
+      logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)

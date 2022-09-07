@@ -28,13 +28,15 @@ def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
 
 
 # ---------------------------------------------------------
-# freeze for the momentum encoder
+# freeze parameters
 # ---------------------------------------------------------
-def filter_momentum_encoder(path: Tuple[Any], val: jnp.ndarray, config: Any):
-    """Filter for the momentum encoder"""
+def filter_by_keywords(path: Tuple[Any], val: jnp.ndarray, keywords: Tuple[Any]):
+    """Filter given a list of keywords"""
     del val
-    if 'Target' in path[0]:
-        return False
+    name = '.'.join(path)
+    for kw in keywords:
+        if kw in name:
+            return False
     return True
 
 

@@ -9,14 +9,23 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mae $salt 128 base imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mae $salt 256 base imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 128 base imagenet-1k --config.seed=2" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 base imagenet-1k --config.seed=2 --config.num_epochs=1600" >> $queue_file
 
-echo "~/mae_jax/infra/wrapper.sh mae $salt 128 large imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mae $salt 256 large imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 128 large imagenet-1k --config.seed=2" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 large imagenet-1k --config.seed=2 --config.num_epochs=1600" >> $queue_file
 
-echo "~/mae_jax/infra/wrapper.sh mae $salt 256 huge imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mae $salt 512 huge imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 huge imagenet-1k --config.seed=2" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 512 huge imagenet-1k --config.seed=2 --config.num_epochs=1600" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 128 base imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 base imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 128 large imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 large imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 256 huge imagenet-1k --config.seed=2 --config.lr_schedule=linear" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mae $salt 512 huge imagenet-1k --config.seed=2 --config.lr_schedule=linear --config.num_epochs=1600" >> $queue_file
 
 # for tau in .1 .2; do
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.learning_rate=5.0e-5 --config.model.clr.tau=$tau --config.model.clr.stop_key=True" >> $queue_file

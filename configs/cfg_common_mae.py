@@ -71,7 +71,8 @@ def get_config():
   config.opt.weight_decay = 0.05
   config.opt_mu_dtype = 'float32'
 
-  config.exclude_wd = True  # exclude some weight decays (bias, norm, cls, posembed)
+  config.exclude_wd = True  # exclude some weight decays (bias, norm)
+  config.freeze_keywords = ('pos_embedding',)
 
   # aug config
   config.aug = ml_collections.ConfigDict()

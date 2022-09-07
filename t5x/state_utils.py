@@ -213,3 +213,7 @@ def apply_assignment_map(ckpt_optimizer_state,
                      unused_patterns_str + "}")
 
   return traverse_util.unflatten_dict(result, sep="/")
+
+
+def str_flatten_dict(state_dict):
+  return '{\n' + ',\n'.join(['{}: {}'.format(k, v) for k, v in flatten_state_dict(state_dict).items()]) + '\n}'
