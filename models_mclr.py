@@ -515,6 +515,7 @@ class SiameseLearner(nn.Module):
 
   encoder: Any
   image_size: int
+  momentum: float
   visualize: bool = False
   knn: Any = None
   clr: Any = None
@@ -522,7 +523,8 @@ class SiameseLearner(nn.Module):
   def setup(self):
     self.source_encoder = VisionTransformer(name='Source', image_size=self.image_size, **self.encoder)
     self.target_encoder = VisionTransformer(name='Target', image_size=self.image_size, **self.encoder)
-    self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
+    if self.knn.on:
+      self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:

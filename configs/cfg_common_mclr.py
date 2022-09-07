@@ -96,6 +96,8 @@ def get_config():
   # model config
   config.model_type = 'mclr'
   config.model = ml_collections.ConfigDict()
+  config.model.momentum = 0.99
+  config.model.visualize = False
 
   # encoder
   config.model.encoder = mclr.get_config()  # ViT-B/16

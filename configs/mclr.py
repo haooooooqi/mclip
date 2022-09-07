@@ -42,6 +42,4 @@ def get_config():
   config.transformer.dropout_rate = 0.0
   config.transformer.droppath_rate = 0.0
 
-  config.visualize = False
-
   return config
