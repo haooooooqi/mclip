@@ -97,12 +97,12 @@ def create_optimizer(config, params_names, steps_per_epoch):
                             functools.partial(opt_util.filter_by_keywords,
                                               keywords=config.freeze_keywords))
 
-      def opt(tau, **kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
+      def opt(ema_momentum, **kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return opt_util.masked_with_momentum(inner=opt_inner(**kwargs),
-                                              tau=tau,
+                                              ema_momentum=ema_momentum,
                                               mask=mask_trainable)
       with opt_args.unlocked():
-        opt_args.tau = config.model.momentum
+        opt_args.ema_momentum = config.opt.ema_momentum
     elif len(config.freeze_keywords) > 0:
       opt_inner = getattr(adamw, config.opt_type)
       mask_trainable = opt_util.filter_parameters(params_names,

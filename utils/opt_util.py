@@ -85,7 +85,7 @@ def masked(
 # ------------------------------------------
 def masked_with_momentum(
     inner: base.GradientTransformation,
-    tau: float,
+    ema_momentum: float,
     mask: Union[base.PyTree, Callable[[base.Params], base.PyTree]]
 ) -> base.GradientTransformation:
 
@@ -111,7 +111,7 @@ def masked_with_momentum(
         mask_tree, new_masked_updates)
 
     if params is not None and 'Source' in params and 'Target' in params:
-        momentum_updates = momentum_delta(params['Source'], params['Target'], tau)
+        momentum_updates = momentum_delta(params['Source'], params['Target'], ema_momentum)
         # hack, directly update target with source
         new_updates = unfreeze(new_updates)
         new_updates['Target'] = momentum_updates
@@ -122,8 +122,8 @@ def masked_with_momentum(
   return base.GradientTransformation(init_fn, update_fn)
 
 
-# to output: tau * t + (1 - tau) * s = t + (1 - tau) * (s - t)
-# delta: (1 - tau) * (s - t)
-def momentum_delta(updates, params, tau):
+# to output: mmt * t + (1 - mmt) * s = t + (1 - mmt) * (s - t)
+# delta: (1 - mmt) * (s - t)
+def momentum_delta(updates, params, mmt):
   """Compute the exponential moving average of the first moment."""
-  return jax.tree_map(lambda x, y: (y - x) * (1 - tau), params, updates)
+  return jax.tree_map(lambda x, y: (y - x) * (1 - mmt), params, updates)

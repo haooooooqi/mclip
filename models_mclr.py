@@ -514,7 +514,8 @@ class SiameseLearner(nn.Module):
 
   encoder: Any
   image_size: int
-  momentum: float
+  mask_ratio: float
+  temp: float
   visualize: bool = False
   knn: Any = None
   clr: Any = None
@@ -562,12 +563,12 @@ class SiameseLearner(nn.Module):
     source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
     target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
 
-    logits = jnp.einsum('nc,mc->nm', source, target) / self.clr.tau
+    logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
     labels_one_hot = jnp.eye(logits.shape[0])
 
     # asymmetric loss
     xent = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
-    xent = xent.mean() * self.clr.tau
+    xent = xent.mean() * self.temp
     return xent
 
   def __call__(self, inputs, *, train, update=True):
@@ -580,7 +581,7 @@ class SiameseLearner(nn.Module):
     imgs1 = imgs[:, 1, :, :, :]
 
     # apply encoder to masked imgs0
-    _, p0 = self.source_encoder(imgs0, train, self.clr.mask_ratio)
+    _, p0 = self.source_encoder(imgs0, train, self.mask_ratio)
     x1, p1 = self.target_encoder(imgs1, train)
 
     # optionally apply knn

@@ -90,6 +90,8 @@ def build_transform(is_train, input_size, aug):
             is_training=True,
             scale=aug.area_range,
             ratio=aug.aspect_ratio_range,
+            hflip=0.5,
+            vflip=0.,
             color_jitter=color_jitter,
             auto_augment=aa,
             interpolation='bicubic',

@@ -43,7 +43,7 @@ def get_config():
   config.image_size = 224
   config.num_views = 2
 
-  config.learning_rate = 1.0e-4  # this is the base lr
+  config.learning_rate = 1.5e-4  # this is the base lr
   config.lr_schedule = 'cos'
   config.warmup_epochs = 40.0
   config.min_abs_lr = 0.  # this is abs lr
@@ -60,7 +60,7 @@ def get_config():
 
   # Consider setting the batch size to max(tpu_chips * 256, 8 * 1024) if you
   # train on a larger pod slice.
-  config.batch_size = 4096
+  config.batch_size = 2048
   config.cache = True
 
   # optimizer config
@@ -68,7 +68,8 @@ def get_config():
   config.opt = ml_collections.ConfigDict()
   config.opt.b1 = 0.9
   config.opt.b2 = 0.95
-  config.opt.weight_decay = 0.3
+  config.opt.weight_decay = 0.1
+    config.opt.ema_momentum = 0.996
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm)
@@ -96,7 +97,8 @@ def get_config():
   # model config
   config.model_type = 'mclr'
   config.model = ml_collections.ConfigDict()
-  config.model.momentum = 0.99
+  config.model.mask_ratio = 0.8 # for extrema
+  config.model.temp = 0.1 # for contrastive learning
   config.model.visualize = False
 
   # encoder
@@ -114,14 +116,9 @@ def get_config():
   config.model.knn.l2norm = True  # apply l2-norm for kNN (after norm)
   config.model.knn.num_classes = 1000  # specifiy here for simplicity
   config.model.knn.queue_size = 131072  # 128 * 1024
-  config.model.knn.batch_size = 4096
+  config.model.knn.batch_size = 2048
   config.model.knn.num_knns = 200
   config.model.knn.temperature = 0.2
-
-  # contrastive loss
-  config.model.clr = ml_collections.ConfigDict()
-  config.model.clr.mask_ratio = 0.75 # for extrema
-  config.model.clr.tau = 0.1
 
   # seeds
   config.seed = -1
