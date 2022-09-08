@@ -494,18 +494,20 @@ class ContrastiveLearner(nn.Module):
     z0 = z0_all.reshape([-1, z0.shape[-1]])
     z1 = z1_all.reshape([-1, z1.shape[-1]])
 
-    if self.config.clr.stopgrad:
-      z1 = jax.lax.stop_gradient(z1)
-
     tau = self.config.clr.tau
 
-    logits = jnp.einsum('nc,mc->nm', z0, z1)
-    logits /= tau
-    labels_one_hot = jnp.eye(logits.shape[0])
+    def compute_asym_loss(q, k):
+      if self.config.clr.stopgrad:
+        k = jax.lax.stop_gradient(k)
+      logits = jnp.einsum('nc,mc->nm', q, k)
+      logits /= tau
+      labels_one_hot = jnp.eye(logits.shape[0])
+      loss = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+      return loss
 
     # symmetric loss for simclr
-    loss01 = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
-    loss10 = optax.softmax_cross_entropy(logits=logits.transpose(), labels=labels_one_hot)
+    loss01 = compute_asym_loss(z0, z1)
+    loss10 = compute_asym_loss(z1, z0)
     loss = (loss01 + loss10) / 2
     loss = loss.mean()
     loss *= 2 * tau
