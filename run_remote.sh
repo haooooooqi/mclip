@@ -10,7 +10,7 @@ tau=0.2
 seed=100
 
 CONFIG=cfg_clr_base
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_simclr_${ep}ep_b${batch}_lr${lr}_wd${wd}_TorchLoader_wseed${seed}_t${tau}
+JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_${VM_NAME}_${CONFIG}_simclr_${ep}ep_b${batch}_lr${lr}_wd${wd}_TorchLoader_wseed${seed}_t${tau}_stopg
 RESUME_DIR=''
 
 WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
@@ -49,6 +49,7 @@ python3 main.py \
     --config.seed_tf=${seed} \
     --config.resume_dir=$RESUME_DIR \
     --config.model.clr.tau=${tau} \
+    --config.model.clr.stopgrad=True \
 2>&1 | tee $LOGDIR/pretrain_\$SSH_ID.log
 " 2>&1 | tee $LOGDIR/pretrain.log
 

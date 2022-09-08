@@ -494,6 +494,9 @@ class ContrastiveLearner(nn.Module):
     z0 = z0_all.reshape([-1, z0.shape[-1]])
     z1 = z1_all.reshape([-1, z1.shape[-1]])
 
+    if self.config.clr.stopgrad:
+      z1 = jax.lax.stop_gradient(z1)
+
     tau = self.config.clr.tau
 
     logits = jnp.einsum('nc,mc->nm', z0, z1)
