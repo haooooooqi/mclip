@@ -1,10 +1,11 @@
-import jax.numpy as jnp
-
+from typing import Tuple, Any
 import tree as nest
 
-from typing import Tuple, Any
+import jax
+import jax.numpy as jnp
 
-# reference: https://github.com/rwightman/efficientnet-jax/blob/6e343d5ff4e02f4500c3d979cb75bb0f33e2c601/jeffnet/common/optim/lars.py#L36
+from optax._src import base
+from optax._src.wrappers import MaskedState
 
 
 # ---------------------------------------------------------
@@ -47,3 +48,35 @@ def filter_parameters(params, filter_fn):
     """Filter the params based on filter_fn."""
     params_to_filter = nest.map_structure_with_path(filter_fn, params)
     return params_to_filter
+
+
+# ------------------------------------------
+# Masked optimizer
+# ------------------------------------------
+def masked(
+    inner: base.GradientTransformation,
+    mask: Union[base.PyTree, Callable[[base.Params], base.PyTree]]
+) -> base.GradientTransformation:
+
+  def mask_pytree(pytree, mask_tree):
+    return jax.tree_map(lambda m, p: p if m else None, mask_tree, pytree)
+
+  def init_fn(params):
+    mask_tree = mask(params) if callable(mask) else mask
+    masked_params = mask_pytree(params, mask_tree)
+    return MaskedState(inner_state=inner.init(masked_params))
+
+  def update_fn(updates, state, params=None):
+    mask_tree = mask(updates) if callable(mask) else mask
+    masked_updates = mask_pytree(updates, mask_tree)
+    masked_params = None if params is None else mask_pytree(params, mask_tree)
+
+    new_masked_updates, new_inner_state = inner.update(
+        masked_updates, state.inner_state, masked_params)
+
+    new_updates = jax.tree_map(
+        lambda m, new_u: new_u if m else 0.,
+        mask_tree, new_masked_updates)  # this takes zero
+    return new_updates, MaskedState(inner_state=new_inner_state)
+
+  return base.GradientTransformation(init_fn, update_fn)

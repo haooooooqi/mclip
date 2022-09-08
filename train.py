@@ -160,7 +160,7 @@ def train_step(state, batch, model, rng):
   # loss_fn return loss (to be computed grad on); the later 3 are considered variables
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   # the parameters must have been passed to the loss functions, grads is gradients w.r.t. the loss
-  aux, grads = grad_fn(state.params)
+  aux, grads = grad_fn(state.params) # [specify the base encoder]
   # aux[0] is loss, aux[1] is unpacked here
   new_mutables, loss, knn_accuracy = aux[1]
   metrics = {'loss': loss}

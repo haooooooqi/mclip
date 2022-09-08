@@ -526,6 +526,14 @@ class SiameseLearner(nn.Module):
     if self.knn.on:
       self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
 
+      self.knn_norm = None
+      if self.knn.postnorm == 'SBN0':
+        self.knn_norm = t5x.layers.TrainOnlyBatchNorm(use_bias=False, use_scale=False,
+                                dtype=self.dtype, axes=('embed',),
+                                name='knn_postnorm')
+      elif self.knn.postnorm != 'None':
+        raise NotImplementedError
+
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
       return
@@ -536,12 +544,8 @@ class SiameseLearner(nn.Module):
     else:
       raise NotImplementedError
 
-    if self.knn.postnorm == 'SBN0':
-      x = t5x.layers.TrainOnlyBatchNorm(use_bias=False, use_scale=False,
-                              dtype=self.dtype, axes=('embed',),
-                              name='knn_postnorm')(x)
-    elif self.knn.postnorm != 'None':
-      raise NotImplementedError
+    if self.knn_norm is not None:
+      x = self.knn_norm(x)
 
     if self.knn.l2norm:
       l2norm = jnp.sqrt(jnp.sum(x**2, axis=-1, keepdims=True) + 1.e-12)
@@ -583,9 +587,9 @@ class SiameseLearner(nn.Module):
     # compute loss
     loss = self.compute_loss(p0, p1)
 
-    if self.visualize: # and not train:
+    if self.visualize:
       raise NotImplementedError
     else:
-      outcome = None  # not used
+      outcome = None
 
     return loss, outcome, knn_accuracy

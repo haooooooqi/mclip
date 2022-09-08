@@ -24,6 +24,7 @@ def init_fn(rng, image_size, num_views, model):
     input_shape = (1, image_size, image_size, 3)
   else:
     input_shape = (1, num_views, image_size, image_size, 3)
+  # the variables are initialized here
   variables = model.init({'params': rng, 'dropout': jax.random.PRNGKey(0)},
                         {'image': jnp.ones(input_shape, model.dtype), 'label': jnp.zeros((1,), jnp.int32)},
                         train=True, update=False)
@@ -91,7 +92,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
       logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
-        return adamw.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
+        return opt_util.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
     else:
       opt = getattr(adamw, config.opt_type)
 

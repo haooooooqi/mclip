@@ -11,7 +11,6 @@ from optax._src import utils
 
 from optax._src import transform
 from optax._src.transform import update_moment, bias_correction, ScaleByAdamState
-from optax._src.wrappers import MaskedState
 
 
 ScalarOrSchedule = Union[float, base.Schedule]
@@ -37,40 +36,7 @@ def adamw(
     weight_decay: float = 1e-4,
     mask: Optional[Union[Any, Callable[[base.Params], Any]]] = None,
 ) -> base.GradientTransformation:
-  """Adam with weight decay regularization.
 
-  AdamW uses weight decay to regularise learning towards small weights, as
-  this leads to better generalisation. In SGD you can also use L2 regularisation
-  to implement this as an additive loss term, however L2 regularization
-  does not behave as intended for adaptive gradient algorithms such as Adam.
-
-  WARNING: Sometimes you may want to skip weight decay for BatchNorm scale or
-  for the bias parameters. You can use `optax.masked` to make your own AdamW
-  variant where `additive_weight_decay` is applied only to a subset of `params`.
-
-  References:
-    Loshchilov et al, 2019: https://arxiv.org/abs/1711.05101
-
-  Args:
-    learning_rate: this is a fixed global scaling factor.
-    b1: the exponential decay rate to track the first moment of past gradients.
-    b2: the exponential decay rate to track the second moment of past gradients.
-    eps: a small constant applied to denominator outside of the square root
-      (as in the Adam paper) to avoid dividing by zero when rescaling.
-    eps_root: (default `0`), a small constant applied to denominator inside the
-      square root (as in RMSProp), to avoid dividing by zero when rescaling.
-      This is needed for instance when computing (meta-)gradients through Adam.
-    mu_dtype: optional `dtype` to be used for the first order accumulator; if
-      `None` then the `dtype is inferred from `params` and `updates`.
-    weight_decay: strength of the weight decay regularization.
-    mask: a tree with same structure as (or a prefix of) the params PyTree,
-      or a Callable that returns such a pytree given the params/updates.
-      The leaves should be booleans, `True` for leaves/subtrees you want to
-      apply the transformation to, and `False` for those you want to skip.
-
-  Returns:
-    the corresponding `GradientTransformation`.
-  """
   return combine.chain(
       _scale_by_adam(
           b1=b1, b2=b2, eps=eps, eps_root=eps_root, mu_dtype=mu_dtype),
@@ -79,7 +45,6 @@ def adamw(
   )
 
 
-# from optax.transform
 def _scale_by_adam(
     b1: float = 0.9,
     b2: float = 0.999,
@@ -87,23 +52,6 @@ def _scale_by_adam(
     eps_root: float = 0.0,
     mu_dtype: Optional[Any] = None,
 ) -> base.GradientTransformation:
-  """Rescale updates according to the Adam algorithm.
-
-  References:
-    [Kingma et al, 2014](https://arxiv.org/abs/1412.6980)
-
-  Args:
-    b1: decay rate for the exponentially weighted average of grads.
-    b2: decay rate for the exponentially weighted average of squared grads.
-    eps: term added to the denominator to improve numerical stability.
-    eps_root: term added to the denominator inside the square-root to improve
-      numerical stability when backpropagating gradients through the rescaling.
-    mu_dtype: optional `dtype` to be used for the first order accumulator; if
-      `None` then the `dtype is inferred from `params` and `updates`.
-
-  Returns:
-    An (init_fn, update_fn) tuple.
-  """
 
   mu_dtype = utils.canonicalize_dtype(mu_dtype)
 
@@ -132,66 +80,3 @@ def update_moment(updates, moments, decay, order):
   """Compute the exponential moving average of the `order`-th moment."""
   return jax.tree_map(
       lambda g, t: (1 - decay) * (g ** order) + decay * t, updates, moments)
-
-
-# ------------------------------------------
-# Masked optimizer
-# ------------------------------------------
-def masked(
-    inner: base.GradientTransformation,
-    mask: Union[base.PyTree, Callable[[base.Params], base.PyTree]]
-) -> base.GradientTransformation:
-  """Mask updates so only some are transformed, the rest are passed through.
-
-  For example, it is common to skip weight decay for BatchNorm scale and all
-  bias parameters. In many networks, these are the only parameters with only
-  one dimension. So, you may create a mask function to mask these out as
-  follows::
-
-    mask_fn = lambda p: jax.tree_map(lambda x: x.ndim != 1, p)
-    weight_decay = optax.masked(optax.add_decayed_weights(0.001), mask_fn)
-
-  You may alternatively create the mask pytree upfront::
-
-    mask = jax.tree_map(lambda x: x.ndim != 1, params)
-    weight_decay = optax.masked(optax.add_decayed_weights(0.001), mask)
-
-  For the ``inner`` transform, state will only be stored for the parameters that
-  have a mask value of ``True``.
-
-  Args:
-    inner: Inner transformation to mask.
-    mask: a PyTree with same structure as (or a prefix of) the params PyTree, or
-      a Callable that returns such a pytree given the params/updates. The leaves
-      should be booleans, ``True`` for leaves/subtrees you want to apply the
-      transformation to, and ``False`` for those you want to skip. The mask must
-      be static for the gradient transformation to be jit-compilable.
-
-  Returns:
-    New GradientTransformation wrapping ``inner``.
-  """
-  def mask_pytree(pytree, mask_tree):
-    return jax.tree_map(lambda m, p: p if m else None, mask_tree, pytree)
-
-  def init_fn(params):
-    mask_tree = mask(params) if callable(mask) else mask
-    masked_params = mask_pytree(params, mask_tree)
-    return MaskedState(inner_state=inner.init(masked_params))
-
-  def update_fn(updates, state, params=None):
-    mask_tree = mask(updates) if callable(mask) else mask
-    masked_updates = mask_pytree(updates, mask_tree)
-    masked_params = None if params is None else mask_pytree(params, mask_tree)
-
-    new_masked_updates, new_inner_state = inner.update(
-        masked_updates, state.inner_state, masked_params)
-
-    # new_updates = jax.tree_map(
-    #     lambda m, new_u, old_u: new_u if m else old_u,
-    #     mask_tree, new_masked_updates, updates)  # this takes the old updates
-    new_updates = jax.tree_map(
-        lambda m, new_u: new_u if m else 0.,
-        mask_tree, new_masked_updates)  # this takes zero
-    return new_updates, MaskedState(inner_state=new_inner_state)
-
-  return base.GradientTransformation(init_fn, update_fn)

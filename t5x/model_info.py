@@ -89,7 +89,7 @@ def log_model_info(log_file: Optional[str],
         _log_variable,
         state_utils.get_name_tree(state_dict['state'], keep_empty_nodes=True),
         state_dict['state'], logical_axes['state'], mesh_axes['state'])
-    
+
     logging_util.set_time_logging(logging)  # restore the logging
 
     _log_info_and_write_to_file(writer, 'Total number of parameters (1e6): %.6f',
