@@ -93,15 +93,14 @@ def create_optimizer(config, params_names, steps_per_epoch):
   if config.opt_type in ('adamw',):
     if config.model_type in ('mclr',):
       opt_inner = getattr(adamw, config.opt_type)
-      mmt_inner = momentum.momentum_update()
-      train_moment_freeze = opt_util.filter_parameters(params_names,
-                            functools.partial(opt_util.filter_by_keywords_momentum,
+      mask_trainable = opt_util.filter_parameters(params_names,
+                            functools.partial(opt_util.filter_by_keywords,
                                               keywords=config.freeze_keywords))
 
       def opt(tau, **kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
-        return opt_util.branched(opt_inner=opt_inner(**kwargs),
-                                mmt_inner=mmt_inner(tau=tau),
-                                mask=train_moment_freeze)
+        return opt_util.masked_with_momentum(inner=opt_inner(**kwargs),
+                                              tau=tau,
+                                              mask=mask_trainable)
       with opt_args.unlocked():
         opt_args.tau = config.model.momentum
     elif len(config.freeze_keywords) > 0:

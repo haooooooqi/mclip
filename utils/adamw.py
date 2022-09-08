@@ -37,9 +37,9 @@ def adamw(
     mask: Optional[Union[Any, Callable[[base.Params], Any]]] = None,
 ) -> base.GradientTransformation:
 
+  # just combine multiple steps together
   return combine.chain(
-      _scale_by_adam(
-          b1=b1, b2=b2, eps=eps, eps_root=eps_root, mu_dtype=mu_dtype),
+      _scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root, mu_dtype=mu_dtype),
       transform.add_decayed_weights(weight_decay, mask),
       _scale_by_learning_rate(learning_rate),
   )
