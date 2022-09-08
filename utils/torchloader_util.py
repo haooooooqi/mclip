@@ -44,7 +44,7 @@ class GeneralImageFolder(datasets.ImageFolder):
         body.append("Transform: ")
         if hasattr(self, "transform") and self.transform is not None:
             body += [repr(self.transforms)]
-        body += ["Number of views: {}".format(self.num_views())]
+        body += ["Number of views: {}".format(self.num_views)]
         lines = [head] + [" " * self._repr_indent + line for line in body]
         return '\n'.join(lines)
 

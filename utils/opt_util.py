@@ -1,5 +1,5 @@
-from typing import Tuple, Any
-import tree as nest
+from typing import Tuple, Any, Union, Callable
+import tree
 
 import jax
 import jax.numpy as jnp
@@ -19,15 +19,6 @@ def filter_bias_and_norm(path: Tuple[Any], val: jnp.ndarray):
     return True
 
 
-def filter_posembed(path: Tuple[Any], val: jnp.ndarray):
-    """Filter to exclude pos emb."""
-    del val
-    name = '.'.join(path)
-    if 'pos_embedding' in name:
-        return False
-    return True
-
-
 # ---------------------------------------------------------
 # freeze parameters
 # ---------------------------------------------------------
@@ -42,11 +33,27 @@ def filter_by_keywords(path: Tuple[Any], val: jnp.ndarray, keywords: Tuple[Any])
 
 
 # ---------------------------------------------------------
+# branch parameters to train, momentum, and freeze
+# ---------------------------------------------------------
+def filter_by_keywords_momentum(path: Tuple[Any], val: jnp.ndarray, keywords: Tuple[Any]):
+    """Filter given a list of keywords, and momentum"""
+    del val
+    name = '.'.join(path)
+    if path[0] == 'Target':
+        return 2
+    for kw in keywords:
+        if kw in name:
+            return 0
+    return 1
+
+
+# ---------------------------------------------------------
 # the entrance function:
 # ---------------------------------------------------------
 def filter_parameters(params, filter_fn):
     """Filter the params based on filter_fn."""
-    params_to_filter = nest.map_structure_with_path(filter_fn, params)
+    # https://tree.readthedocs.io/en/latest/api.html
+    params_to_filter = tree.map_structure_with_path(filter_fn, params)
     return params_to_filter
 
 
@@ -59,6 +66,7 @@ def masked(
 ) -> base.GradientTransformation:
 
   def mask_pytree(pytree, mask_tree):
+    # given a mask_tree, only returns parameters that are true
     return jax.tree_map(lambda m, p: p if m else None, mask_tree, pytree)
 
   def init_fn(params):

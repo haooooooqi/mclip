@@ -17,10 +17,8 @@ from optax._src.transform import update_moment, bias_correction, ScaleByAdamStat
 # Momentum update as an optimizer
 # ------------------------------------------
 def momentum_update(
-    momentum: float
+    tau: float
 ) -> base.GradientTransformation:
-
-  return _momentum_update(momentum)
 
   def init_fn(params):
     # do nothing
@@ -28,7 +26,7 @@ def momentum_update(
 
   def update_fn(updates, state, params=None):
     del state
-    delta = momentum_delta(updates, params, momentum)
+    delta = momentum_delta(updates, params, tau)
     return delta, None
 
   return base.GradientTransformation(init_fn, update_fn)

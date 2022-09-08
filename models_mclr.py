@@ -386,7 +386,6 @@ def gather_by_einsum(x, ids):
 class VisionTransformer(nn.Module):
   """VisionTransformer."""
 
-  mask_ratio: float
   sincos: bool
   patches: Any
   transformer: Any
@@ -399,7 +398,7 @@ class VisionTransformer(nn.Module):
   dtype: Any = jnp.float32
 
   def setup(self):
-    self.use_cls_token = (self.classifier in {'token', 'tgap'})
+    self.use_cls_token = (self.classifier in ('token', 'tgap'))
     assert self.use_cls_token  # kaiming: TODO: support both?
 
     self.conv_0 = t5x.layers.Conv(
@@ -519,10 +518,13 @@ class SiameseLearner(nn.Module):
   visualize: bool = False
   knn: Any = None
   clr: Any = None
+  dtype: Any = jnp.float32
 
   def setup(self):
-    self.source_encoder = VisionTransformer(name='Source', image_size=self.image_size, **self.encoder)
-    self.target_encoder = VisionTransformer(name='Target', image_size=self.image_size, **self.encoder)
+    self.encoder.name = 'Source' # hack to change name
+    self.source_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+    self.encoder.name = 'Target'
+    self.target_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
     if self.knn.on:
       self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
 

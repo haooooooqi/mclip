@@ -39,7 +39,7 @@ def get_config():
 
   config.model.encoder.update(vit.get_l16_config())
   config.model.encoder.hidden_size = 1280
-  config.model.encoder.transformer.mlp_dim = config.model.hidden_size * 4
+  config.model.encoder.transformer.mlp_dim = config.model.encoder.hidden_size * 4
   config.model.encoder.transformer.num_layers = 32
   config.model.encoder.transformer.rescale_init = 1.0
 

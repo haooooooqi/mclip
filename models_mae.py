@@ -167,7 +167,7 @@ class VisionTransformer(nn.Module):
     return imgs_vis
 
   def apply_encoder(self, inputs, train):
-    use_cls_token = (self.classifier in {'token', 'tgap'})
+    use_cls_token = (self.classifier in ('token', 'tgap'))
     assert use_cls_token  # kaiming: TODO: support both?
 
     x = t5x.layers.Conv(

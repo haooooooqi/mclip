@@ -144,9 +144,8 @@ def train_step(state, batch, model, rng):
 
   def loss_fn(params):
     """loss function used for training."""
-    # some parameters are considered as mutables here
+    # mutable parameters: KNN related ones
     mutable = [k for k in state.flax_mutables]
-    # has "method" to specify the function to call, default __call__
     outcome = model.apply(
         {'params': params, **state.flax_mutables},
         inputs=batch,
@@ -160,7 +159,7 @@ def train_step(state, batch, model, rng):
   # loss_fn return loss (to be computed grad on); the later 3 are considered variables
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   # the parameters must have been passed to the loss functions, grads is gradients w.r.t. the loss
-  aux, grads = grad_fn(state.params) # [specify the base encoder]
+  aux, grads = grad_fn(state.params)
   # aux[0] is loss, aux[1] is unpacked here
   new_mutables, loss, knn_accuracy = aux[1]
   metrics = {'loss': loss}
