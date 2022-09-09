@@ -53,7 +53,7 @@ STORAGE_BUCKET=gs://xinleic
 ################################################################
 # folders
 ################################################################
-JOB_DIR=${DATASET}/${PRETRAIN_TAG}/${CONFIG}/${EXTRA_ARGS_ALL_TAG}
+JOB_DIR=${DATASET}/${PRETRAIN_TAG}/${JOB_NAME}/${CONFIG}/${EXTRA_ARGS_ALL_TAG}
 WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR}/pretrain
 
 LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR}/pretrain
@@ -105,7 +105,7 @@ mkdir -p /tmp/tpu_logs && sudo chmod a+w -R /tmp/tpu_logs
 if [ -f $LOG_DIR/pretrain.flag ]; then
     # actively call for fine-tuning
     LOG_TUNE_PREFIX="${HOME}/logs/`date +'%Y-%m-%d_%H-%M-%S'`_$$_${JOB_NAME}"
-    nohup $HOME/vit_jax/scripts/finetune.sh $JOB_NAME $TPU_NAME $CONFIG $JOB_DIR $WORK_DIR \
+    nohup $HOME/vit_jax/scripts/finetune.sh $JOB_NAME $TPU_NAME ${PRETRAIN_TAG}_${CONFIG} $JOB_DIR $WORK_DIR \
         $EXTRA_ARGS_COMMON_TAG $EXTRA_ARGS_COMMON 1>${LOG_TUNE_PREFIX}.out 2>${LOG_TUNE_PREFIX}.err &
 fi
 
