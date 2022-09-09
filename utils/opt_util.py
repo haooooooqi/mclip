@@ -1,12 +1,15 @@
-from typing import Tuple, Any, Union, Callable
+from typing import Tuple, Any, Union, Callable, NamedTuple
 import tree
 
 import jax
 import jax.numpy as jnp
 
+import chex
 import flax
 
 from optax._src import base
+from optax._src import numerics
+from optax._src.alias import ScalarOrSchedule
 from optax._src.wrappers import MaskedState
 
 freeze = flax.core.frozen_dict.freeze
@@ -83,9 +86,15 @@ def masked(
 # ------------------------------------------
 # Masked optimizer + Momentum update
 # ------------------------------------------
+class MaskedMomentumState(NamedTuple):
+  """Maintains inner transform state for masked transformations."""
+  count: chex.Array
+  inner_state: Any
+
+
 def masked_with_momentum(
     inner: base.GradientTransformation,
-    ema_momentum: float,
+    ema_momentum: ScalarOrSchedule,
     mask: Union[base.PyTree, Callable[[base.Params], base.PyTree]]
 ) -> base.GradientTransformation:
 
@@ -96,7 +105,7 @@ def masked_with_momentum(
   def init_fn(params):
     mask_tree = mask(params) if callable(mask) else mask
     masked_params = mask_pytree(params, mask_tree)
-    return MaskedState(inner_state=inner.init(masked_params))
+    return MaskedMomentumState(count=jnp.zeros([], jnp.int32), inner_state=inner.init(masked_params))
 
   def update_fn(updates, state, params=None):
     mask_tree = mask(updates) if callable(mask) else mask
@@ -111,13 +120,16 @@ def masked_with_momentum(
         mask_tree, new_masked_updates)
 
     if params is not None and 'Source' in params and 'Target' in params:
-        momentum_updates = momentum_delta(params['Source'], params['Target'], ema_momentum)
+        mmt = ema_momentum(state.count) if callable(ema_momentum) else ema_momentum
+        momentum_updates = momentum_delta(params['Source'], params['Target'], mmt)
         # hack, directly update target with source
         new_updates = unfreeze(new_updates)
         new_updates['Target'] = momentum_updates
         new_updates = freeze(new_updates)
 
-    return new_updates, MaskedState(inner_state=new_inner_state)
+    count_inc = numerics.safe_int32_increment(state.count)
+
+    return new_updates, MaskedMomentumState(count=count_inc, inner_state=new_inner_state)
 
   return base.GradientTransformation(init_fn, update_fn)
 
@@ -127,3 +139,23 @@ def masked_with_momentum(
 def momentum_delta(updates, params, mmt):
   """Compute the exponential moving average of the first moment."""
   return jax.tree_map(lambda x, y: (y - x) * (1 - mmt), params, updates)
+
+
+# ------------------------------------------
+# momentum schedule
+# ------------------------------------------
+def cosine_increase_schedule(
+    init_value: float,
+    steps: int,
+) -> base.Schedule:
+  """Returns a function which implements cosine rate increase."""
+  if not steps > 0:
+    raise ValueError('The cosine_decay_schedule requires positive steps!')
+
+  def schedule(count):
+    count = jnp.minimum(count, steps)
+    cosine_decay = 0.5 * (1 + jnp.cos(jnp.pi * count / steps))
+    value = 1.0 - cosine_decay * (1.0 - init_value)
+    return value
+
+  return schedule

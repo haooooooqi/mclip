@@ -90,6 +90,9 @@ def create_optimizer(config, params_names, steps_per_epoch):
     opt_args.mask = mask_wd
     opt_args.mu_dtype = getattr(jnp, config.opt_mu_dtype)
 
+    del opt_args.ema_momentum
+    del opt_args.ema_schedule
+
   if config.opt_type in ('adamw',):
     if config.model_type in ('mclr',):
       opt_inner = getattr(adamw, config.opt_type)
@@ -100,10 +103,16 @@ def create_optimizer(config, params_names, steps_per_epoch):
 
       def opt(ema_momentum, **kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return opt_util.masked_with_momentum(inner=opt_inner(**kwargs),
-                                              ema_momentum=ema_momentum,
-                                              mask=mask_trainable)
+                                            ema_momentum=ema_momentum,
+                                            mask=mask_trainable)
       with opt_args.unlocked():
-        opt_args.ema_momentum = config.opt.ema_momentum
+        if config.opt.ema_schedule == 'const':
+          opt_args.ema_momentum = config.opt.ema_momentum
+        elif config.opt.ema_schedule == 'cos':
+          opt_args.ema_momentum = opt_util.cosine_increase_schedule(init_value=config.opt.ema_momentum,
+                                                                  steps=config.num_epochs * steps_per_epoch)
+        else:
+          raise NotImplementedError
     elif len(config.freeze_keywords) > 0:
       opt_inner = getattr(adamw, config.opt_type)
       mask_trainable = opt_util.filter_parameters(params_names,

@@ -10,10 +10,8 @@ from optax._src import numerics
 from optax._src import utils
 
 from optax._src import transform
+from optax._src.alias import ScalarOrSchedule
 from optax._src.transform import update_moment, bias_correction, ScaleByAdamState
-
-
-ScalarOrSchedule = Union[float, base.Schedule]
 
 
 def _scale_by_learning_rate(learning_rate: ScalarOrSchedule, flip_sign=True):

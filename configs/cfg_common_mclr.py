@@ -70,6 +70,7 @@ def get_config():
   config.opt.b2 = 0.95
   config.opt.weight_decay = 0.1
   config.opt.ema_momentum = 0.996
+  config.opt.ema_schedule = 'const'
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm)
@@ -101,7 +102,7 @@ def get_config():
   config.model.temp = 0.2 # for contrastive learning
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096
-  config.model.loss_type = 'cos'
+  config.model.loss_type = 'info-nce'
   config.model.visualize = False
 
   # encoder

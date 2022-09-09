@@ -35,7 +35,7 @@ import jax
 import jax.numpy as jnp
 import optax
 
-import utils.adamw
+from utils import opt_util
 
 
 freeze = flax.core.frozen_dict.freeze
@@ -236,6 +236,11 @@ class OptaxStatePartitionRules:
       # MaskedState
       optax.MaskedState:
           lambda state, params_axes: optax.MaskedState(
+              inner_state=OptaxStatePartitionRules.derive_optax_logical_axes(
+                  state.inner_state, params_axes)),
+      opt_util.MaskedMomentumState:
+          lambda state, params_axes: opt_util.MaskedMomentumState(
+              count=None,
               inner_state=OptaxStatePartitionRules.derive_optax_logical_axes(
                   state.inner_state, params_axes)),
       optax.InjectHyperparamsState:
