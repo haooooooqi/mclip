@@ -99,6 +99,8 @@ def get_config():
   config.model = ml_collections.ConfigDict()
   config.model.mask_ratio = 0.8 # for extrema
   config.model.temp = 0.1 # for contrastive learning
+  config.model.pred_layers = 2
+  config.model.pred_dim_hidden = 4096
   config.model.visualize = False
 
   # encoder

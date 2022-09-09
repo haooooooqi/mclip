@@ -437,10 +437,10 @@ class VisionTransformer(nn.Module):
       kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
       if i < self.proj_layers - 1:
         dim = self.proj_dim_hidden
-        post_relu = True
+        post_act = True
       else:
         dim = self.proj_dim_out
-        post_relu = False
+        post_act = False
 
       projector.append(t5x.layers.Dense(
           features=dim,
@@ -450,8 +450,13 @@ class VisionTransformer(nn.Module):
           kernel_axes=kernel_axes,
           name='proj{}'.format(i),
       ))
-      if post_relu:
-        projector.append(nn.relu)
+      if post_act:
+        projector.append(t5x.layers.LayerNorm(
+          dtype=self.dtype,
+          axes=(kernel_axes[-1],),
+          name='proj_ln{}'.format(i),
+        ))
+        projector.append(nn.gelu)
 
       flip = not flip
 
@@ -522,10 +527,15 @@ class SiameseLearner(nn.Module):
   dtype: Any = jnp.float32
 
   def setup(self):
+    # source
     self.encoder.name = 'Source' # hack to change name
     self.source_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+
+    # target
     self.encoder.name = 'Target'
     self.target_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+
+    # knn
     if self.knn.on:
       self.online_knn = onlineknn_util.OnlineKNN(knn=self.knn)
 
@@ -536,6 +546,37 @@ class SiameseLearner(nn.Module):
                                 name='knn_postnorm')
       elif self.knn.postnorm != 'None':
         raise NotImplementedError
+
+    # predictor
+    flip = False if self.encoder.proj_layers % 2 == 0 else True
+    predictor = []
+    for i in range(self.pred_layers):
+      kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
+      if i < self.pred_layers - 1:
+        dim = self.pred_dim_hidden
+        post_act = True
+      else:
+        dim = self.encoder.proj_dim_out
+        post_act = False
+
+      predictor.append(t5x.layers.Dense(
+          features=dim,
+          dtype=self.dtype,
+          kernel_init=mlp_kernel_init,
+          bias_init=mlp_bias_init,
+          kernel_axes=kernel_axes,
+          name='pred{}'.format(i),
+      ))
+      if post_act:
+        predictor.append(t5x.layers.LayerNorm(
+          dtype=self.dtype,
+          axes=(kernel_axes[-1],),
+          name='pred_ln{}'.format(i),
+        ))
+        predictor.append(nn.gelu)
+
+      flip = not flip
+    self.predictor = nn.Sequential(predictor)
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -562,30 +603,23 @@ class SiameseLearner(nn.Module):
     # l2 normalization
     source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
     target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
-
-    logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
-    labels_one_hot = jnp.eye(logits.shape[0])
-
-    # asymmetric loss
-    xent = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
-    xent = xent.mean() * self.temp
-    return xent
+    # cosine similarity
+    logits = jnp.einsum('nc,mc->nm', source, target)
+    return -logits.mean()
 
   def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
     labels = inputs['label']
 
-    # split the images
-    assert len(imgs.shape) == 5 and imgs.shape[1] == 2
-    imgs0 = imgs[:, 0, :, :, :]
-    imgs1 = imgs[:, 1, :, :, :]
-
-    # apply encoder to masked imgs0
-    _, p0 = self.source_encoder(imgs0, train, self.mask_ratio)
-    x1, p1 = self.target_encoder(imgs1, train)
+    # the augmentations are shared, just w/ or w/o masking
+    _, p0 = self.source_encoder(imgs, train, self.mask_ratio)
+    x1, p1 = self.target_encoder(imgs, train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
+
+    # predictor
+    p0 = self.predictor(p0)
 
     # compute loss
     loss = self.compute_loss(p0, p1)
