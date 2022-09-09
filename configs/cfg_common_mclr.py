@@ -41,7 +41,7 @@ def get_config():
   # `name` argument of tensorflow_datasets.builder()
   config.dataset = 'imagenet2012:5.*.*'
   config.image_size = 224
-  config.num_views = 2
+  config.num_views = 1
 
   config.learning_rate = 1.5e-4  # this is the base lr
   config.lr_schedule = 'cos'
@@ -69,7 +69,7 @@ def get_config():
   config.opt.b1 = 0.9
   config.opt.b2 = 0.95
   config.opt.weight_decay = 0.1
-    config.opt.ema_momentum = 0.996
+  config.opt.ema_momentum = 0.996
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm)

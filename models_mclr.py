@@ -521,9 +521,10 @@ class SiameseLearner(nn.Module):
   image_size: int
   mask_ratio: float
   temp: float
+  pred_layers: int
+  pred_dim_hidden: int
   visualize: bool = False
   knn: Any = None
-  clr: Any = None
   dtype: Any = jnp.float32
 
   def setup(self):
