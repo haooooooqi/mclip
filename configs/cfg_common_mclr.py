@@ -101,6 +101,7 @@ def get_config():
   config.model.temp = 0.2 # for contrastive learning
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096
+  config.model.loss_type = 'cos'
   config.model.visualize = False
 
   # encoder

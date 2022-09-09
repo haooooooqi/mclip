@@ -11,6 +11,7 @@ set -x
 # before --: options only for training
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
+echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.loss_type=info-nce" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mae $salt 128 base imagenet-1k --config.seed=0" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mae $salt 256 large imagenet-1k --config.seed=0" >> $queue_file

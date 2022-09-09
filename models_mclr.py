@@ -593,6 +593,7 @@ class SiameseLearner(nn.Module):
   temp: float
   pred_layers: int
   pred_dim_hidden: int
+  loss_type: str = 'cos'
   visualize: bool = False
   knn: Any = None
   dtype: Any = jnp.float32
@@ -674,9 +675,25 @@ class SiameseLearner(nn.Module):
     # l2 normalization
     source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
     target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
-    # cosine similarity
+
+    if self.loss_type == 'cos':
+      return self.cosine(source, target)
+    elif self.loss_type == 'info-nce':
+      return self.info_nce(source, target)
+    else:
+      raise NotImplementedError
+
+  def cosine(self, source, target):
     logits = jnp.einsum('nc,mc->nm', source, target)
     return -logits.mean()
+
+  def info_nce(self, source, target):
+    logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
+    labels_one_hot = jnp.eye(logits.shape[0])
+
+    # asymmetric loss
+    xent = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    return xent.mean() * self.temp
 
   def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
