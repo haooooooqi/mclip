@@ -8,23 +8,6 @@ from typing import Tuple, Any
 
 
 # ---------------------------------------------------------
-# rescale layers
-# ---------------------------------------------------------
-def layer_rescale(path: Tuple[Any], val: jnp.ndarray):
-    """Rescale the last layer of each block by layer_id."""
-    del val
-    # path[0] = 'Transformer'
-    if len(path) > 3 and path[1].startswith("encoderblock_") and path[-1] == 'kernel':
-        if (path[-3] == 'self_attention' and path[-2] == 'out') or \
-                (path[-3] == 'mlp' and path[-2] == 'Dense_1'):
-            layer_id = path[1][len("encoderblock_"):]  # remove prefix
-            layer_id = int(layer_id) + 1
-            rescale = (2.0 * layer_id) ** -.5
-            return rescale
-    return 1.
-
-
-# ---------------------------------------------------------
 # exclude wd
 # ---------------------------------------------------------
 def filter_bias_and_norm(path: Tuple[Any], val: jnp.ndarray):

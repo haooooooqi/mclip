@@ -8,7 +8,7 @@ set -x
 ################################################################
 JOB_NAME=$1
 TPU_NAME=$2
-CONFIG=$3
+PRETRAIN_CONFIG=$3
 JOB_DIR=$4
 WORK_DIR_PRETRAIN=$5
 EXTRA_ARGS_COMMON_TAG=$6
@@ -56,7 +56,7 @@ export LOCAL_REDIRECT_CKPT_DIR=${WORK_DIR}
 
 python3 main.py \
     --workdir=${LOG_DIR} \
-    --config=configs/cfg_vit_${CONFIG}.py \
+    --config=configs/cfg_vit_${PRETRAIN_CONFIG}.py \
     --config.pretrain_dir=${WORK_DIR_PRETRAIN} \
     --config.torchload.data_dir=/datasets/${DATASET} \
     ${EXTRA_ARGS_COMMON} \
