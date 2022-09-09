@@ -77,17 +77,17 @@ def create_optimizer(config, params_names, steps_per_epoch):
   learning_rate_fn = create_learning_rate_fn(config, abs_learning_rate, steps_per_epoch)
 
   # optional: exclude some wd
-  mask = None
+  mask_wd = None
   if config.exclude_wd:
-    mask = jax.tree_map(lambda x: x,
+    mask_wd = jax.tree_map(lambda x: x,
       opt_util.filter_parameters(params_names, opt_util.filter_bias_and_norm)
     )
-  logging.info(colored('Apply wd: {}'.format(mask), "blue"))
+  logging.info(colored('Apply wd: {}'.format(t5x.state_utils.str_flatten_dict(mask_wd)), "blue"))
 
   opt_args = copy.deepcopy(config.opt)
   with opt_args.unlocked():
     opt_args.learning_rate = learning_rate_fn
-    opt_args.mask = mask
+    opt_args.mask = mask_wd
     opt_args.mu_dtype = getattr(jnp, config.opt_mu_dtype)
 
   if config.opt_type in ('adamw',):
@@ -96,6 +96,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
       mask_trainable = opt_util.filter_parameters(params_names,
                             functools.partial(opt_util.filter_by_keywords,
                                               keywords=config.freeze_keywords))
+      logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
       def opt(ema_momentum, **kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return opt_util.masked_with_momentum(inner=opt_inner(**kwargs),
@@ -108,6 +109,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
       mask_trainable = opt_util.filter_parameters(params_names,
                             functools.partial(opt_util.filter_by_keywords,
                                               keywords=config.freeze_keywords))
+      logging.info(colored('Trainable: {}'.format(t5x.state_utils.str_flatten_dict(mask_trainable)), "red"))
 
       def opt(**kwargs) -> optax._src.base.GradientTransformation:  # same type as opt
         return opt_util.masked(inner=opt_inner(**kwargs), mask=mask_trainable)
