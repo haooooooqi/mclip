@@ -41,7 +41,6 @@ def get_config():
   config.model.encoder.hidden_size = 1024
   config.model.encoder.transformer.mlp_dim = config.model.encoder.hidden_size * 4
   config.model.encoder.transformer.num_layers = 24
-  config.model.encoder.transformer.rescale_init = 1.0
 
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False

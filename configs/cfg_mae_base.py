@@ -41,7 +41,6 @@ def get_config():
   config.model.hidden_size = 768
   config.model.transformer.mlp_dim = config.model.hidden_size * 4
   config.model.transformer.num_layers = 12
-  config.model.transformer.rescale_init = 1.0
 
   config.partitioning.num_partitions = 1
   config.partitioning.partition_states = False
