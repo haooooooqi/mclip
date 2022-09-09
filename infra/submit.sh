@@ -10,7 +10,7 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 default imagenet-1k" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mae $salt 128 base imagenet-1k --config.seed=0" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mae $salt 256 large imagenet-1k --config.seed=0" >> $queue_file

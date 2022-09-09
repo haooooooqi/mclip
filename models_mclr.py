@@ -466,6 +466,7 @@ class VisionTransformer(nn.Module):
   proj_layers: int
   proj_dim_hidden: int
   proj_dim_out: int
+  classifier: str = 'token' # not used
   dtype: Any = jnp.float32
 
   def setup(self):
