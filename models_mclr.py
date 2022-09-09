@@ -346,7 +346,7 @@ class CrossDecoder1DBlock(nn.Module):
   attention_dropout_rate: float = 0.1
   droppath_rate: float = 0.0
   layer_id: int = None
-  rescale_out: float = 1.
+  rescale_out: float = 1.0
 
   def setup(self):
     self.ln_0 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
@@ -356,7 +356,7 @@ class CrossDecoder1DBlock(nn.Module):
         num_heads=self.num_heads,
         qkv_features=self.hidden_size,
         out_features=self.hidden_size,
-        qkv_kernel_init=lambda *args: qkv_kernel_init(*args),
+        qkv_kernel_init=qkv_kernel_init,
         out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_out,
     )
     self.dropout_0 = nn.Dropout(rate=self.dropout_rate)
