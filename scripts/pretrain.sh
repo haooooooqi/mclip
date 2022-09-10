@@ -59,38 +59,40 @@ WORK_DIR=${STORAGE_BUCKET}/checkpoints/${JOB_DIR}/pretrain
 LOG_DIR=/checkpoint/$USER/logs/${JOB_DIR}/pretrain
 sudo mkdir -p ${LOG_DIR} && sudo chmod -R 777 ${LOG_DIR}
 
-################################################################
-# staging
-################################################################
-TAG_WITH_TIME=${JOB_NAME}_`date +'%Y-%m-%d_%H-%M-%S'`
-STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${FOLDER}_${TAG_WITH_TIME}
-mkdir -p $STAGE_DIR
-rsync -avz $HOME/$FOLDER/ $STAGE_DIR/
+if [ ! -f ${LOG_DIR}/pretrain.flag ]; then
+    ################################################################
+    # staging
+    ################################################################
+    TAG_WITH_TIME=${JOB_NAME}_`date +'%Y-%m-%d_%H-%M-%S'`
+    STAGE_DIR=/checkpoint/$USER/stages/${JOB_DIR}/${FOLDER}_${TAG_WITH_TIME}
+    mkdir -p $STAGE_DIR
+    rsync -avz $HOME/$FOLDER/ $STAGE_DIR/
 
-# so that it can be sync-ed well
-sleep 5
+    # so that it can be sync-ed well
+    sleep 5
 
-################################################################
-# launch on all nodes
-################################################################
-cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all --command "
-cd $STAGE_DIR
+    ################################################################
+    # launch on all nodes
+    ################################################################
+    cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} --zone europe-west4-a --worker all --command "
+    cd $STAGE_DIR
 
-export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
-export LOCAL_REDIRECT_CKPT_DIR=${WORK_DIR}
+    export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
+    export LOCAL_REDIRECT_CKPT_DIR=${WORK_DIR}
 
-python3 main.py \
-    --workdir=${LOG_DIR} \
-    --config=configs/cfg_${PRETRAIN_TAG}_${CONFIG}.py \
-    --config.resume_dir='' \
-    --config.torchload.data_dir=/datasets/${DATASET} \
-    ${EXTRA_ARGS_ALL} \
-    2>&1 | tee $LOG_DIR/pretrain_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
+    python3 main.py \
+        --workdir=${LOG_DIR} \
+        --config=configs/cfg_${PRETRAIN_TAG}_${CONFIG}.py \
+        --config.resume_dir='' \
+        --config.torchload.data_dir=/datasets/${DATASET} \
+        ${EXTRA_ARGS_ALL} \
+        2>&1 | tee $LOG_DIR/pretrain_\${SSH_CLIENT// /_}_${TAG_WITH_TIME}.log
 
-if [ \${PIPESTATUS[0]} -eq 0 ]; then
-    touch $LOG_DIR/pretrain.flag
+    if [ \${PIPESTATUS[0]} -eq 0 ]; then
+        touch $LOG_DIR/pretrain.flag
+    fi
+    " 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 fi
-" 2>&1 | tee $LOG_DIR/pretrain_main_${TAG_WITH_TIME}.log
 
 ################################################################
 # cleanup on all nodes
