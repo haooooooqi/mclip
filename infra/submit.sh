@@ -17,7 +17,7 @@ set -x
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.warmup_epochs=10" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.batch_size=4096" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 large imagenet-1k --config.batch_size=4096" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 large imagenet-1k --config.batch_size=4096" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.batch_size=4096" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.opt.ema_schedule=cos" >> $queue_file
