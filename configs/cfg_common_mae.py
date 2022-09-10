@@ -77,7 +77,7 @@ def get_config():
   # aug config
   config.aug = ml_collections.ConfigDict()
 
-  config.aug.area_range = (0.2, 1)
+  config.aug.area_min = 0.2
   config.aug.aspect_ratio_range = (3. / 4, 4. / 3.)
   config.aug.label_smoothing = 0.0  # not used
   config.aug.autoaug = None  # autoaug, randaug, or None

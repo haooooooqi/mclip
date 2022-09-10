@@ -10,7 +10,8 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
+echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.aug.area_min=0.08" >> $queue_file
+echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.aug.area_min=0.08" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.warmup_epochs=10" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.warmup_epochs=10" >> $queue_file

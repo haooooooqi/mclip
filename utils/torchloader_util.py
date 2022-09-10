@@ -88,7 +88,7 @@ def build_transform(is_train, input_size, aug):
         transform = create_transform(
             input_size=input_size,
             is_training=True,
-            scale=aug.area_range,
+            scale=(aug.area_min, 1.0),
             ratio=aug.aspect_ratio_range,
             hflip=0.5,
             vflip=0.,
