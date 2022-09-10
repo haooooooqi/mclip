@@ -96,18 +96,18 @@ def load_from_jax_pretrain(state, pretrain_dir):
         'Not matching: {}, {}, {}'.format(k, named_state_params[k].shape, named_load_params[k].shape)
       if named_state_params[k].shape != named_load_params[k].shape:
         logging.info('Reshaping: {}, {}, {}'.format(k, named_state_params[k].shape, named_load_params[k].shape))
-        named_load_params[k] = named_load_params[k].reshape(named_state_params[k].shape)      
+        named_load_params[k] = named_load_params[k].reshape(named_state_params[k].shape)
       named_params[k] = named_load_params[k]
     else:
       assert False, 'Error: {}'.format(k)
-  
+
   list_params = []
   for k in named_params.keys():
     list_params.append(named_params[k])
 
   params = tu.tree_unflatten(tree_ref, list_params)
   params = flax.core.frozen_dict.freeze(params)
-  
+
   # sanity
   tu.tree_map(lambda x, y: (x.shape, y.shape), params, state_params)
   verify = tu.tree_map(lambda x, y: (x.shape == y.shape), params, state_params)

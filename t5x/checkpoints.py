@@ -913,6 +913,9 @@ class Checkpointer(object):
     ckpt_state_dict = self._get_optimizer_state_dict(ckpt_contents,
                                                      state_transformation_fns)
 
+    if 'Source' in ckpt_state_dict['target'].keys():
+      ckpt_state_dict['target'] = ckpt_state_dict['target']['Source']
+
     # The state dict may contain TensorStore specs that need to be read.
     dummy_spec = ts.Spec({'driver': 'zarr', 'kvstore': {'driver': 'memory'}})
 
