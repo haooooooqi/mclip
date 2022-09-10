@@ -466,6 +466,7 @@ class VisionTransformer(nn.Module):
   proj_layers: int
   proj_dim_hidden: int
   proj_dim_out: int
+  num_decoder_layer: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
 
@@ -495,18 +496,20 @@ class VisionTransformer(nn.Module):
                           **self.transformer,
                           prefix='encoder')
 
-    self.cls_token = t5x.layers.param_with_axes('cls_top',
-      clstoken_init,
-      (1, 1, self.hidden_size),
-      self.dtype,
-      axes=('_null0', '_null1', 'embed')
-    )
+    if self.num_decoder_layer > 0:
+      self.cls_token = t5x.layers.param_with_axes('cls_top',
+        clstoken_init,
+        (1, 1, self.hidden_size),
+        self.dtype,
+        axes=('_null0', '_null1', 'embed')
+      )
 
-    self.decoder = CrossDecoder(name='CrossTransformer',
-                          hidden_size=self.hidden_size,
-                          mlp_dim=self.transformer.mlp_dim,
-                          num_heads=self.transformer.num_heads,
-                          prefix='decoder')
+      self.decoder = CrossDecoder(name='CrossTransformer',
+                            hidden_size=self.hidden_size,
+                            mlp_dim=self.transformer.mlp_dim,
+                            num_heads=self.transformer.num_heads,
+                            num_layers=self.num_decoder_layer,
+                            prefix='decoder')
 
     flip = False
     projector = []
@@ -571,12 +574,15 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
-    # append class token
-    cls_token = jnp.tile(self.cls_token, [n, 1, 1])
+    if self.num_decoder_layer > 0:
+      # append class token
+      cls_token = jnp.tile(self.cls_token, [n, 1, 1])
 
-    # cross attention with class token
-    p = self.decoder(x, cls_token, train=train)
-    p = jnp.squeeze(p, axis=1)
+      # cross attention with class token
+      p = self.decoder(x, cls_token, train=train)
+      p = jnp.squeeze(p, axis=1)
+    else:
+      p = jnp.mean(x, axis=1)
 
     # apply projector
     p = self.projector(p)

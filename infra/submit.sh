@@ -10,8 +10,18 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.aug.area_min=0.08" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.aug.area_min=0.08" >> $queue_file
+echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.opt.ema_momentum=0." >> $queue_file
+
+# ~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=0
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.batch_size=4096 --config.learning_rate 1e-4" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.batch_size=4096 --config.learning_rate 1e-4" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=1" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.encoder.num_decoder_layer=1" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.aug.area_min=0.08" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.aug.area_min=0.08" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.warmup_epochs=10" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.warmup_epochs=10" >> $queue_file
