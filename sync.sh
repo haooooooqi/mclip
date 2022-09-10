@@ -2,10 +2,15 @@
 
 DEST_DEV=vit_jax
 
-for i in configs scripts t5x utils; do
-    rsync -aiz --delete --partial --progress $i/ devtpux4:$DEST_DEV/$i/
-    rsync -aiz --delete --partial --progress $i/ devtpuv0:$DEST_DEV/$i/
-done
+sync_tpu () {
+    MACHINE=$1
 
-rsync -aiz --delete --partial --progress *.py devtpux4:$DEST_DEV/
-rsync -aiz --delete --partial --progress *.py devtpuv0:$DEST_DEV/
+    rsync -aiz --delete --partial --progress *.py $MACHINE:$DEST_DEV/
+
+    for i in configs scripts t5x utils; do
+        rsync -aiz --delete --partial --progress $i/ $MACHINE:$DEST_DEV/$i/
+    done
+}
+
+sync_tpu devtpux4
+# sync_tpu devtpuv0
