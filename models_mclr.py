@@ -542,10 +542,11 @@ class VisionTransformer(nn.Module):
 
     self.projector = nn.Sequential(projector)
 
-  def random_mask(self, x, mask_ratio):
+  def random_mask(self, x, mask_ratio, num_crops):
     if mask_ratio > 0.:
-      N, L, _ = x.shape  # batch, length, dim
-      len_keep = int(L * (1 - mask_ratio))
+      N, L, C = x.shape  # batch, length, dim
+
+      len_keep = int(L * (1. - mask_ratio)) * num_crops
 
       rng = self.make_rng('dropout')
       noise = random.uniform(rng, shape=x.shape[:2])
@@ -556,11 +557,14 @@ class VisionTransformer(nn.Module):
       ids_keep = ids_shuffle[:, :len_keep]
       x = gather_by_einsum(x, ids_keep)
 
+      # multi-crop
+      x = jnp.reshape(x, [N * num_crops, len_keep // num_crops, C])
+
     x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'embed'))
 
     return x
 
-  def __call__(self, inputs, train, mask_ratio=0.):
+  def __call__(self, inputs, train, mask_ratio=0., num_crops=1):
     x = self.conv_0(inputs)
 
     n, h, w, c = x.shape
@@ -569,14 +573,14 @@ class VisionTransformer(nn.Module):
     x = self.pos_embed(x)
 
     # masking: length -> length * mask_ratio
-    x = self.random_mask(x, mask_ratio)
+    x = self.random_mask(x, mask_ratio, num_crops)
 
     # apply the encoder
     x = self.encoder(x, train=train)
 
     if self.num_decoder_layer > 0:
       # append class token
-      cls_token = jnp.tile(self.cls_token, [n, 1, 1])
+      cls_token = jnp.tile(self.cls_token, [n * num_crops, 1, 1])
 
       # cross attention with class token
       p = self.decoder(x, cls_token, train=train)
@@ -596,6 +600,7 @@ class SiameseLearner(nn.Module):
   encoder: Any
   image_size: int
   mask_ratio: float
+  num_crops: int
   temp: float
   pred_layers: int
   pred_dim_hidden: int
@@ -608,6 +613,9 @@ class SiameseLearner(nn.Module):
     # source
     self.encoder.name = 'Source' # hack to change name
     self.source_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+
+    # assert the number is the same
+    assert (1. - self.mask_ratio) * self.num_crops <= 1.
 
     # target
     self.encoder.name = 'Target'
@@ -695,10 +703,10 @@ class SiameseLearner(nn.Module):
 
   def info_nce(self, source, target):
     logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
-    labels_one_hot = jnp.eye(logits.shape[0])
+    labels = jnp.tile(jnp.arange(logits.shape[-1], dtype=jnp.int32), self.num_crops)
 
     # asymmetric loss
-    xent = optax.softmax_cross_entropy(logits=logits, labels=labels_one_hot)
+    xent = optax.softmax_cross_entropy_with_integer_labels(logits=logits, labels=labels)
     return xent.mean() * self.temp
 
   def __call__(self, inputs, *, train, update=True):
@@ -706,7 +714,7 @@ class SiameseLearner(nn.Module):
     labels = inputs['label']
 
     # the augmentations are shared, just w/ or w/o masking
-    _, p0 = self.source_encoder(imgs, train, self.mask_ratio)
+    _, p0 = self.source_encoder(imgs, train, self.mask_ratio, self.num_crops)
     x1, p1 = self.target_encoder(imgs, train)
 
     # optionally apply knn

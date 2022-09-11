@@ -10,9 +10,13 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.opt.ema_momentum=0." >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.lr_schedule=linear" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.min_abs_lr=8e-5" >> $queue_file
 
-# ~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=0
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.opt.ema_momentum=0." >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=0" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 large imagenet-1k --config.model.encoder.num_decoder_layer=0" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.batch_size=4096 --config.learning_rate 1e-4" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.batch_size=4096 --config.learning_rate 1e-4" >> $queue_file

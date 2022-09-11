@@ -98,7 +98,8 @@ def get_config():
   # model config
   config.model_type = 'mclr'
   config.model = ml_collections.ConfigDict()
-  config.model.mask_ratio = 0.8 # for extrema
+  config.model.mask_ratio = 0.8
+  config.model.num_crops = 1
   config.model.temp = 0.2 # for contrastive learning
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096
