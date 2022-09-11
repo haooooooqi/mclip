@@ -703,7 +703,7 @@ class SiameseLearner(nn.Module):
 
   def info_nce(self, source, target):
     logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
-    labels = jnp.tile(jnp.arange(logits.shape[-1], dtype=jnp.int32), self.num_crops)
+    labels = jnp.tile(jnp.arange(logits.shape[-1], dtype=jnp.int32)[:,None], (1, self.num_crops)).flatten()
 
     # asymmetric loss
     xent = optax.softmax_cross_entropy_with_integer_labels(logits=logits, labels=labels)
