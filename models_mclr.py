@@ -698,7 +698,8 @@ class SiameseLearner(nn.Module):
       raise NotImplementedError
 
   def cosine(self, source, target):
-    logits = jnp.einsum('nc,mc->nm', source, target)
+    source = jnp.reshape(source, [source.shape[0] // self.num_crops, self.num_crops, -1])
+    logits = jnp.einsum('nvc,nc->nv', source, target)
     return -logits.mean()
 
   def info_nce(self, source, target):

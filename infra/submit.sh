@@ -10,6 +10,9 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.num_crops=1" >> $queue_file
+
 # for am in .08 .2 .5; do
 #     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.aug.area_min=$am" >> $queue_file
 # done
