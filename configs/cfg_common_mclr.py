@@ -44,7 +44,7 @@ def get_config():
   config.num_views = 1
 
   config.learning_rate = 1.5e-4  # this is the base lr
-  config.lr_schedule = 'cos'
+  config.lr_schedule = 'linear'
   config.warmup_epochs = 40.0
   config.min_abs_lr = 0.  # this is abs lr
   config.warmup_abs_lr = 0.  # this is abs lr
@@ -70,7 +70,7 @@ def get_config():
   config.opt.b2 = 0.95
   config.opt.weight_decay = 0.1
   config.opt.ema_momentum = 0.996
-  config.opt.ema_schedule = 'const'
+  config.opt.ema_schedule = 'cos'
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm)
@@ -79,7 +79,7 @@ def get_config():
   # aug config
   config.aug = ml_collections.ConfigDict()
 
-  config.aug.area_min = 0.2
+  config.aug.area_min = 0.08
   config.aug.aspect_ratio_range = (3. / 4, 4. / 3.)
   config.aug.label_smoothing = 0.0  # not used
   config.aug.autoaug = None  # autoaug, randaug, or None
@@ -99,7 +99,7 @@ def get_config():
   config.model_type = 'mclr'
   config.model = ml_collections.ConfigDict()
   config.model.mask_ratio = 0.8
-  config.model.num_crops = 1
+  config.model.num_crops = 2
   config.model.temp = 0.2 # for contrastive learning
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096

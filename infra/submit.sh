@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c4`
-salt=4p90
+salt=5p90
 queue_file=$HOME/tpus/queue.txt
 lock_dir=$HOME/tpus/lock
 mkdir -p $lock_dir
@@ -10,12 +10,28 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-for nc in 2 4 5; do
-    echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.num_crops=$nc" >> $queue_file
-    echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.num_crops=$nc --config.model.encoder.num_decoder_layer=0" >> $queue_file
-done
+# for am in .08 .2 .5; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.aug.area_min=$am" >> $queue_file
+# done
 
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.num_crops=2 --config.model.encoder.num_decoder_layer=0" >> $queue_file
+# for b2 in .95 .99 .999; do
+#     for mmt in .99 .996; do
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.opt.b2=$b2 --config.opt.ema_momentum=$mmt" >> $queue_file
+#     done
+# done
+
+# for temp in .1 .3; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.temp=$temp" >> $queue_file
+# done
+
+# for nc in 2 4 5; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.num_crops=$nc" >> $queue_file
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.num_crops=$nc --config.model.encoder.num_decoder_layer=0" >> $queue_file
+# done
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.num_crops=2 --config.model.encoder.num_decoder_layer=0" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.num_crops=2" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.num_crops=2 --config.opt.ema_schedule=cos" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.batch_size=4096 --config.learning_rate 1e-4 --config.model.encoder.num_decoder_layer=0" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 512 huge imagenet-1k --config.model.encoder.num_decoder_layer=0" >> $queue_file

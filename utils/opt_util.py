@@ -150,7 +150,7 @@ def cosine_increase_schedule(
 ) -> base.Schedule:
   """Returns a function which implements cosine rate increase."""
   if not steps > 0:
-    raise ValueError('The cosine_decay_schedule requires positive steps!')
+    raise ValueError('The cosine_increase_schedule requires positive steps!')
 
   def schedule(count):
     count = jnp.minimum(count, steps)
