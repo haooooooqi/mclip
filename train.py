@@ -169,6 +169,9 @@ def train_step(state, batch, model, rng):
   # only for metric logging
   lr = state._optimizer.optimizer_def.metric_learning_rate_fn(state.step)
   metrics['learning_rate'] = lr
+  if 'metric_momentum_fn' in dir(state._optimizer.optimizer_def):
+    mmt = state._optimizer.optimizer_def.metric_momentum_fn(state.step)
+    metrics['momentum'] = mmt
 
   new_state = state.apply_gradient(
     grads,

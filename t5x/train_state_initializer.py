@@ -128,7 +128,11 @@ def create_optimizer(config, params_names, steps_per_epoch):
     # t5x will wrap the optimizer
     opt = t5x.optimizers.wrap_optax_optimizer(opt)
     opt = opt(**opt_args)
-    opt.metric_learning_rate_fn = learning_rate_fn  # hack for metric
+
+    # for metrics
+    opt.metric_learning_rate_fn = learning_rate_fn
+    if config.model_type in ('mclr',) and config.opt.ema_schedule == 'cos':
+      opt.metric_momentum_fn = opt_args.ema_momentum
 
   else:
     raise NotImplementedError
