@@ -399,9 +399,58 @@ class CrossDecoder1DBlock(nn.Module):
     return y + x
 
 
-class CrossDecoder(nn.Module):
+class ClassDecoder1DBlock(nn.Module):
+  """Transformer decoder layer from CaiT."""
+  hidden_size: int
+  mlp_dim: int
+  num_heads: int
+  dtype: Dtype = jnp.float32
+  layer_id: int = None
+  rescale_out: float = 1.0
+
+  def setup(self):
+    self.ln_0 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
+    self.self_attention = MsaBlock(
+        dtype=self.dtype,
+        dropout_rate=0.,
+        num_heads=self.num_heads,
+        qkv_features=self.hidden_size,
+        out_features=self.hidden_size,
+        qkv_kernel_init=qkv_kernel_init,
+        out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_out,
+    )
+
+    self.ln_1 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
+    self.mlp = MlpBlock(
+        mlp_dim=self.mlp_dim,
+        dtype=self.dtype,
+        out_dim=self.hidden_size,
+        dropout_rate=0.,
+        kernel_init=mlp_kernel_init,
+        bias_init=mlp_bias_init,
+        rescale_out=self.rescale_out,
+    )
+
+  def __call__(self, inputs, queries, deterministic):
+    """Applies decoder module."""
+
+    # Self attention.
+    q = self.ln_0(queries)
+    x = jnp.concatenate([q, inputs], axis=1)
+    t = self.self_attention(q, x, deterministic=deterministic)
+    t = t + queries
+
+    # MLP block.
+    y = self.ln_1(t)
+    y = self.mlp(y, deterministic=deterministic)
+
+    return y + t
+
+
+class Decoder(nn.Module):
   """Transformer Model Decoder for sequence to sequence translation."""
 
+  decoder_type: str
   hidden_size: int
   mlp_dim: int
   num_heads: int
@@ -411,15 +460,20 @@ class CrossDecoder(nn.Module):
   remat_policy: str = 'none'
 
   def setup(self):
-    # this should be the activation check-pointing trigger
-    BlockLayer = CrossDecoder1DBlock
+    if self.decoder_type == 'cross':
+      BlockLayer = CrossDecoder1DBlock
+    elif self.decoder_type == 'class':
+      BlockLayer = ClassDecoder1DBlock
+    else:
+      raise NotImplementedError
+
     if self.remat_policy not in (None, 'none'):
       if self.remat_policy == 'minimal':
         policy = jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims
       else:
         policy = None
       BlockLayer = remat(
-          CrossDecoder1DBlock,
+          BlockLayer,
           prevent_cse=True,
           policy=policy,
           static_argnums=(1,))
@@ -470,6 +524,7 @@ class VisionTransformer(nn.Module):
   proj_dim_hidden: int
   proj_dim_out: int
   num_queries: int
+  decoder_type: str
   num_decoder_layer: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
@@ -508,7 +563,8 @@ class VisionTransformer(nn.Module):
         axes=('_null0', '_null1', 'embed')
       )
 
-      self.decoder = CrossDecoder(name='CrossTransformer',
+      self.decoder = Decoder(name='DecoderTransformer',
+                            decoder_type=self.decoder_type,
                             hidden_size=self.hidden_size,
                             mlp_dim=self.transformer.mlp_dim,
                             num_heads=self.transformer.num_heads,

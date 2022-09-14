@@ -10,12 +10,21 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k" >> $queue_file
+for lw in .1 .3 3.; do
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.intra_weight=$lw" >> $queue_file
+done
 
-# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_decoder_layer=1" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
+
+for nl in 4 8; do
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_decoder_layer=$nl" >> $queue_file
+done
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos" >> $queue_file
-# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_queries=8" >> $queue_file
+
+for nq in 2 4; do
+    echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_queries=$nq" >> $queue_file
+done
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.num_epochs=100" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.num_epochs=200" >> $queue_file
