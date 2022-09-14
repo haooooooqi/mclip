@@ -337,14 +337,11 @@ class Encoder(nn.Module):
 
 
 class CrossDecoder1DBlock(nn.Module):
-  """Transformer decoder layer from CaiT."""
+  """Transformer decoder layer."""
   hidden_size: int
   mlp_dim: int
   num_heads: int
   dtype: Dtype = jnp.float32
-  dropout_rate: float = 0.1
-  attention_dropout_rate: float = 0.1
-  droppath_rate: float = 0.0
   layer_id: int = None
   rescale_out: float = 1.0
 
@@ -352,42 +349,54 @@ class CrossDecoder1DBlock(nn.Module):
     self.ln_0 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
     self.self_attention = MsaBlock(
         dtype=self.dtype,
-        dropout_rate=self.attention_dropout_rate,
+        dropout_rate=0.,
         num_heads=self.num_heads,
         qkv_features=self.hidden_size,
         out_features=self.hidden_size,
         qkv_kernel_init=qkv_kernel_init,
         out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_out,
     )
-    self.dropout_0 = nn.Dropout(rate=self.dropout_rate)
-    self.droppath_0 = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')
 
     self.ln_1 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
+    self.cross_attention = MsaBlock(
+        dtype=self.dtype,
+        dropout_rate=0.,
+        num_heads=self.num_heads,
+        qkv_features=self.hidden_size,
+        out_features=self.hidden_size,
+        qkv_kernel_init=qkv_kernel_init,
+        out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_out,
+    )
+
+    self.ln_2 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
     self.mlp = MlpBlock(
-        mlp_dim=self.mlp_dim, dtype=self.dtype, out_dim=self.hidden_size, dropout_rate=self.dropout_rate,
+        mlp_dim=self.mlp_dim,
+        dtype=self.dtype,
+        out_dim=self.hidden_size,
+        dropout_rate=0.,
         kernel_init=mlp_kernel_init,
         bias_init=mlp_bias_init,
         rescale_out=self.rescale_out,
     )
-    self.droppath_1 = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')
 
-  def __call__(self, inputs, token, deterministic):
-    """Applies Encoder1DBlock module."""
+  def __call__(self, inputs, queries, deterministic):
+    """Applies decoder module."""
 
-    # Attention block.
-    token = self.ln_0(token) # layer norm is only applied to the cls token
-    x = jnp.concatenate([token, inputs], axis=1) # concatenate after all normalized
-    t = self.self_attention(token, x, deterministic=deterministic)
-    t = self.dropout_0(t, deterministic=deterministic)
-    t = self.droppath_0(t, deterministic=deterministic)
-    t = t + token
+    # Self attention.
+    q = self.ln_0(queries)
+    q = self.self_attention(q, q, deterministic=deterministic)
+    q = q + queries
+
+    # Cross attention.
+    x = self.ln_1(q)
+    x = self.cross_attention(x, inputs, deterministic=deterministic)
+    x = x + q
 
     # MLP block.
-    y = self.ln_1(t)
+    y = self.ln_2(x)
     y = self.mlp(y, deterministic=deterministic)
-    y = self.droppath_1(y, deterministic=deterministic)
 
-    return t + y
+    return y + x
 
 
 class CrossDecoder(nn.Module):
@@ -397,9 +406,6 @@ class CrossDecoder(nn.Module):
   mlp_dim: int
   num_heads: int
   num_layers: int = 2
-  dropout_rate: float = 0.0
-  attention_dropout_rate: float = 0.0
-  droppath_rate: float = 0.0
   prefix: str = 'decoder'
   rescale_out: float = 1.0
   remat_policy: str = 'none'
@@ -423,9 +429,6 @@ class CrossDecoder(nn.Module):
       blocks.append(BlockLayer(
           hidden_size=self.hidden_size,
           mlp_dim=self.mlp_dim,
-          dropout_rate=self.dropout_rate,
-          attention_dropout_rate=self.attention_dropout_rate,
-          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
           name=self.prefix + 'block_{:02d}'.format(lyr),
           num_heads=self.num_heads,
           layer_id=lyr,
@@ -435,15 +438,15 @@ class CrossDecoder(nn.Module):
 
     self.ln = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))
 
-  def __call__(self, inputs, token, *, train):
+  def __call__(self, inputs, queries, *, train):
     """Applies Transformer model on the inputs."""
     assert inputs.ndim == 3  # (batch, len, emb)
 
-    t = token
+    q = queries
     deterministic = not train
     for block in self.blocks:
-      t = block(inputs, t, deterministic)
-    decoded = self.ln(t)
+      q = block(inputs, q, deterministic)
+    decoded = self.ln(q)
 
     return decoded
 
@@ -466,6 +469,7 @@ class VisionTransformer(nn.Module):
   proj_layers: int
   proj_dim_hidden: int
   proj_dim_out: int
+  num_queries: int
   num_decoder_layer: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
@@ -497,9 +501,9 @@ class VisionTransformer(nn.Module):
                           prefix='encoder')
 
     if self.num_decoder_layer > 0:
-      self.cls_token = t5x.layers.param_with_axes('cls_top',
+      self.decoder_query = t5x.layers.param_with_axes('decoder_query',
         clstoken_init,
-        (1, 1, self.hidden_size),
+        (1, self.num_queries, self.hidden_size),
         self.dtype,
         axes=('_null0', '_null1', 'embed')
       )
@@ -578,18 +582,14 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
-    if self.num_decoder_layer > 0:
-      # append class token
-      cls_token = jnp.tile(self.cls_token, [n * num_crops, 1, 1])
+    # append class token
+    q = jnp.tile(self.decoder_query, [n * num_crops, 1, 1])
 
-      # cross attention with class token
-      p = self.decoder(x, cls_token, train=train)
-      p = jnp.squeeze(p, axis=1)
-    else:
-      p = jnp.mean(x, axis=1)
+    # cross attention with class token
+    q = self.decoder(x, q, train=train)
 
     # apply projector
-    p = self.projector(p)
+    p = self.projector(q)
 
     return x, p
 
@@ -698,12 +698,12 @@ class SiameseLearner(nn.Module):
       raise NotImplementedError
 
   def cosine(self, source, target):
-    source = jnp.reshape(source, [source.shape[0] // self.num_crops, self.num_crops, -1])
-    logits = jnp.einsum('nvc,nc->nv', source, target)
+    source = jnp.reshape(source, [source.shape[0] // self.num_crops, self.num_crops, self.encoder.num_queries, -1])
+    logits = jnp.einsum('nvqc,nqc->nvq', source, target)
     return -logits.mean()
 
   def info_nce(self, source, target):
-    logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
+    logits = jnp.einsum('nqc,mqc->nmq', source, target) / self.temp
     labels = jnp.tile(jnp.arange(logits.shape[-1], dtype=jnp.int32)[:,None], (1, self.num_crops)).flatten()
 
     # asymmetric loss

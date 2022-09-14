@@ -111,6 +111,7 @@ def get_config():
   config.model.encoder.proj_layers = 3
   config.model.encoder.proj_dim_hidden = 4096
   config.model.encoder.proj_dim_out = 256
+  config.model.encoder.num_queries = 16
   config.model.encoder.num_decoder_layer = 2
 
   # knn
