@@ -605,6 +605,7 @@ class SiameseLearner(nn.Module):
   pred_layers: int
   pred_dim_hidden: int
   loss_type: str = 'cos'
+  intra_weight: float = 1.0
   visualize: bool = False
   knn: Any = None
   dtype: Any = jnp.float32
@@ -690,6 +691,9 @@ class SiameseLearner(nn.Module):
     source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
     target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
 
+    # the dimensions are made more clear
+    source = jnp.reshape(source, [source.shape[0] // self.num_crops, self.num_crops, self.encoder.num_queries, -1])
+
     if self.loss_type == 'cos':
       return self.cosine(source, target)
     elif self.loss_type == 'info-nce':
@@ -698,17 +702,26 @@ class SiameseLearner(nn.Module):
       raise NotImplementedError
 
   def cosine(self, source, target):
-    source = jnp.reshape(source, [source.shape[0] // self.num_crops, self.num_crops, self.encoder.num_queries, -1])
     logits = jnp.einsum('nvqc,nqc->nvq', source, target)
     return -logits.mean()
 
   def info_nce(self, source, target):
-    logits = jnp.einsum('nqc,mqc->nmq', source, target) / self.temp
-    labels = jnp.tile(jnp.arange(logits.shape[-1], dtype=jnp.int32)[:,None], (1, self.num_crops)).flatten()
+    # batch size
+    N = source.shape[0]
 
-    # asymmetric loss
-    xent = optax.softmax_cross_entropy_with_integer_labels(logits=logits, labels=labels)
-    return xent.mean() * self.temp
+    # inter-image contrast
+    logits_inter = jnp.einsum('nvqc,mqc->nvqm', source, target) / self.temp
+    labels_inter = jnp.tile(jnp.arange(N, dtype=jnp.int32)[:, None, None], (1, self.num_crops, self.encoder.num_queries))
+    xent_inter = optax.softmax_cross_entropy_with_integer_labels(logits=logits_inter, labels=labels_inter)
+
+    # intra-image contrast
+    logits_intra = jnp.einsum('nvqc,npc->nvqp', source, target) / self.temp
+    labels_intra = jnp.tile(jnp.arange(self.encoder.num_queries, dtype=jnp.int32)[None, None, :], (N, self.num_crops, 1))
+    xent_intra = optax.softmax_cross_entropy_with_integer_labels(logits=logits_intra, labels=labels_intra)
+
+    loss = xent_inter.mean() + xent_intra.mean() * self.intra_weight
+
+    return loss * self.temp
 
   def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']

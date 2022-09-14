@@ -104,6 +104,7 @@ def get_config():
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096
   config.model.loss_type = 'info-nce'
+  config.model.intra_weight = 1.0
   config.model.visualize = False
 
   # encoder
