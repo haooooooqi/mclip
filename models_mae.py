@@ -502,6 +502,7 @@ class VisionTransformer(nn.Module):
     pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
     target = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
     if shuffler is not None:
+      pred = shuffler.restore(pred)
       target = shuffler.restore(target)
 
     imgs_pred = self.unpatchify(pred)
