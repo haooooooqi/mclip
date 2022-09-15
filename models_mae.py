@@ -166,6 +166,46 @@ class FixedShuffler(nn.Module):
     return outputs
 
 
+class FarthestShuffler(nn.Module):
+  """ Perform fixed shuffle
+  """
+  length: int
+
+  def setup(self):
+    assert self.length == 196  # hack
+    ids_shuffle = [  0, 195,  13, 182,  90, 110, 175,   6,  84,  45,  51, 129, 135,  69,
+          186,   3,   9,  42,  48,  87,  93, 126, 132, 152, 192,  25,  81, 155,
+          159,  41,  53, 157, 163, 184,  15,  18,  21,  30,  33,  36,  38,  57,
+            60,  63,  66,  72,  75,  78,  97,  99, 102, 105, 108, 114, 117, 120,
+          123, 125, 142, 144, 147, 150, 165, 167, 180, 188, 190,   1,   2,   4,
+            5,   7,   8,  10,  11,  12,  14,  16,  17,  19,  20,  22,  23,  24,
+            26,  27,  28,  29,  31,  32,  34,  35,  37,  39,  40,  43,  44,  46,
+            47,  49,  50,  52,  54,  55,  56,  58,  59,  61,  62,  64,  65,  67,
+            68,  70,  71,  73,  74,  76,  77,  79,  80,  82,  83,  85,  86,  88,
+            89,  91,  92,  94,  95,  96,  98, 100, 101, 103, 104, 106, 107, 109,
+          111, 112, 113, 115, 116, 118, 119, 121, 122, 124, 127, 128, 130, 131,
+          133, 134, 136, 137, 138, 139, 140, 141, 143, 145, 146, 148, 149, 151,
+          153, 154, 156, 158, 160, 161, 162, 164, 166, 168, 169, 170, 171, 172,
+          173, 174, 176, 177, 178, 179, 181, 183, 185, 187, 189, 191, 193, 194]
+    ids_shuffle = jnp.array(ids_shuffle)
+
+    ids_restore = jnp.argsort(ids_shuffle, axis=0)
+
+    self.ids_shuffle = self.variable('ids', 'ids_shuffle',
+      lambda s: ids_shuffle, ids_shuffle.shape)
+
+    self.ids_restore = self.variable('ids', 'ids_restore',
+      lambda s: ids_restore, ids_restore.shape)
+    
+  def __call__(self, inputs):
+    outputs = inputs[:, self.ids_shuffle.value, :]
+    return outputs
+
+  def restore(self, inputs):
+    outputs = inputs[:, self.ids_restore.value, :]
+    return outputs
+
+
 class MlpBlock(nn.Module):
   """Transformer MLP / feed-forward block."""
 
@@ -370,8 +410,7 @@ class VisionTransformer(nn.Module):
   knn: Any = None
   num_ohem: int = 0
   pred_offset: int = 0
-  shuffle: bool = False
-  reorder: bool = False
+  sequentialize: str = 'raster'
   use_start_token: bool = False
   use_decoder_pos: bool = False
 
@@ -454,20 +493,25 @@ class VisionTransformer(nn.Module):
     loss = jnp.mean(loss)
     return loss
 
-  def visualization(self, imgs, pred):
+  def visualization(self, imgs, pred, target, shuffler):
     """
     imgs: [N, H, W, 3]
     pred: [N, L-1, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
-    pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero
+    pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+    target = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+    if shuffler is not None:
+      target = shuffler.restore(target)
 
     imgs_pred = self.unpatchify(pred)
+    imgs_target = self.unpatchify(target)
 
-    imgs_vis = jnp.concatenate([imgs, imgs_pred], axis=2)
+    imgs_vis = jnp.concatenate([imgs, imgs_pred, imgs_target], axis=2)
     return imgs_vis
 
   def apply_reorder(self, x, target):
+    """ random one of four raster orders """
     assert x.shape[:2] == target.shape[:2]
 
     rng = self.make_rng('dropout')
@@ -519,15 +563,23 @@ class VisionTransformer(nn.Module):
 
     x = AddPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, img_shape=(h, w, c), name='posembed_encoder')(x)
 
-    # apply fixed shuffle
-    if self.shuffle:
+    shuffler = None
+    if self.sequentialize == 'raster':
+      pass
+    elif self.sequentialize == 'fixed_shuffle':
+      # apply fixed shuffle
       shuffler = FixedShuffler(length=h * w)
       x = shuffler(x)
       target = shuffler(target)
-
-    if self.reorder:
-      assert not self.shuffle
+    elif self.sequentialize == 'reorder':
+      # random one of four raster orders
       x, target = self.apply_reorder(x, target)
+    elif self.sequentialize == 'farthest':
+      shuffler = FarthestShuffler(length=h * w)
+      x = shuffler(x)
+      target = shuffler(target)
+    else:
+      raise NotImplementedError
 
     # shift by one
     x_encode = x[:, :-1, :] # remove the last one
@@ -542,7 +594,7 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x_encode, train=train)
 
-    return x_encode, target
+    return x_encode, target, shuffler
 
   def apply_decoder(self, x, train):
     use_cls_token=(self.classifier == 'token')
@@ -631,7 +683,7 @@ class VisionTransformer(nn.Module):
     labels = inputs['label']
 
     # apply encoder
-    x, target = self.apply_encoder(imgs, train=train)
+    x, target, shuffler = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
@@ -643,7 +695,7 @@ class VisionTransformer(nn.Module):
     loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred)
+      outcome = self.visualization(imgs, pred, target, shuffler)
     else:
       outcome = pred  # not used
 
