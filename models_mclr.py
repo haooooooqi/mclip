@@ -460,6 +460,16 @@ class Decoder(nn.Module):
   remat_policy: str = 'none'
 
   def setup(self):
+    # projection layer first
+    self.neck = t5x.layers.Dense(
+      features=self.hidden_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
+      name='bottleneck'
+    )
+    self.neck_ln = t5x.layers.LayerNorm(name=self.prefix + '_neck_norm', axes=('embed',))
+
     if self.decoder_type == 'cross':
       BlockLayer = CrossDecoder1DBlock
     elif self.decoder_type == 'class':
@@ -494,7 +504,9 @@ class Decoder(nn.Module):
 
   def __call__(self, inputs, queries, *, train):
     """Applies Transformer model on the inputs."""
-    assert inputs.ndim == 3  # (batch, len, emb)
+    assert inputs.ndim == 3
+    # match dimensions
+    inputs = self.neck_ln(self.neck(inputs))
 
     q = queries
     deterministic = not train
@@ -525,6 +537,8 @@ class VisionTransformer(nn.Module):
   proj_dim_out: int
   num_queries: int
   decoder_type: str
+  decoder_dim: int
+  num_decoder_heads: int
   num_decoder_layer: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
@@ -555,21 +569,20 @@ class VisionTransformer(nn.Module):
                           **self.transformer,
                           prefix='encoder')
 
-    if self.num_decoder_layer > 0:
-      self.decoder_query = t5x.layers.param_with_axes('decoder_query',
-        clstoken_init,
-        (1, self.num_queries, self.hidden_size),
-        self.dtype,
-        axes=('_null0', '_null1', 'embed')
-      )
+    self.decoder_query = t5x.layers.param_with_axes('decoder_query',
+      clstoken_init,
+      (1, self.num_queries, self.decoder_dim),
+      self.dtype,
+      axes=('_null0', '_null1', 'embed')
+    )
 
-      self.decoder = Decoder(name='DecoderTransformer',
-                            decoder_type=self.decoder_type,
-                            hidden_size=self.hidden_size,
-                            mlp_dim=self.transformer.mlp_dim,
-                            num_heads=self.transformer.num_heads,
-                            num_layers=self.num_decoder_layer,
-                            prefix='decoder')
+    self.decoder = Decoder(name='DecoderTransformer',
+                          decoder_type=self.decoder_type,
+                          hidden_size=self.decoder_dim,
+                          mlp_dim=self.decoder_dim * 4,
+                          num_heads=self.num_decoder_heads,
+                          num_layers=self.num_decoder_layer,
+                          prefix='decoder')
 
     flip = False
     projector = []

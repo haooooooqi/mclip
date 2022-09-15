@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c4`
-salt=6p90
+salt=7p90
 queue_file=$HOME/tpus/queue.txt
 lock_dir=$HOME/tpus/lock
 mkdir -p $lock_dir
@@ -10,21 +10,28 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-for lw in .1 .3 3.; do
-    echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.intra_weight=$lw" >> $queue_file
-done
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=8" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.decoder_type=class --config.model.encoder.num_decoder_layer=4" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k" >> $queue_file
+
+# for lw in .1 .3 3.; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.intra_weight=$lw" >> $queue_file
+# done
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.decoder_type=class" >> $queue_file
 
-for nl in 4 8; do
-    echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_decoder_layer=$nl" >> $queue_file
-done
+# for nl in 4 8; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_decoder_layer=$nl" >> $queue_file
+# done
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos" >> $queue_file
 
-for nq in 2 4; do
-    echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_queries=$nq" >> $queue_file
-done
+# for nq in 2 4; do
+#     echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 base imagenet-1k --config.model.loss_type=cos --config.model.encoder.num_queries=$nq" >> $queue_file
+# done
 
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.num_epochs=100" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.num_epochs=200" >> $queue_file

@@ -104,7 +104,7 @@ def get_config():
   config.model.pred_layers = 2
   config.model.pred_dim_hidden = 4096
   config.model.loss_type = 'info-nce'
-  config.model.intra_weight = 1.0
+  config.model.intra_weight = 0.3
   config.model.visualize = False
 
   # encoder
@@ -114,6 +114,8 @@ def get_config():
   config.model.encoder.proj_dim_out = 256
   config.model.encoder.num_queries = 16
   config.model.encoder.decoder_type = 'cross'
+  config.model.encoder.decoder_dim = 512
+  config.model.encoder.num_decoder_heads = 16
   config.model.encoder.num_decoder_layer = 2
 
   # knn
