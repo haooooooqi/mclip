@@ -28,7 +28,7 @@ from utils import posembed_util
 from utils import initializers_util
 from utils import onlineknn_util
 
-from models_mclr import AddPositionEmbs, MlpBlock, gather_by_einsum, Encoder
+from models_mclr import AddPositionEmbs, gather_by_einsum, Encoder
 
 Array = Any
 PRNGKey = Any

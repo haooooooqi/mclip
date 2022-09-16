@@ -29,7 +29,7 @@
 
 import ml_collections
 
-import configs.mae as mae
+import configs.vit as vit
 
 
 def get_config():
@@ -95,7 +95,17 @@ def get_config():
 
   # model config
   config.model_type = 'mae'
-  config.model = mae.get_config()  # ViT-B/16
+  config.model = vit.get_b16_config()
+  config.model.mask_ratio = 0.75
+  config.model.norm_pix_loss = True
+  config.model.sincos = True
+  config.model.visualize = True
+  config.model.transformer.dropout_rate = 0.0
+  config.model.transformer.droppath_rate = 0.0
+
+  config.model.decoder = vit.get_decoder_config()
+  config.model.decoder.transformer.dropout_rate = 0.0
+  config.model.decoder.transformer.droppath_rate = 0.0
 
   # knn
   config.model.knn = ml_collections.ConfigDict()

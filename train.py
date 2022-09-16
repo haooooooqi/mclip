@@ -63,7 +63,7 @@ import t5x.rng
 import t5x.model_info
 import t5x.checkpoints
 
-import models_mae, models_mclr
+import models_mae, models_mclr, models_maco
 
 
 def build_dataloaders(config, partitioner, rng_torch):
@@ -310,6 +310,8 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     model = models_mae.VisionTransformer(**config.model)
   elif config.model_type == 'mclr':
     model = models_mclr.SiameseLearner(image_size=config.image_size, **config.model)
+  elif config.model_type == 'maco':
+    model = models_maco.SiameseLearner(image_size=config.image_size, **config.model)
   else:
     raise NotImplementedError
 

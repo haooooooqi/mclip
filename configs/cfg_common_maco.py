@@ -96,13 +96,10 @@ def get_config():
   config.pretrain_fmt = 'jax'  # 't5x'
 
   # model config
-  config.model_type = 'mclr'
+  config.model_type = 'maco'
   config.model = ml_collections.ConfigDict()
-  config.model.mask_ratio = 0.8
-  config.model.num_crops = 2
+  config.model.mask_ratio = 0.75
   config.model.temp = 0.2 # for contrastive learning
-  config.model.pred_layers = 2
-  config.model.pred_dim_hidden = 4096
   config.model.loss_type = 'info-nce'
   config.model.intra_weight = 0.3
   config.model.visualize = False
@@ -112,14 +109,12 @@ def get_config():
   config.model.encoder.sincos = True
   config.model.encoder.transformer.dropout_rate = 0.0
   config.model.encoder.transformer.droppath_rate = 0.0
-  config.model.encoder.proj_layers = 3
-  config.model.encoder.proj_dim_hidden = 4096
-  config.model.encoder.proj_dim_out = 256
-  config.model.encoder.num_queries = 16
-  config.model.encoder.decoder_type = 'cross'
-  config.model.encoder.decoder_dim = 512
-  config.model.encoder.num_decoder_heads = 16
-  config.model.encoder.num_decoder_layer = 2
+
+  # decoder
+  config.model.decoder = vit.get_decoder_config()
+  config.model.decoder.sincos = True
+  config.model.decoder.transformer.dropout_rate = 0.0
+  config.model.decoder.transformer.droppath_rate = 0.0
 
   # knn
   config.model.knn = ml_collections.ConfigDict()

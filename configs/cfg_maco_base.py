@@ -30,25 +30,19 @@
 import ml_collections
 
 import configs.vit as vit
+import configs.cfg_common_maco as cfg_common_maco
 
 
 def get_config():
   """Get the hyperparameter configuration to train on TPUs."""
-  config = ml_collections.ConfigDict()
+  config = cfg_common_maco.get_config()
 
-  config.mask_ratio = 0.75
-  config.norm_pix_loss = True
+  config.model.encoder.update(vit.get_b16_config())
+  config.model.encoder.hidden_size = 768
+  config.model.encoder.transformer.mlp_dim = config.model.encoder.hidden_size * 4
+  config.model.encoder.transformer.num_layers = 12
 
-  config.sincos = True
-
-  config.update(vit.get_b16_config())
-  config.transformer.dropout_rate = 0.0
-  config.transformer.droppath_rate = 0.0
-
-  config.decoder = vit.get_decoder_config()
-  config.decoder.transformer.dropout_rate = 0.0
-  config.decoder.transformer.droppath_rate = 0.0
-
-  config.visualize = True
+  config.partitioning.num_partitions = 1
+  config.partitioning.partition_states = False
 
   return config

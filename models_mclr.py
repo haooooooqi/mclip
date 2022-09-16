@@ -89,25 +89,14 @@ class AddPositionEmbs(nn.Module):
     # but this is not addressed here if sincos=False
 
   def __call__(self, inputs):
-    """Applies AddPositionEmbs module.
-
-    By default this layer uses a fixed sinusoidal embedding table. If a
-    learned position embedding is desired, pass an initializer to
-    posemb_init.
-
-    Args:
-      inputs: Inputs to the layer.
-
-    Returns:
-      Output tensor with shape `(bs, timesteps, in_dim)`.
-    """
+    """Applies AddPositionEmbs module."""
     # PE is always fixed in this case, directly excluded in the optimizer
-    pe = self.pe
-
     if self.use_cls_token:
-      output = inputs + pe[:, 1:, :]
+      pe = self.pe[:, 1:, :]
     else:
-      output = inputs + pe
+      pe = self.pe
+
+    output = inputs + pe
 
     return output
 
