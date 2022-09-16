@@ -20,8 +20,8 @@ python3 main.py \
     --config.model.num_ohem=64 \
     --config.model.pred_offset=16 \
     --config.model.use_start_token=False \
-    --config.model.use_decoder_pos=True \
-    --config.model.sequentialize='farthest' \
+    --config.model.use_decoder_pos=False \
+    --config.model.sequentialize='row' \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

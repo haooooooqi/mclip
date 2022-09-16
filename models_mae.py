@@ -29,6 +29,7 @@ from utils import attention_util
 from utils import dist_util
 from utils.onlineknn_util import OnlineKNN
 
+from utils import attention_mask_util
 
 Array = Any
 PRNGKey = Any
@@ -345,6 +346,7 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   torch_qkv: bool = False
+  sequentialize: str = ''
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -359,15 +361,10 @@ class Encoder(nn.Module):
     """
     assert inputs.ndim == 3  # (batch, len, emb)
 
-    # build the mask:
-    # mask: mask for the attention weights. This should be broadcastable to the
-    #   shape `[batch..., num_heads, q_length, kv_length]`.
-    #   This can be used for incorporating causal masks.
-    #   Attention weights are masked out if their corresponding mask value
-    #   is `False`.
-    _, L, _ = inputs.shape
-    mask = jnp.tril(jnp.ones(shape=(L, L), dtype=jnp.bool_)) # make a lower triangle
-    mask = jnp.reshape(mask, (1, 1, L, L))
+    if self.sequentialize == 'row':
+      mask = attention_mask_util.get_row_mask(inputs)
+    else:  # raster
+      mask = attention_mask_util.get_causal_mask(inputs)
 
     x = inputs
     # Input Encoder
@@ -567,33 +564,37 @@ class VisionTransformer(nn.Module):
     shuffler = None
     if self.sequentialize == 'raster':
       pass
-    elif self.sequentialize == 'fixed_shuffle':
-      # apply fixed shuffle
-      shuffler = FixedShuffler(length=h * w)
-      x = shuffler(x)
-      target = shuffler(target)
-    elif self.sequentialize == 'reorder':
-      # random one of four raster orders
-      x, target = self.apply_reorder(x, target)
-    elif self.sequentialize == 'farthest':
-      shuffler = FarthestShuffler(length=h * w)
-      x = shuffler(x)
-      target = shuffler(target)
+    elif self.sequentialize == 'row':
+      pass
+    # elif self.sequentialize == 'fixed_shuffle':
+    #   # apply fixed shuffle
+    #   shuffler = FixedShuffler(length=h * w)
+    #   x = shuffler(x)
+    #   target = shuffler(target)
+    # elif self.sequentialize == 'reorder':
+    #   # random one of four raster orders
+    #   x, target = self.apply_reorder(x, target)
+    # elif self.sequentialize == 'farthest':
+    #   shuffler = FarthestShuffler(length=h * w)
+    #   x = shuffler(x)
+    #   target = shuffler(target)
     else:
       raise NotImplementedError
 
+    # row-order: we don't shift here
     # shift by one
-    x_encode = x[:, :-1, :] # remove the last one
-    target = target[:, 1:, :]  # remove the first one
+    # x_encode = x[:, :-1, :] # remove the last one
+    # target = target[:, 1:, :]  # remove the first one
 
     if self.use_start_token:
+      raise NotImplementedError
       # use start_token
       start_token = self.param('start_token', masktoken_init, (1, 1, c))
       start_token = jnp.tile(start_token, [n, 1, 1])
       x_encode = jnp.concatenate([start_token, x_encode], axis=1)
 
     # apply the encoder
-    x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder')(x_encode, train=train)
+    x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder', sequentialize=self.sequentialize)(x, train=train)
 
     return x_encode, target, shuffler
 
@@ -617,6 +618,7 @@ class VisionTransformer(nn.Module):
     # x_ = vmapped_gather(x_, ids_restore)
 
     if self.use_decoder_pos:
+      raise NotImplementedError
       assert not self.use_start_token
       N, L, C = x.shape
       L = x.shape[1] + 1
@@ -636,7 +638,7 @@ class VisionTransformer(nn.Module):
     # x = jnp.concatenate([x[:, :num_clstokens, :], x_], axis=1)  # append cls token
 
     # apply the decoder
-    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')(x, train=train)
+    x = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder', sequentialize=self.sequentialize)(x, train=train)
 
     # apply the predictor
     x = nn.Dense(
@@ -677,6 +679,27 @@ class VisionTransformer(nn.Module):
     knn_accuracy = OnlineKNN(knn=self.knn)(x, labels, train=train)
     return knn_accuracy
 
+  def shift_pred_and_target(self, pred, target):
+    assert target.shape == pred.shape
+    if self.sequentialize == 'row':
+      n, L, c = pred.shape
+      h = w = int(L**.5)
+      assert h * w == L  # no cls token for now
+
+      pred = pred.reshape([n, h, w, c])
+      target = target.reshape([n, h, w, c])
+
+      pred = pred[:, :, :-1, :] # remove the last one along w
+      target = target[:, :, 1:, :] # remove the first one along w
+
+      pred = pred.reshape([n, -1, c])
+      target = target.reshape([n, -1, c])
+    elif self.sequentialize == 'raster':
+      # shift by one
+      pred = pred[:, :-1, :] # remove the last one
+      target = target[:, 1:, :]  # remove the first one
+    else:
+      raise NotImplementedError
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -691,6 +714,9 @@ class VisionTransformer(nn.Module):
 
     # apply decoder
     pred = self.apply_decoder(x, train=train)
+
+    # shift pred and target
+    pred, target = self.shift_pred_and_target(pred, target)
 
     # compute loss
     loss = self.compute_loss(pred, target)
