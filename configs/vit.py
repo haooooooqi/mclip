@@ -111,6 +111,23 @@ def get_decoder_config():
 
 
 @_register
+def get_small_decoder_config():
+  """Returns the 1/2 MAE decoder configuration."""
+  config = ml_collections.ConfigDict()
+  config.name = 'ViT-DS_16'
+  config.patches = ml_collections.ConfigDict({'size': (16, 16)})
+  config.hidden_size = 256
+  config.transformer = ml_collections.ConfigDict()
+  config.transformer.mlp_dim = 1024
+  config.transformer.num_heads = 8
+  config.transformer.num_layers = 8
+  config.transformer.attention_dropout_rate = 0.0
+  config.transformer.dropout_rate = 0.0
+  config.classifier = 'token'
+  return config
+
+
+@_register
 def get_b16_config():
   """Returns the ViT-B/16 configuration."""
   config = ml_collections.ConfigDict()

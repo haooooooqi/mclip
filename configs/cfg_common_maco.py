@@ -60,7 +60,7 @@ def get_config():
 
   # Consider setting the batch size to max(tpu_chips * 256, 8 * 1024) if you
   # train on a larger pod slice.
-  config.batch_size = 2048
+  config.batch_size = 4096
   config.cache = True
 
   # optimizer config
@@ -101,7 +101,7 @@ def get_config():
   config.model.mask_ratio = 0.75
   config.model.temp = 0.2 # for contrastive learning
   config.model.loss_type = 'info-nce'
-  config.model.intra_weight = 0.3
+  config.model.intra_weight = 0.
   config.model.visualize = False
 
   # encoder
@@ -111,8 +111,9 @@ def get_config():
   config.model.encoder.transformer.droppath_rate = 0.0
 
   # decoder
-  config.model.decoder = vit.get_decoder_config()
+  config.model.decoder = vit.get_small_decoder_config()
   config.model.decoder.sincos = True
+  config.model.decoder.transformer.num_layers = 1
   config.model.decoder.transformer.dropout_rate = 0.0
   config.model.decoder.transformer.droppath_rate = 0.0
 

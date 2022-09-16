@@ -224,6 +224,8 @@ class Encoder1DBlock(nn.Module):
   droppath_rate: float = 0.0
   layer_id: int = None
   rescale_out: float = 1.0
+  res_attn: bool = True
+  res_mlp: bool = True
 
   def setup(self):
     self.ln_0 = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))
@@ -257,14 +259,16 @@ class Encoder1DBlock(nn.Module):
     x = self.self_attention(x, x, deterministic=deterministic)
     x = self.dropout_0(x, deterministic=deterministic)
     x = self.droppath_0(x, deterministic=deterministic)
-    x = x + inputs
+    if self.res_attn:
+      x = x + inputs
 
     # MLP block.
     y = self.ln_1(x)
     y = self.mlp(y, deterministic=deterministic)
     y = self.droppath_1(y, deterministic=deterministic)
-
-    return x + y
+    if self.res_mlp:
+      y = x + y
+    return y
 
 
 class Encoder(nn.Module):
@@ -279,6 +283,8 @@ class Encoder(nn.Module):
   droppath_rate: float = 0.0
   prefix: str = 'encoder'
   rescale_out: float = 1.0
+  res_attn: bool = True
+  res_mlp: bool = True
   remat_policy: str = 'none'
 
   def setup(self):
@@ -307,6 +313,8 @@ class Encoder(nn.Module):
           num_heads=self.num_heads,
           layer_id=lyr,
           rescale_out=self.rescale_out,
+          res_attn=self.res_attn,
+          res_mlp=self.res_mlp,
       ))
     self.blocks = blocks
 

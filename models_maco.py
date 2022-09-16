@@ -67,6 +67,7 @@ class EncoderTransformer(nn.Module):
   transformer: Any
   image_size: int
   hidden_size: int
+  proj_size: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
 
@@ -95,6 +96,14 @@ class EncoderTransformer(nn.Module):
                           hidden_size=self.hidden_size,
                           **self.transformer,
                           prefix='encoder')
+
+    self.proj = t5x.layers.Dense(
+      features=self.proj_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('embed', 'mlp'),  # 'mlp' is split first
+      name='bottleneck',
+    )
 
   def random_mask(self, x, mask_ratio):
     ids_shuffle, ids_restore = None, None
@@ -131,7 +140,9 @@ class EncoderTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
-    return x, ids
+    p = self.proj(x)
+
+    return x, p, ids
 
 
 class DecoderTransformer(nn.Module):
@@ -146,13 +157,6 @@ class DecoderTransformer(nn.Module):
 
   def setup(self):
     self.L = (self.image_size // self.patches.size[0]) * (self.image_size // self.patches.size[1])
-    self.conv_0 = t5x.layers.Dense(
-      features=self.hidden_size,
-      kernel_init=mlp_kernel_init,
-      bias_init=mlp_bias_init,
-      kernel_axes=('mlp', 'embed'),  # 'mlp' is split first
-      name='bottleneck',
-    )
 
     self.mask_token = t5x.layers.param_with_axes('mask_token',
                                             masktoken_init,
@@ -171,11 +175,13 @@ class DecoderTransformer(nn.Module):
 
     self.encoder = Encoder(name='Transformer',
                           hidden_size=self.hidden_size,
+                          res_attn=False,
+                          res_mlp=False,
                           **self.transformer,
                           prefix='decoder')
 
   def __call__(self, inputs, ids_restore, train, mask_ratio=0.):
-    x = self.conv_0(inputs)
+    x = inputs
     len_keep = int(self.L * (1. - mask_ratio))
     len_mask = self.L - len_keep
     mask_tokens = jnp.tile(self.mask_token, [x.shape[0], len_mask, 1])
@@ -210,11 +216,15 @@ class SiameseLearner(nn.Module):
   def setup(self):
     # source
     self.encoder.name = 'Source' # hack to change name
-    self.source_encoder = EncoderTransformer(image_size=self.image_size, **self.encoder)
+    self.source_encoder = EncoderTransformer(image_size=self.image_size,
+                                            proj_size=self.decoder.hidden_size,
+                                            **self.encoder)
 
     # target
     self.encoder.name = 'Target'
-    self.target_encoder = EncoderTransformer(image_size=self.image_size, **self.encoder)
+    self.target_encoder = EncoderTransformer(image_size=self.image_size,
+                                            proj_size=self.decoder.hidden_size,
+                                            **self.encoder)
 
     # knn
     if self.knn.on:
@@ -231,15 +241,6 @@ class SiameseLearner(nn.Module):
     # decoder
     self.decoder.name = 'Decoder'
     self.source_decoder = DecoderTransformer(image_size=self.image_size, **self.decoder)
-
-    # predictor with encoder dimension
-    self.predictor = t5x.layers.Dense(
-        features=self.encoder.hidden_size,
-        kernel_init=mlp_kernel_init,
-        bias_init=mlp_bias_init,
-        kernel_axes=('embed', 'classes'),  # 'mlp' is split first
-        name='predictor',
-    )
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -282,17 +283,20 @@ class SiameseLearner(nn.Module):
     # batch size
     N, L, _ = source.shape
 
-    # inter-image contrast
+    # inter-image contrast -- with position embedding it is probably not need?
     logits_inter = jnp.einsum('nqc,mqc->nqm', source, target) / self.temp
     labels_inter = jnp.tile(jnp.arange(N, dtype=jnp.int32)[:, None], (1, L))
     xent_inter = optax.softmax_cross_entropy_with_integer_labels(logits=logits_inter, labels=labels_inter)
 
-    # intra-image contrast
-    logits_intra = jnp.einsum('nqc,npc->nqp', source, target) / self.temp
-    labels_intra = jnp.tile(jnp.arange(L, dtype=jnp.int32)[None, :], (N, 1))
-    xent_intra = optax.softmax_cross_entropy_with_integer_labels(logits=logits_intra, labels=labels_intra)
+    loss = xent_inter.mean()
 
-    loss = xent_inter.mean() + xent_intra.mean() * self.intra_weight
+    if self.intra_weight != 0:
+      # intra-image contrast
+      logits_intra = jnp.einsum('nqc,npc->nqp', source, target) / self.temp
+      labels_intra = jnp.tile(jnp.arange(L, dtype=jnp.int32)[None, :], (N, 1))
+      xent_intra = optax.softmax_cross_entropy_with_integer_labels(logits=logits_intra, labels=labels_intra)
+
+      loss += xent_intra.mean() * self.intra_weight
 
     return loss * self.temp
 
@@ -301,25 +305,22 @@ class SiameseLearner(nn.Module):
     labels = inputs['label']
 
     # the augmentations are shared, just w/ or w/o masking
-    x0, ids = self.source_encoder(imgs, train, self.mask_ratio)
-    x1, _ = self.target_encoder(imgs, train)
+    _, p0, ids = self.source_encoder(imgs, train, self.mask_ratio)
+    x1, p1, _ = self.target_encoder(imgs, train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
     # decoder
-    x0, len_keep = self.source_decoder(x0, ids[1], train, self.mask_ratio)
+    p0, len_keep = self.source_decoder(p0, ids[1], train, self.mask_ratio)
 
     # only compute loss on the masked tokens
     ids_masked = ids[0][:, len_keep:]
-    x0 = gather_by_einsum(x0, ids_masked)
-    x1 = gather_by_einsum(x1, ids_masked)
-
-    # predictor
-    x0 = self.predictor(x0)
+    p0 = gather_by_einsum(p0, ids_masked)
+    p1 = gather_by_einsum(p1, ids_masked)
 
     # compute loss
-    loss = self.compute_loss(x0, x1)
+    loss = self.compute_loss(p0, p1)
 
     if self.visualize:
       raise NotImplementedError
