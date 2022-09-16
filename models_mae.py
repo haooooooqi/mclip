@@ -496,8 +496,14 @@ class VisionTransformer(nn.Module):
     pred: [N, L-1, p*p*3]
     mask: [N, L], 0 is keep, 1 is remove, 
     """
-    pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
-    target = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+    assert target.shape == pred.shape
+
+    # if self.sequentialize == 'raster':
+    #   pred = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+    #   target = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+    # else:
+    #   raise NotImplementedError
+
     if shuffler is not None:
       pred = shuffler.restore(pred)
       target = shuffler.restore(target)
@@ -692,14 +698,25 @@ class VisionTransformer(nn.Module):
       pred = pred[:, :, :-1, :] # remove the last one along w
       target = target[:, :, 1:, :] # remove the first one along w
 
+      pred_vis = jnp.pad(pred, ((0, 0), (0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+
       pred = pred.reshape([n, -1, c])
       target = target.reshape([n, -1, c])
+      pred_vis = pred_vis.reshape([n, -1, c])
+      target_vis = target_vis.reshape([n, -1, c])
+
     elif self.sequentialize == 'raster':
       # shift by one
       pred = pred[:, :-1, :] # remove the last one
       target = target[:, 1:, :]  # remove the first one
+
+      pred_vis = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
     else:
       raise NotImplementedError
+
+    return pred, target, pred_vis, target_vis
 
   @nn.compact
   def __call__(self, inputs, *, train):
@@ -716,13 +733,13 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, train=train)
 
     # shift pred and target
-    pred, target = self.shift_pred_and_target(pred, target)
+    pred, target, pred_vis, target_vis = self.shift_pred_and_target(pred, target)
 
     # compute loss
     loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred, target, shuffler)
+      outcome = self.visualization(imgs, pred_vis, target_vis, shuffler)
     else:
       outcome = pred  # not used
 
