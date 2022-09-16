@@ -10,6 +10,15 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
+# for lw in .1 .5 1.; do
+#     for nq in 4 8 32; do
+#         echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.intra_weight=$lw --config.model.encoder.num_queries=$nq" >> $queue_file
+#     done
+# done
+
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.encoder.num_decoder_layer=8" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mclr $salt 256 large imagenet-1k --config.model.encoder.num_decoder_layer=8 --config.model.encoder.proj_layers=1" >> $queue_file
+
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mclr $salt 128 base imagenet-1k --config.model.encoder.num_decoder_layer=8" >> $queue_file
 
