@@ -106,7 +106,7 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220726_070056_kmh-tpuvm-v3-256-6_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw1_r0.25_un4_knnclr'
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_015806_kmh-tpuvm-v3-256-7_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw0.01_r0.25_un0_knnclr'
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_225256_kmh-tpuvm-v3-256-7_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw0.1_r0.25_un0_knnclr'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_225256_kmh-tpuvm-v3-256-7_cfg_mae_large_maeclr_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_t0.2_lw0.1_r0.25_un0_knnclr'
 
 # explore: patch clr (bugged)
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220730_193810_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_tokenv0'
@@ -143,3 +143,8 @@ PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_225256_kmh-tpuvm-v3-256-7_c
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_014817_kmh-tpuvm-v3-256-3_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_sup_dec1_w0.01'
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220822_014930_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_800ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100_sup_dec8_w0.01'
+
+
+# autoreg revisit
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220915_022850_kmh-tpuvm-v3-256-4_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_fps'
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220915_040503_kmh-tpuvm-v3-256-6_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_NOnormpix_ohem0_off0_dec8_fps'

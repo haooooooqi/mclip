@@ -21,8 +21,8 @@ python3 main.py \
     --config.aug.autoaug=autoaug \
     --config.model.transformer.torch_qkv=False \
     --config.eval_only=False \
-    --config.model.classifier=tgap \
-    --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220630_165012_kmh-tpuvm-v3-256-4_cfg_mae_large_maetf_100ep_b4096_lr1.0e-4_mask0.75_TorchLoader_wseed100'
+    --config.model.classifier=gap \
+    --config.pretrain_dir='gs://kmh-gcp/checkpoints/flax/20220915_022850_kmh-tpuvm-v3-256-4_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_fps'
 
     # --config.aug.area_range=0.9,1 \
     # --config.aug.aspect_ratio_range=0.8,1.2 \
