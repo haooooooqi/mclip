@@ -106,7 +106,7 @@ class EncoderTransformer(nn.Module):
     )
 
   def random_mask(self, x, mask_ratio):
-    ids_shuffle, ids_restore = None, None
+    ids_shuffle = None
 
     if mask_ratio > 0.:
       L = x.shape[1]
@@ -116,7 +116,6 @@ class EncoderTransformer(nn.Module):
       noise = random.uniform(rng, shape=x.shape[:2])
 
       ids_shuffle = jnp.argsort(noise, axis=1)  # ascend: small is keep, large is remove
-      ids_restore = jnp.argsort(ids_shuffle, axis=1)
 
       # keep the first subset
       ids_keep = ids_shuffle[:, :len_keep]
@@ -124,7 +123,7 @@ class EncoderTransformer(nn.Module):
 
     x = t5x.layers.with_sharding_constraint(x, ('batch', 'length', 'embed'))
 
-    return x, (ids_shuffle, ids_restore)
+    return x, ids_shuffle
 
   def __call__(self, inputs, train, mask_ratio=0.):
     x = self.conv_0(inputs)
@@ -187,18 +186,15 @@ class DecoderTransformer(nn.Module):
       name='predictor',
     )
 
-  def __call__(self, inputs, ids_restore, train, mask_ratio=0.):
+  def __call__(self, inputs, ids_shuffle, train, mask_ratio=0.):
     x = inputs
     len_keep = int(self.L * (1. - mask_ratio))
     len_mask = self.L - len_keep
     mask_tokens = jnp.tile(self.mask_token, [x.shape[0], len_mask, 1])
     x = jnp.concatenate([x, mask_tokens], axis=1)
 
-    # restore positions
-    x = gather_by_einsum(x, ids_restore)
-
     # add position embedding
-    x = self.pos_embed(x)
+    x = self.pos_embed(x, ids_shuffle)
 
     # apply the encoder
     x = self.encoder(x, train=train)
@@ -322,11 +318,11 @@ class SiameseLearner(nn.Module):
     knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
     # decoder
-    p0, len_keep = self.source_decoder(p0, ids[1], train, self.mask_ratio)
+    p0, len_keep = self.source_decoder(p0, ids, train, self.mask_ratio)
 
     # only compute loss on the masked tokens
-    ids_masked = ids[0][:, len_keep:]
-    p0 = gather_by_einsum(p0, ids_masked)
+    p0 = p0[:, len_keep:, :]
+    ids_masked = ids[:, len_keep:]
     p1 = gather_by_einsum(p1, ids_masked)
 
     # compute loss

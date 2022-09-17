@@ -68,8 +68,8 @@ def get_config():
   config.opt = ml_collections.ConfigDict()
   config.opt.b1 = 0.9
   config.opt.b2 = 0.95
-  config.opt.weight_decay = 0.1
-  config.opt.ema_momentum = 0.996
+  config.opt.weight_decay = 0.05
+  config.opt.ema_momentum = 0.9998
   config.opt.ema_schedule = 'cos'
   config.opt_mu_dtype = 'float32'
 
@@ -98,7 +98,7 @@ def get_config():
   # model config
   config.model_type = 'maco'
   config.model = ml_collections.ConfigDict()
-  config.model.mask_ratio = 0.75
+  config.model.mask_ratio = 0.8
   config.model.temp = 0.2 # for contrastive learning
   config.model.loss_type = 'info-nce'
   config.model.intra_weight = 0.
@@ -113,7 +113,7 @@ def get_config():
   # decoder
   config.model.decoder = vit.get_small_decoder_config()
   config.model.decoder.sincos = True
-  config.model.decoder.transformer.num_layers = 1
+  config.model.decoder.transformer.num_layers = 8
   config.model.decoder.transformer.dropout_rate = 0.0
   config.model.decoder.transformer.droppath_rate = 0.0
 

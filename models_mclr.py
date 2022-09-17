@@ -88,13 +88,16 @@ class AddPositionEmbs(nn.Module):
     # when loading for finetuning, this zero posembed can be tuned.
     # but this is not addressed here if sincos=False
 
-  def __call__(self, inputs):
+  def __call__(self, inputs, ids_shuffle=None):
     """Applies AddPositionEmbs module."""
     # PE is always fixed in this case, directly excluded in the optimizer
     if self.use_cls_token:
       pe = self.pe[:, 1:, :]
     else:
       pe = self.pe
+
+    if ids_shuffle is not None:
+      pe = gather_by_einsum_singleton(pe, ids_shuffle)
 
     output = inputs + pe
 
@@ -522,6 +525,12 @@ def gather_by_einsum(x, ids):
   """kaiming: vmap + gather is slow with pjit; use einsum instead"""
   mat = jax.nn.one_hot(ids, x.shape[1])  # [N, K, L]
   x = jnp.einsum('nl...,nkl->nk...', x, mat)
+  return x
+
+
+def gather_by_einsum_singleton(x, ids):
+  mat = jax.nn.one_hot(ids, x.shape[1])  # [N, K, L]
+  x = jnp.einsum('ml...,nkl->nk...', x, mat)
   return x
 
 
