@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c4`
-salt=4p90
+salt=5p90
 queue_file=$HOME/tpus/queue.txt
 lock_dir=$HOME/tpus/lock
 mkdir -p $lock_dir

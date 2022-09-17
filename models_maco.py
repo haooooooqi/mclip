@@ -140,6 +140,7 @@ class EncoderTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
+    # apply the bottleneck
     p = self.proj(x)
 
     return x, p, ids
@@ -175,10 +176,16 @@ class DecoderTransformer(nn.Module):
 
     self.encoder = Encoder(name='Transformer',
                           hidden_size=self.hidden_size,
-                          res_attn=False,
-                          res_mlp=False,
                           **self.transformer,
                           prefix='decoder')
+
+    self.proj = t5x.layers.Dense(
+      features=self.hidden_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('embed', 'mlp'),  # 'mlp' is split first
+      name='predictor',
+    )
 
   def __call__(self, inputs, ids_restore, train, mask_ratio=0.):
     x = inputs
@@ -195,6 +202,9 @@ class DecoderTransformer(nn.Module):
 
     # apply the encoder
     x = self.encoder(x, train=train)
+
+    # apply the predictor
+    x = self.proj(x)
 
     return x, len_keep
 

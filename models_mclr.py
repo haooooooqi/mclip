@@ -267,7 +267,7 @@ class Encoder1DBlock(nn.Module):
     y = self.mlp(y, deterministic=deterministic)
     y = self.droppath_1(y, deterministic=deterministic)
     if self.res_mlp:
-      y = x + y
+      y = y + x
     return y
 
 
@@ -286,6 +286,7 @@ class Encoder(nn.Module):
   res_attn: bool = True
   res_mlp: bool = True
   remat_policy: str = 'none'
+  last_ln: bool = True
 
   def setup(self):
     # this should be the activation check-pointing trigger
@@ -318,7 +319,8 @@ class Encoder(nn.Module):
       ))
     self.blocks = blocks
 
-    self.ln = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))
+    if self.last_ln:
+      self.ln = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))
 
   def __call__(self, inputs, *, train):
     """Applies Transformer model on the inputs."""
@@ -328,9 +330,10 @@ class Encoder(nn.Module):
     deterministic = not train
     for block in self.blocks:
       x = block(x, deterministic)
-    encoded = self.ln(x)
+    if self.last_ln:
+      x = self.ln(x)
 
-    return encoded
+    return x
 
 
 class CrossDecoder1DBlock(nn.Module):
