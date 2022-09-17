@@ -100,7 +100,7 @@ def get_config():
   config.model = ml_collections.ConfigDict()
   config.model.mask_ratio = 0.8
   config.model.temp = 0.2 # for contrastive learning
-  config.model.loss_type = 'info-nce'
+  config.model.loss_type = 'cos'
   config.model.intra_weight = 0.
   config.model.visualize = False
 

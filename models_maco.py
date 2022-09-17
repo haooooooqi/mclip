@@ -270,25 +270,35 @@ class SiameseLearner(nn.Module):
     return knn_accuracy
 
   def compute_loss(self, source, target):
-    # l2 normalization
-    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
-    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
-
     if self.loss_type == 'cos':
       return self.cosine(source, target)
+    elif self.loss_type == 'norm_l2':
+      return self.norm_l2(source, target)
     elif self.loss_type == 'info-nce':
       return self.info_nce(source, target)
     else:
       raise NotImplementedError
 
   def cosine(self, source, target):
+    # l2 normalization
+    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
+    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
+
     logits = jnp.einsum('nqc,nqc->nq', source, target)
     return -logits.mean()
+
+  def norm_l2(self, source, target):
+    mean = jnp.mean(target, axis=-1, keepdims=True)
+    var = jnp.var(target, axis=-1, keepdims=True)
+    target = (target - mean) / (var + 1.e-6)**.5
+    return jnp.square(source - target).mean()
 
   def info_nce(self, source, target):
     # batch size
     N, L, _ = source.shape
-
+    # l2 normalization
+    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
+    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
     # inter-image contrast -- with position embedding it is probably not need?
     logits_inter = jnp.einsum('nqc,mqc->nqm', source, target) / self.temp
     labels_inter = jnp.tile(jnp.arange(N, dtype=jnp.int32)[:, None], (1, L))
