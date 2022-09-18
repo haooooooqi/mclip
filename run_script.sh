@@ -18,10 +18,10 @@ python3 main.py \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
     --config.model.num_ohem=64 \
-    --config.model.pred_offset=1 \
+    --config.model.pred_offset=0 \
     --config.model.use_start_token=False \
     --config.model.use_decoder_pos=False \
-    --config.model.sequentialize='row' \
+    --config.model.sequentialize='p2x' \
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

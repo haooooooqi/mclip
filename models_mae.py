@@ -363,6 +363,8 @@ class Encoder(nn.Module):
 
     if self.sequentialize == 'row':
       mask = attention_mask_util.get_row_mask(inputs)
+    elif self.sequentialize == 'p2x':
+      mask = attention_mask_util.get_p2x_mask(inputs)
     else:  # raster
       mask = attention_mask_util.get_causal_mask(inputs)
 
@@ -572,6 +574,8 @@ class VisionTransformer(nn.Module):
       pass
     elif self.sequentialize == 'row':
       pass
+    elif self.sequentialize == 'p2x':
+      pass
     # elif self.sequentialize == 'fixed_shuffle':
     #   # apply fixed shuffle
     #   shuffler = FixedShuffler(length=h * w)
@@ -689,11 +693,12 @@ class VisionTransformer(nn.Module):
     assert target.shape == pred.shape
 
     offset = self.pred_offset + 1  # by default, offset = 1
-    if self.sequentialize == 'row':
-      n, L, c = pred.shape
-      h = w = int(L**.5)
-      assert h * w == L  # no cls token for now
 
+    n, L, c = pred.shape
+    h = w = int(L**.5)
+    assert h * w == L  # no cls token for now
+
+    if self.sequentialize == 'row':
       pred = pred.reshape([n, h, w, c])
       target = target.reshape([n, h, w, c])
 
@@ -703,10 +708,16 @@ class VisionTransformer(nn.Module):
       pred_vis = jnp.pad(pred, ((0, 0), (0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
       target_vis = jnp.pad(target, ((0, 0), (0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
 
-      pred = pred.reshape([n, -1, c])
-      target = target.reshape([n, -1, c])
-      pred_vis = pred_vis.reshape([n, -1, c])
-      target_vis = target_vis.reshape([n, -1, c])
+    elif self.sequentialize == 'p2x':
+      assert self.pred_offset == 0
+      pred = pred.reshape([n, h, w, c])
+      target = target.reshape([n, h, w, c])
+
+      pred = pred[:, :-2, :-2, :]
+      target = target[:, 2:, 2:, :]
+
+      pred_vis = jnp.pad(pred, ((0, 0), (2, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (2, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
 
     elif self.sequentialize == 'raster':
       # shift by one
@@ -717,6 +728,11 @@ class VisionTransformer(nn.Module):
       target_vis = jnp.pad(target, ((0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
     else:
       raise NotImplementedError
+
+    pred = pred.reshape([n, -1, c])
+    target = target.reshape([n, -1, c])
+    pred_vis = pred_vis.reshape([n, -1, c])
+    target_vis = target_vis.reshape([n, -1, c])
 
     return pred, target, pred_vis, target_vis
 

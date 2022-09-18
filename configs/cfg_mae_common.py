@@ -66,7 +66,7 @@ def get_config():
 
   config.model.num_ohem = 0
   config.model.pred_offset = 0
-  config.model.sequentialize = 'raster'  # 'raster', 'fixed_shuffle', 'reorder', 'farthest'; 'row'
+  config.model.sequentialize = 'raster'  # 'raster', 'fixed_shuffle', 'reorder', 'farthest'; 'row', 'p2x'
 
   config.model.use_start_token = False  # use start_token
   config.model.use_decoder_pos = False  # use decoder pos embed

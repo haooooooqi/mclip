@@ -41,3 +41,39 @@ def get_row_mask(inputs):
   mask = jnp.array(mask, dtype=jnp.bool_)
   mask = jnp.reshape(mask, (1, 1, L, L))
   return mask
+
+
+def get_p2x_mask(inputs):
+  """
+  example: h=4, w=4, mask=
+[[1 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0]
+ [1 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0]
+ [1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0]
+ [1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0]
+ [1 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0]
+ [1 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0]
+ [1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0]
+ [1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0]
+ [1 1 1 1 1 1 1 1 1 1 0 0 1 1 0 0]
+ [1 1 1 1 1 1 1 1 1 1 0 0 1 1 0 0]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 0 0 1 1 0 0]
+ [1 1 1 1 1 1 1 1 1 1 0 0 1 1 0 0]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]
+  """
+  _, L, _ = inputs.shape
+
+  h = w = int(L**.5)
+  assert h * w == L  # no cls token for now
+
+  xs, ys = np.meshgrid(range(w), range(h))
+  xys = np.concatenate([xs.reshape(-1, 1), ys.reshape(-1, 1)], axis=-1)
+  mask = [[
+    k[1] // 2 < q[1] // 2 or (k[1] // 2 == q[1] // 2 and k[0] // 2 <= q[0] // 2)
+  for k in xys] for q in xys]
+
+  mask = jnp.array(mask, dtype=jnp.bool_)
+  mask = jnp.reshape(mask, (1, 1, L, L))
+  return mask
