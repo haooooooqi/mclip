@@ -252,14 +252,10 @@ class SiameseLearner(nn.Module):
     source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
     target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
 
-    # split them
-    s0, s1 = jnp.split(source, 2, axis=0)
-    t0, t1 = jnp.split(target, 2, axis=0)
-
     if self.loss_type == 'cos':
-      return self.cosine(s0, t1) + self.cosine(s1, t0)
+      return self.cosine(source, target)
     elif self.loss_type == 'info-nce':
-      return self.info_nce(s0, t1) + self.info_nce(s1, t0)
+      return self.info_nce(source, target)
     else:
       raise NotImplementedError
 
@@ -282,14 +278,13 @@ class SiameseLearner(nn.Module):
     # split the images
     imgs0 = imgs[:, 0, :, :, :]
     imgs1 = imgs[:, 1, :, :, :]
-    imgs = jnp.concatenate([imgs0, imgs1], axis=0)
 
     # the augmentations are shared, just w/ or w/o masking
-    _, p0 = self.source_encoder(imgs, train)
-    x1, p1 = self.target_encoder(imgs, train)
+    _, p0 = self.source_encoder(imgs0, train)
+    x1, p1 = self.target_encoder(imgs1, train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(jnp.split(x1, 2, axis=0)[0], labels, train=(train and update))
+    knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
     # predictor
     p0 = self.predictor(p0)

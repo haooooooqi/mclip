@@ -52,7 +52,7 @@ class GeneralImageFolder(tv.datasets.ImageFolder):
         if self.num_views > 1:
             samples = []
             for i in range(self.num_views):
-                if i % 2 == 0:
+                if i % 2 == 0 or self.target_transform is None:
                     transform = self.transform
                 else:
                     transform = self.target_transform
@@ -109,7 +109,7 @@ def build_train_transform(input_size, aug):
             mean=IMAGENET_DEFAULT_MEAN,
             std=IMAGENET_DEFAULT_STD,
         )
-    elif aug.train_type == 'moco-v3':
+    elif aug.train_type == 'byol':
         random_crop = transform_util.RandomResizedCrop(224, scale=(aug.area_min, 1.), iterations=100)
         color_jitter = tv.transforms.ColorJitter(.4, .4, .2, .1)
         rnd_color_jitter = tv.transforms.RandomApply([color_jitter], p=0.8)
@@ -134,6 +134,22 @@ def build_train_transform(input_size, aug):
             normalize,
         ])
         return transform, transform_prime
+    elif aug.train_type == 'byol-sym':
+        random_crop = transform_util.RandomResizedCrop(224, scale=(aug.area_min, 1.), iterations=100)
+        color_jitter = tv.transforms.ColorJitter(.4, .4, .2, .1)
+        rnd_color_jitter = tv.transforms.RandomApply([color_jitter], p=0.8)
+        normalize = tv.transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        transform = tv.transforms.Compose([
+            random_crop,
+            tv.transforms.RandomHorizontalFlip(),
+            rnd_color_jitter,
+            tv.transforms.RandomGrayscale(p=0.2),
+            tv.transforms.RandomApply([transform_util.GaussianBlurSimple([.1, 2.])], p=0.5),
+            tv.transforms.RandomApply([transform_util.Solarize()], p=0.2),
+            tv.transforms.ToTensor(),
+            normalize,
+        ])
+        return transform
     elif aug.train_type == 'moco-v2':
         random_crop = transform_util.RandomResizedCrop(224, scale=(aug.area_min, 1.), iterations=100)
         color_jitter = tv.transforms.ColorJitter(.4, .4, .4, .1)
