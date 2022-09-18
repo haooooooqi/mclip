@@ -78,7 +78,7 @@ def get_config():
 
   # aug config
   config.aug = ml_collections.ConfigDict()
-
+  config.aug.train_type = 'timm'
   config.aug.area_min = 0.08
   config.aug.aspect_ratio_range = (3. / 4, 4. / 3.)
   config.aug.label_smoothing = 0.0  # not used

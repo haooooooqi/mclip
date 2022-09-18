@@ -11,9 +11,6 @@
 import os
 import PIL
 
-import numpy as np
-import jax
-
 import torch
 from torchvision import datasets, transforms
 
@@ -61,18 +58,22 @@ class GeneralImageFolder(datasets.ImageFolder):
         else:
             sample = self.transform(img)
 
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
         return sample, target
 
 
 def build_dataset(is_train, data_dir, image_size, num_views, aug):
     # build transform
     transform = build_transform(is_train, image_size, aug)
+    # hack: use target transform for the second augmentation
+    target_transform = None
+    if type(transform) is tuple:
+        transform, target_transform = transform
 
     root = os.path.join(data_dir, 'train' if is_train else 'val')
-    dataset = GeneralImageFolder(num_views, root=root, transform=transform)
+    dataset = GeneralImageFolder(num_views,
+                                root=root,
+                                transform=transform,
+                                target_transform=target_transform)
 
     logging.info(dataset)
 
@@ -80,26 +81,33 @@ def build_dataset(is_train, data_dir, image_size, num_views, aug):
 
 
 def build_transform(is_train, input_size, aug):
-    # train transform
     if is_train:
-        color_jitter = None if aug.color_jit is None else aug.color_jit[0]
-        aa = AUTOAUGS[aug.autoaug] if aug.autoaug else None
-        # this should always dispatch to transforms_imagenet_train
-        transform = create_transform(
-            input_size=input_size,
-            is_training=True,
-            scale=(aug.area_min, 1.0),
-            ratio=aug.aspect_ratio_range,
-            hflip=0.5,
-            vflip=0.,
-            color_jitter=color_jitter,
-            auto_augment=aa,
-            interpolation='bicubic',
-            mean=IMAGENET_DEFAULT_MEAN,
-            std=IMAGENET_DEFAULT_STD,
-        )
-        return transform
+        return build_train_transform(input_size, aug)
+    else:
+        return build_test_transform(input_size, aug)
 
+
+def build_train_transform(input_size, aug):
+    color_jitter = None if aug.color_jit is None else aug.color_jit[0]
+    aa = AUTOAUGS[aug.autoaug] if aug.autoaug else None
+    # this should always dispatch to transforms_imagenet_train
+    transform = create_transform(
+        input_size=input_size,
+        is_training=True,
+        scale=(aug.area_min, 1.0),
+        ratio=aug.aspect_ratio_range,
+        hflip=0.5,
+        vflip=0.,
+        color_jitter=color_jitter,
+        auto_augment=aa,
+        interpolation='bicubic',
+        mean=IMAGENET_DEFAULT_MEAN,
+        std=IMAGENET_DEFAULT_STD,
+    )
+    return transform
+
+
+def build_test_transform(input_size, aug):
     # eval transform
     t = []
     if input_size <= 224:
@@ -108,9 +116,10 @@ def build_transform(is_train, input_size, aug):
         crop_pct = 1.0
     size = int(input_size / crop_pct)
     t.append(
-        transforms.Resize(size, interpolation=PIL.Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
+        transforms.Resize(size, interpolation=PIL.Image.BICUBIC),
     )
     t.append(transforms.CenterCrop(input_size))
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+
     return transforms.Compose(t)

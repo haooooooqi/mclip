@@ -14,7 +14,7 @@ sudo pip3 uninstall -y tensorflow
 sudo pip3 install tf-nightly==2.10.0.dev20220521
 sudo pip3 install tensorflow_addons
 sudo pip3 install jax[tpu]==0.3.13 jaxlib==0.3.10 flax==0.5.0 -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-sudo pip3 install absl-py cached_property gin-config numpy orbax seqio-nightly tensorstore timm
+sudo pip3 install absl-py cached_property gin-config numpy orbax seqio-nightly tensorstore timm opencv-python
 
 # checkpoint
 SHARED_FS=10.89.225.82:/mmf_megavlt
@@ -44,6 +44,9 @@ for i in $(seq 10); do
     break
   fi
 done
+
+# mosh
+sudo apt-get -y install mosh
 
 # timezone
 sudo timedatectl set-timezone America/Los_Angeles
