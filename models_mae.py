@@ -556,9 +556,9 @@ class VisionTransformer(nn.Module):
 
     n, h, w, c = inputs.shape
 
-    if self.sequentialize == 'raster':      
-      x = inputs[:, :-poff, :-poff, :]  # remove last
-      target = inputs[:, poff:, poff:, :]  # remove first
+    if self.sequentialize == 'raster':
+      x = inputs[:, :-poff, :-poff, :]  # remove last of w-axis
+      target = inputs[:, :-poff, poff:, :]  # remove first of w-axis
 
     else:
       raise NotImplementedError
