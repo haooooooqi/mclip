@@ -11,6 +11,7 @@ set -x
 # before --: options only for training
 
 # echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.opt.ema_momentum=0.999" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 256 large imagenet-1k --config.opt.ema_momentum=0.999" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.model.loss_type=norm_l2" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh maco $salt 128 large imagenet-1k --config.model.loss_type=norm_l2" >> $queue_file
