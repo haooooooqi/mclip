@@ -145,10 +145,10 @@ class VisionTransformer(nn.Module):
     x = self.encoder(x, train=train)
 
     # just do global average pooling
-    x = jnp.mean(x, axis=1)
+    p = jnp.mean(x, axis=1)
 
     # apply projector
-    p = self.projector(x)
+    p = self.projector(p)
 
     return x, p
 
@@ -289,7 +289,7 @@ class SiameseLearner(nn.Module):
     x1, p1 = self.target_encoder(imgs, train)
 
     # optionally apply knn
-    knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
+    knn_accuracy = self.apply_knn(jnp.split(x1, 2, axis=0)[0], labels, train=(train and update))
 
     # predictor
     p0 = self.predictor(p0)
