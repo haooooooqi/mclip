@@ -472,9 +472,9 @@ class VisionTransformer(nn.Module):
       var = jnp.var(target, axis=-1, keepdims=True)
       target = (target - mean) / (var + 1.e-6)**.5
 
-    if self.pred_offset > 0:
-      target = target[:, self.pred_offset:, :] # remove the head
-      pred = pred[:, :-self.pred_offset, :]  # remove the tail
+    # if self.pred_offset > 0:
+    #   target = target[:, self.pred_offset:, :] # remove the head
+    #   pred = pred[:, :-self.pred_offset, :]  # remove the tail
 
     loss = jnp.square(pred - target)
 
@@ -687,6 +687,8 @@ class VisionTransformer(nn.Module):
 
   def shift_pred_and_target(self, pred, target):
     assert target.shape == pred.shape
+
+    offset = self.pred_offset + 1  # by default, offset = 1
     if self.sequentialize == 'row':
       n, L, c = pred.shape
       h = w = int(L**.5)
@@ -695,11 +697,11 @@ class VisionTransformer(nn.Module):
       pred = pred.reshape([n, h, w, c])
       target = target.reshape([n, h, w, c])
 
-      pred = pred[:, :, :-1, :] # remove the last one along w
-      target = target[:, :, 1:, :] # remove the first one along w
+      pred = pred[:, :, :-offset, :] # remove the last one along w
+      target = target[:, :, offset:, :] # remove the first one along w
 
-      pred_vis = jnp.pad(pred, ((0, 0), (0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
-      target_vis = jnp.pad(target, ((0, 0), (0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+      pred_vis = jnp.pad(pred, ((0, 0), (0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
 
       pred = pred.reshape([n, -1, c])
       target = target.reshape([n, -1, c])
@@ -708,11 +710,11 @@ class VisionTransformer(nn.Module):
 
     elif self.sequentialize == 'raster':
       # shift by one
-      pred = pred[:, :-1, :] # remove the last one
-      target = target[:, 1:, :]  # remove the first one
+      pred = pred[:, :-offset, :] # remove the last one
+      target = target[:, offset:, :]  # remove the first one
 
-      pred_vis = jnp.pad(pred, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
-      target_vis = jnp.pad(target, ((0, 0), (1, 0), (0, 0)))  # pad zero at the beginning of L
+      pred_vis = jnp.pad(pred, ((0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (offset, 0), (0, 0)))  # pad zero at the beginning of L
     else:
       raise NotImplementedError
 

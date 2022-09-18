@@ -7,7 +7,7 @@ batch=4096
 seed=100
 
 ohem=0
-offset=0
+offset=2
 
 dec_layers=8
 

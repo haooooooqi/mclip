@@ -18,7 +18,7 @@ python3 main.py \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
     --config.model.num_ohem=64 \
-    --config.model.pred_offset=16 \
+    --config.model.pred_offset=1 \
     --config.model.use_start_token=False \
     --config.model.use_decoder_pos=False \
     --config.model.sequentialize='row' \
