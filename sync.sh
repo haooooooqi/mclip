@@ -13,4 +13,4 @@ sync_tpu () {
 }
 
 sync_tpu devtpux4
-# sync_tpu devtpuv0
+sync_tpu devtpuv0
