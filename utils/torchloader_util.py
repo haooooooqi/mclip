@@ -9,25 +9,25 @@
 # --------------------------------------------------------
 
 import os
+from absl import logging
 import PIL
 
 import torch
-from torchvision import datasets, transforms
+import torchvision as tv
 
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+
+from utils import transform_util
 
 # for visualization
 MEAN_RGB = [v * 255 for v in IMAGENET_DEFAULT_MEAN]
 STDDEV_RGB = [v * 255 for v in IMAGENET_DEFAULT_STD]
 
-
-from absl import logging
-
 AUTOAUGS = {'autoaug': 'v0', 'randaugv2': 'rand-m9-mstd0.5-inc1'}
 
 
-class GeneralImageFolder(datasets.ImageFolder):
+class GeneralImageFolder(tv.datasets.ImageFolder):
     def __init__(self, num_views, **kwargs):
         super(GeneralImageFolder, self).__init__(**kwargs)
         self.num_views = num_views
@@ -51,9 +51,13 @@ class GeneralImageFolder(datasets.ImageFolder):
 
         if self.num_views > 1:
             samples = []
-            for _ in range(self.num_views):
+            for i in range(self.num_views):
+                if i % 2 == 0:
+                    transform = self.transform
+                else:
+                    transform = self.target_transform
                 # extra dimension
-                samples.append(self.transform(img).unsqueeze(0))
+                samples.append(transform(img).unsqueeze(0))
             sample = torch.cat(samples)
         else:
             sample = self.transform(img)
@@ -88,23 +92,64 @@ def build_transform(is_train, input_size, aug):
 
 
 def build_train_transform(input_size, aug):
-    color_jitter = None if aug.color_jit is None else aug.color_jit[0]
-    aa = AUTOAUGS[aug.autoaug] if aug.autoaug else None
-    # this should always dispatch to transforms_imagenet_train
-    transform = create_transform(
-        input_size=input_size,
-        is_training=True,
-        scale=(aug.area_min, 1.0),
-        ratio=aug.aspect_ratio_range,
-        hflip=0.5,
-        vflip=0.,
-        color_jitter=color_jitter,
-        auto_augment=aa,
-        interpolation='bicubic',
-        mean=IMAGENET_DEFAULT_MEAN,
-        std=IMAGENET_DEFAULT_STD,
-    )
-    return transform
+    if aug.train_type == 'timm':
+        color_jitter = None if aug.color_jit is None else aug.color_jit[0]
+        aa = AUTOAUGS[aug.autoaug] if aug.autoaug else None
+        # this should always dispatch to transforms_imagenet_train
+        return create_transform(
+            input_size=input_size,
+            is_training=True,
+            scale=(aug.area_min, 1.0),
+            ratio=aug.aspect_ratio_range,
+            hflip=0.5,
+            vflip=0.,
+            color_jitter=color_jitter,
+            auto_augment=aa,
+            interpolation='bicubic',
+            mean=IMAGENET_DEFAULT_MEAN,
+            std=IMAGENET_DEFAULT_STD,
+        )
+    elif aug.train_type == 'moco-v3':
+        random_crop = transform_util.RandomResizedCrop(224, scale=(aug.area_min, 1.), iterations=100)
+        color_jitter = tv.transforms.ColorJitter(.4, .4, .2, .1)
+        rnd_color_jitter = tv.transforms.RandomApply([color_jitter], p=0.8)
+        normalize = tv.transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        transform = tv.transforms.Compose([
+            random_crop,
+            tv.transforms.RandomHorizontalFlip(),
+            rnd_color_jitter,
+            tv.transforms.RandomGrayscale(p=0.2),
+            tv.transforms.RandomApply([transform_util.GaussianBlurSimple([.1, 2.])], p=1.0),
+            tv.transforms.ToTensor(),
+            normalize,
+        ])
+        transform_prime = tv.transforms.Compose([
+            random_crop,
+            tv.transforms.RandomHorizontalFlip(),
+            rnd_color_jitter,
+            tv.transforms.RandomGrayscale(p=0.2),
+            tv.transforms.RandomApply([transform_util.GaussianBlurSimple([.1, 2.])], p=0.1),
+            tv.transforms.RandomApply([transform_util.Solarize()], p=0.2),
+            tv.transforms.ToTensor(),
+            normalize,
+        ])
+        return transform, transform_prime
+    elif aug.train_type == 'moco-v2':
+        random_crop = transform_util.RandomResizedCrop(224, scale=(aug.area_min, 1.), iterations=100)
+        color_jitter = tv.transforms.ColorJitter(.4, .4, .4, .1)
+        rnd_color_jitter = tv.transforms.RandomApply([color_jitter], p=0.8)
+        normalize = tv.transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        return tv.transforms.Compose([
+            random_crop,
+            tv.transforms.RandomHorizontalFlip(),
+            rnd_color_jitter,
+            tv.transforms.RandomGrayscale(p=0.2),
+            tv.transforms.RandomApply([transform_util.GaussianBlurSimple([.1, 2.])], p=0.5),
+            tv.transforms.ToTensor(),
+            normalize,
+        ])
+    else:
+        raise NotImplementedError
 
 
 def build_test_transform(input_size, aug):
@@ -116,10 +161,10 @@ def build_test_transform(input_size, aug):
         crop_pct = 1.0
     size = int(input_size / crop_pct)
     t.append(
-        transforms.Resize(size, interpolation=PIL.Image.BICUBIC),
+        tv.transforms.Resize(size, interpolation=PIL.Image.BICUBIC),
     )
-    t.append(transforms.CenterCrop(input_size))
-    t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
+    t.append(tv.transforms.CenterCrop(input_size))
+    t.append(tv.transforms.ToTensor())
+    t.append(tv.transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD))
 
-    return transforms.Compose(t)
+    return tv.transforms.Compose(t)
