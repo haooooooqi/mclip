@@ -68,6 +68,8 @@ def get_config():
   config.model.pred_offset = 0
   config.model.sequentialize = 'raster'  # 'raster', 'fixed_shuffle', 'reorder', 'farthest'; 'row', 'p2x'
 
+  config.model.pred_outside = False
+
   config.model.use_start_token = False  # use start_token
   config.model.use_decoder_pos = False  # use decoder pos embed
 
@@ -98,6 +100,8 @@ def get_config():
   config.aug.label_smoothing = 0.0
 
   config.aug.autoaug = None  # autoaug, randaug, or None
+
+  config.aug.image_size = 224
 
   config.aug.color_jit = None  # [0.4, 0.4, 0.4]  # None to disable; [brightness, contrast, saturation]
 

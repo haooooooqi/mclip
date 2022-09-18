@@ -21,7 +21,8 @@ python3 main.py \
     --config.model.pred_offset=0 \
     --config.model.use_start_token=False \
     --config.model.use_decoder_pos=False \
-    --config.model.sequentialize='p2x' \
+    --config.model.sequentialize='raster' \
+    --config.model.pred_outside=True
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \

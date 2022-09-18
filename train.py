@@ -41,7 +41,6 @@ import optax
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-import input_pipeline
 import models_mae
 
 from utils import summary_util as summary_util  # must be after 'from clu import metric_writers'
@@ -212,27 +211,6 @@ def prepare_pt_data(xs):
   return jax.tree_map(_prepare, xs)
 
 
-def create_input_iter(dataset_builder, batch_size, image_size, dtype, train,
-                      cache, force_shuffle=None, seed_per_host=False, aug=None,):
-  ds = input_pipeline.create_split(
-      dataset_builder, batch_size, image_size=image_size, dtype=dtype,
-      train=train, cache=cache, force_shuffle=force_shuffle, seed_per_host=seed_per_host, aug=aug,)
-
-  if aug is not None and (aug.mix.mixup or aug.mix.cutmix):
-    apply_mix = functools.partial(mix_util.apply_mix, cfg=aug.mix)
-    ds = map(apply_mix, ds)
-
-  # ------------------------------------------------
-  # from IPython import embed; embed();
-  # if (0 == 0): raise NotImplementedError
-  # x = next(iter(ds))
-  # ------------------------------------------------
-
-  ds = map(prepare_tf_data, ds)
-  it = jax_utils.prefetch_to_device(ds, 2)
-  return it
-
-
 class TrainState(train_state.TrainState):
   rng: Any
   variables: flax.core.FrozenDict[str, Any]
@@ -359,6 +337,21 @@ def rebuild_data_loader_train(dataset_train, sampler_train, local_batch_size, co
   return data_loader_train
 
 
+def revise_image_size(config):
+  if not config.model.pred_outside:
+    return config
+
+  p = config.model.patches.size[0]
+
+  if config.model.sequentialize == 'raster':
+    offset = config.model.pred_offset + 1
+    config.aug.image_size += p * offset
+  else:
+    raise NotImplementedError
+  
+  return config
+
+
 def train_and_evaluate(config: ml_collections.ConfigDict,
                        workdir: str) -> TrainState:
   """Execute model training and evaluation loop.
@@ -370,6 +363,11 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   Returns:
     Final TrainState.
   """
+  # revise image size
+  config = revise_image_size(config)
+
+  image_size = config.aug.image_size
+
   # ------------------------------------
   # Set random seed
   # ------------------------------------
@@ -383,20 +381,9 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   rng = random.PRNGKey(config.seed_jax)  # used to be 0
 
-  image_size = 224
-
   if config.batch_size % jax.device_count() > 0:
     raise ValueError('Batch size must be divisible by the number of devices')
   local_batch_size = config.batch_size // jax.process_count()
-
-  # input_dtype = tf.float32
-  # dataset_builder = tfds.builder(config.dataset)
-  # train_iter = create_input_iter(
-  #     dataset_builder, local_batch_size, image_size, input_dtype, train=True,
-  #     cache=config.cache, seed_per_host=config.seed_per_host, aug=config.aug)
-  # eval_iter = create_input_iter(
-  #     dataset_builder, local_batch_size, image_size, input_dtype, train=False,
-  #     cache=config.cache, seed_per_host=config.seed_per_host, force_shuffle=True)  # for visualization
 
   dataset_val = torchloader_util.build_dataset(is_train=False, data_dir=config.torchload.data_dir, aug=config.aug)
   dataset_train = torchloader_util.build_dataset(is_train=True, data_dir=config.torchload.data_dir, aug=config.aug)

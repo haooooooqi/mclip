@@ -410,6 +410,7 @@ class VisionTransformer(nn.Module):
   num_ohem: int = 0
   pred_offset: int = 0
   sequentialize: str = 'raster'
+  pred_outside: bool = False
   use_start_token: bool = False
   use_decoder_pos: bool = False
 
@@ -542,13 +543,39 @@ class VisionTransformer(nn.Module):
     x, target = jnp.split(xt_new, (x.shape[-1],), axis=-1)
     return x, target
 
+  def prepare_inputs(self, inputs):
+
+    if not self.pred_outside:
+      x = inputs
+      target = inputs
+      return x, target
+
+    p = self.patches.size[0]
+    offset = self.pred_offset + 1
+    poff = offset * p
+
+    n, h, w, c = inputs.shape
+
+    if self.sequentialize == 'raster':      
+      x = inputs[:, :-poff, :-poff, :]  # remove last
+      target = inputs[:, poff:, poff:, :]  # remove first
+
+    else:
+      raise NotImplementedError
+
+    assert x.shape == target.shape
+
+    return x, target
+
   def apply_encoder(self, inputs, train):
     use_cls_token=(self.classifier == 'token')
     assert not use_cls_token  # kaiming: TODO: support both?
 
-    target = self.patchify(inputs)
+    img_inputs, target = self.prepare_inputs(inputs)
+      
+    target = self.patchify(target)
 
-    x = inputs
+    x = img_inputs
 
     # We can merge s2d+emb into a single conv; it's the same.
     x = nn.Conv(
@@ -606,7 +633,7 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x_encode = Encoder(name='Transformer', **self.transformer, prefix='encoder', sequentialize=self.sequentialize)(x, train=train)
 
-    return x_encode, target, shuffler
+    return x_encode, target, img_inputs, shuffler
 
   def apply_decoder(self, x, train):
     use_cls_token=(self.classifier == 'token')
@@ -742,7 +769,7 @@ class VisionTransformer(nn.Module):
     labels = inputs['label']
 
     # apply encoder
-    x, target, shuffler = self.apply_encoder(imgs, train=train)
+    x, target, img_inputs, shuffler = self.apply_encoder(imgs, train=train)
 
     # optionally apply knn
     knn_accuracy = self.apply_knn(x, labels, train=train)
@@ -751,13 +778,16 @@ class VisionTransformer(nn.Module):
     pred = self.apply_decoder(x, train=train)
 
     # shift pred and target
-    pred, target, pred_vis, target_vis = self.shift_pred_and_target(pred, target)
+    if not self.pred_outside:
+      pred, target, pred_vis, target_vis = self.shift_pred_and_target(pred, target)
+    else:
+      pred_vis, target_vis = pred, target, 
 
     # compute loss
     loss = self.compute_loss(pred, target)
 
     if self.visualize and not train:
-      outcome = self.visualization(imgs, pred_vis, target_vis, shuffler)
+      outcome = self.visualization(img_inputs, pred_vis, target_vis, shuffler)
     else:
       outcome = pred  # not used
 
