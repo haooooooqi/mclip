@@ -17,12 +17,12 @@ python3 main.py \
     --config.aug.crop_ver=v2 \
     --config.model.visualize=True \
     --config.model.transformer.torch_qkv=False \
-    --config.model.num_ohem=64 \
+    --config.model.num_ohem=0 \
     --config.model.pred_offset=0 \
     --config.model.use_start_token=False \
     --config.model.use_decoder_pos=False \
     --config.model.sequentialize='raster' \
-    --config.model.pred_outside=True
+    --config.model.pred_outside=False
 
     # --config.model.transformer.num_layers=2 \
     # --config.model.patches.size=\(16,16\) \
