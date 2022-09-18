@@ -94,7 +94,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
     del opt_args.ema_schedule
 
   if config.opt_type in ('adamw',):
-    if config.model_type in ('mclr', 'maco'):
+    if config.model_type in ('mclr', 'maco', 'mv3'):
       opt_inner = getattr(adamw, config.opt_type)
       mask_trainable = opt_util.filter_parameters(params_names,
                             functools.partial(opt_util.filter_by_keywords,
@@ -131,7 +131,7 @@ def create_optimizer(config, params_names, steps_per_epoch):
 
     # for metrics
     opt.metric_learning_rate_fn = learning_rate_fn
-    if config.model_type in ('mclr', 'maco') and config.opt.ema_schedule == 'cos':
+    if config.model_type in ('mclr', 'maco', 'mv3') and config.opt.ema_schedule == 'cos':
       opt.metric_momentum_fn = opt_args.ema_momentum
 
   else:
