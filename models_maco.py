@@ -31,10 +31,6 @@ from utils import onlineknn_util
 
 from models_mclr import AddPositionEmbs, gather_by_einsum, Encoder
 
-Array = Any
-PRNGKey = Any
-Shape = Tuple[int]
-Dtype = Any
 
 # init hacks
 INIT_VER = 'mae_jax_v2'
