@@ -559,7 +559,10 @@ class VisionTransformer(nn.Module):
     if self.sequentialize == 'raster':
       x = inputs[:, :-poff, :-poff, :]  # remove last of w-axis
       target = inputs[:, :-poff, poff:, :]  # remove first of w-axis
-
+    elif self.sequentialize == 'p2x':
+      poff *= 2
+      x = inputs[:, :-poff, :-poff, :]  # remove last of w-axis
+      target = inputs[:, :-poff, poff:, :]  # remove first of w-axis
     else:
       raise NotImplementedError
 

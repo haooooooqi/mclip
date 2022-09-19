@@ -346,6 +346,9 @@ def revise_image_size(config):
   if config.model.sequentialize == 'raster':
     offset = config.model.pred_offset + 1
     config.aug.image_size += p * offset
+  elif config.model.sequentialize == 'p2x':
+    offset = config.model.pred_offset + 1
+    config.aug.image_size += p * offset * 2
   else:
     raise NotImplementedError
   
