@@ -156,6 +156,7 @@
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220917_161629_kmh-tpuvm-v3-256-6_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off2_dec8_row'
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220918_010035_kmh-tpuvm-v3-256-2_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_p2x'  # target is bugged in this run
-PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220919_002726_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_p2x'
+# PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220919_002726_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_p2x'
 
 # PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220918_070624_kmh-tpuvm-v3-512-1_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_raster_out'  # pred_out is bugged in this run
+PRETRAIN_DIR='gs://kmh-gcp/checkpoints/flax/20220918_225312_kmh-tpuvm-v3-256-4_cfg_mae_large_autoreg_800ep_b4096_lr1.0e-4_TorchLoader_wseed100_normpix_ohem0_off0_dec8_raster_out'
