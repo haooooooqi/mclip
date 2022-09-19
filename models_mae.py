@@ -740,11 +740,14 @@ class VisionTransformer(nn.Module):
       pred = pred.reshape([n, h, w, c])
       target = target.reshape([n, h, w, c])
 
-      pred = pred[:, :-2, :-2, :]
-      target = target[:, 2:, 2:, :]
+      # pred = pred[:, :-2, :-2, :]
+      # target = target[:, 2:, 2:, :]
 
-      pred_vis = jnp.pad(pred, ((0, 0), (2, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
-      target_vis = jnp.pad(target, ((0, 0), (2, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
+      pred = pred[:, :, :-2, :]
+      target = target[:, :, 2:, :]
+
+      pred_vis = jnp.pad(pred, ((0, 0), (0, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
+      target_vis = jnp.pad(target, ((0, 0), (0, 0), (2, 0), (0, 0)))  # pad zero at the beginning of L
 
     elif self.sequentialize == 'raster':
       # shift by one
