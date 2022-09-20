@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # salt=`head /dev/urandom | tr -dc a-z0-9 | head -c4`
-salt=4p90
+salt=6p90
 queue_file=$HOME/tpus/queue.txt
 lock_dir=$HOME/tpus/lock
 mkdir -p $lock_dir
@@ -10,8 +10,16 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
-echo "~/mae_jax/infra/wrapper.sh mv3 $salt 128 base imagenet-1k --config.model.loss_type=cos" >> $queue_file
-echo "~/mae_jax/infra/wrapper.sh mv3 $salt 256 large imagenet-1k --config.model.loss_type=cos" >> $queue_file
+# for mr in .75 .9; do
+#     echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.model.mask_ratio=$mr" >> $queue_file
+#     echo "~/mae_jax/infra/wrapper.sh maco $salt 256 large imagenet-1k --config.model.mask_ratio=$mr" >> $queue_file
+# done
+
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.model.pred_vis=True" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 256 large imagenet-1k --config.model.pred_vis=True" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh mv3 $salt 128 base imagenet-1k --config.model.loss_type=cos" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh mv3 $salt 256 large imagenet-1k --config.model.loss_type=cos" >> $queue_file
 
 # echo "~/mae_jax/infra/wrapper.sh mv3 $salt 128 base imagenet-1k" >> $queue_file
 # echo "~/mae_jax/infra/wrapper.sh mv3 $salt 256 large imagenet-1k" >> $queue_file

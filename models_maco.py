@@ -208,6 +208,7 @@ class SiameseLearner(nn.Module):
   decoder: Any
   image_size: int
   mask_ratio: float
+  pred_vis: bool
   temp: float
   loss_type: str = 'cos'
   intra_weight: float = 1.0
@@ -327,9 +328,10 @@ class SiameseLearner(nn.Module):
     p0, len_keep = self.source_decoder(p0, ids, train, self.mask_ratio)
 
     # only compute loss on the masked tokens
-    p0 = p0[:, len_keep:, :]
-    ids_masked = ids[:, len_keep:]
-    p1 = gather_by_einsum(p1, ids_masked)
+    if not self.pred_vis:
+      p0 = p0[:, len_keep:, :]
+      ids = ids[:, len_keep:]
+    p1 = gather_by_einsum(p1, ids)
 
     # compute loss
     loss = self.compute_loss(p0, p1)

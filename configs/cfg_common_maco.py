@@ -99,6 +99,7 @@ def get_config():
   config.model_type = 'maco'
   config.model = ml_collections.ConfigDict()
   config.model.mask_ratio = 0.8
+  config.model.pred_vis = False
   config.model.temp = 0.2 # for contrastive learning
   config.model.loss_type = 'cos'
   config.model.intra_weight = 0.
@@ -111,7 +112,7 @@ def get_config():
   config.model.encoder.transformer.droppath_rate = 0.0
 
   # decoder
-  config.model.decoder = vit.get_small_decoder_config()
+  config.model.decoder = vit.get_decoder_config()
   config.model.decoder.sincos = True
   config.model.decoder.transformer.num_layers = 8
   config.model.decoder.transformer.dropout_rate = 0.0
