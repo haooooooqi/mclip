@@ -45,7 +45,7 @@ if INIT_VER == 'mae_jax_v2':
   clstoken_init = fixed_gaussian_init
   masktoken_init = fixed_gaussian_init
   posemb_init = fixed_gaussian_init  # not used if sincos
-  
+
   # patch_kernel_init = fixed_gaussian_init
   patch_kernel_init = initializers_util.patch_kernel()
   patch_bias_init = nn.initializers.zeros  # different from PyTorch?
@@ -159,7 +159,7 @@ class Add1DPositionEmbs(nn.Module):
 
   @nn.compact
   def __call__(self, inputs):
-    pe = self.get_pos_emb(inputs)    
+    pe = self.get_pos_emb(inputs)
     output = inputs + pe
     return output
 
@@ -464,6 +464,141 @@ class EncoderCross(nn.Module):
     return encoded
 
 
+
+class Encoder1DBlockPrompt(nn.Module):
+  """Transformer encoder layer (Promopting decoder  from MILAN).
+  Attributes:
+    inputs: input data.
+    mlp_dim: dimension of the mlp on top of attention block.
+    dtype: the dtype of the computation (default: float32).
+    dropout_rate: dropout rate.
+    attention_dropout_rate: dropout for attention heads.
+    deterministic: bool, deterministic or not (to apply dropout).
+    num_heads: Number of heads in nn.MultiHeadDotProductAttention
+  """
+
+  mlp_dim: int
+  num_heads: int
+  dtype: Dtype = jnp.float32
+  dropout_rate: float = 0.1
+  attention_dropout_rate: float = 0.1
+  droppath_rate: float = 0.0
+  layer_id: int = None
+  rescale_init: float = 1.
+
+  @nn.compact
+  def __call__(self, inputs, fix_encoding_tokens, *, deterministic, use_cls_token, ids_restore):
+    """Applies Encoder1DBlock module.
+    Args:
+      inputs: Inputs to the layer.
+      deterministic: Dropout will not be applied when set to true.
+    Returns:
+      output after transformer encoder block.
+    """
+
+    # Attention block.
+    assert inputs.ndim == 3, f'Expected (batch, seq, hidden) got {inputs.shape}'
+    assert fix_encoding_tokens.ndim == 3, f'Expected (batch, seq, hidden) got {fix_encoding_tokens.shape}'
+    q = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(inputs)
+
+    # fix_encoding_tokens = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(fix_encoding_tokens)
+
+    n, h, w = ids_restore.shape
+    ids_restore = jnp.reshape(ids_restore, [n, h * w])
+    num_clstokens = 1 if use_cls_token else 0
+    kv = jnp.concatenate([fix_encoding_tokens[:, num_clstokens:, :], q], axis=1)
+    # kv = gather_by_einsum(kv, ids_restore)  # reshuffle is not needed for kv
+    kv = jnp.concatenate([fix_encoding_tokens[:, :num_clstokens, :], kv], axis=1)
+
+
+    # ----------------------------------------------------
+    # t5x
+    MsaBlock = functools.partial(
+      t5x.layers.MultiHeadDotProductAttention,
+      qkv_kernel_init=lambda *args: qkv_kernel_init(*args) * self.rescale_init,
+      out_kernel_init=lambda *args: out_kernel_init(*args) * self.rescale_init,
+    )
+    # ----------------------------------------------------
+    x = MsaBlock(
+        dtype=self.dtype,
+        dropout_rate=self.attention_dropout_rate,
+        num_heads=self.num_heads,
+    )(q, kv)
+    x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=deterministic)
+    # droppath
+    x = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_msa')(x, deterministic=deterministic)
+    x = x + inputs
+
+    # MLP block.
+    y = t5x.layers.LayerNorm(dtype=self.dtype, axes=('embed',))(x)
+    y = MlpBlock(
+        mlp_dim=self.mlp_dim, dtype=self.dtype, dropout_rate=self.dropout_rate,
+        kernel_init=lambda *args: mlp_kernel_init(*args) * self.rescale_init,
+        bias_init=mlp_bias_init,
+        )(y, deterministic=deterministic)
+    # droppath
+    y = nn.Dropout(rate=self.droppath_rate, broadcast_dims=(1, 2), name='droppath_mlp')(y, deterministic=deterministic)
+
+    return x + y
+
+
+class EncoderPrompt(nn.Module):
+  """Transformer Model Encoder for sequence to sequence translation.
+  Attributes:
+    num_layers: number of layers
+    mlp_dim: dimension of the mlp on top of attention block
+    num_heads: Number of heads in nn.MultiHeadDotProductAttention
+    dropout_rate: dropout rate.
+    attention_dropout_rate: dropout rate in self attention.
+  """
+
+  num_layers: int
+  mlp_dim: int
+  num_heads: int
+  dropout_rate: float = 0.1
+  attention_dropout_rate: float = 0.1
+  droppath_rate: float = 0.0
+  prefix: str = 'encoder'
+  rescale_init: float = 1.0
+
+  @nn.compact
+  def __call__(self, inputs, fix_encoding_tokens, *, train, use_cls_token, ids_restore, pred_masked_only=False):
+    """Applies Transformer model on the inputs.
+    Args:
+      inputs: Inputs to the layer.
+      train: Set to `True` when training.
+    Returns:
+      output of a transformer encoder.
+    """
+    assert inputs.ndim == 3  # (batch, len, emb)
+
+    x = inputs
+    for lyr in range(self.num_layers):
+      x = Encoder1DBlockPrompt(
+          mlp_dim=self.mlp_dim,
+          dropout_rate=self.dropout_rate,
+          attention_dropout_rate=self.attention_dropout_rate,
+          droppath_rate=self.droppath_rate * lyr / (self.num_layers - 1) if self.droppath_rate > 0. else 0.,
+          name=self.prefix + 'block_{:02d}'.format(lyr),
+          num_heads=self.num_heads,
+          layer_id=lyr,
+          rescale_init=self.rescale_init,
+        )(x, fix_encoding_tokens, deterministic=not train, use_cls_token=use_cls_token, ids_restore=ids_restore)
+
+    if not pred_masked_only:
+      # full sequence recovery
+      num_clstokens = 1 if use_cls_token else 0
+      n, h, w = ids_restore.shape
+      ids_restore = jnp.reshape(ids_restore, [n, h * w])
+      x_ = jnp.concatenate([fix_encoding_tokens[:, num_clstokens:, :], x], axis=1)
+      x_ = gather_by_einsum(x_, ids_restore)
+      x = jnp.concatenate([fix_encoding_tokens[:, :num_clstokens, :], x_], axis=1)
+
+    encoded = t5x.layers.LayerNorm(name=self.prefix + '_norm', axes=('embed',))(x)
+
+    return encoded
+
+
 # the implemention for pmap
 def gather(x, ids):
   return x[ids, :]
@@ -491,7 +626,7 @@ def random_mask(rng, x, mask_ratio, bias=None):
   N, L, _ = x.shape  # batch, length, dim
   len_keep = int(L * (1 - mask_ratio))
 
-  noise = random.uniform(rng, shape=x.shape[:2])  
+  noise = random.uniform(rng, shape=x.shape[:2])
 
   if bias is not None:
     noise += bias
@@ -501,6 +636,7 @@ def random_mask(rng, x, mask_ratio, bias=None):
 
   # keep the first subset
   ids_keep = ids_shuffle[:, :len_keep]
+  ids_unkeep = ids_shuffle[:, len_keep:]
   x_masked = gather_by_einsum(x, ids_keep)
 
   x_masked = t5x.layers.with_sharding_constraint(x_masked, ('batch', 'length', 'embed'))
@@ -513,7 +649,7 @@ def random_mask(rng, x, mask_ratio, bias=None):
   mask = gather_by_einsum(mask, ids_restore)
   mask = t5x.layers.with_sharding_constraint(mask, ('batch', 'length'))
 
-  return x_masked, mask, ids_restore
+  return x_masked, mask, ids_restore, ids_keep, ids_unkeep
 
 
 class LanguageTransformer(nn.Module):
@@ -541,7 +677,7 @@ class LanguageTransformer(nn.Module):
       features=self.hidden_size,
       embedding_init=fixed_gaussian_init,
       one_hot=True,
-      axes=['classes', 'embed'],  # do not use 'vocab' 
+      axes=['classes', 'embed'],  # do not use 'vocab'
       name='token_embedding')
     encoder_layers['pos_emb'] = Add1DPositionEmbs(sincos=self.sincos, posemb_init=fixed_gaussian_init, name='posembed_encoder')
     encoder_layers['blocks'] = Encoder(name='Transformer', **self.transformer, prefix='encoder')
@@ -580,7 +716,7 @@ class LanguageTransformer(nn.Module):
     pred: [N, L, K]
     mask: [N, L], 0 is keep (known), 1 is remove (unknown)
     is_valid: [N, L], 1 is real, 0 is pad
-    """    
+    """
     labels_one_hot = jax.nn.one_hot(txt, self.vocab_size)  # [N, L, K]
     loss = optax.softmax_cross_entropy(pred, labels_one_hot)  # [N, L]
 
@@ -594,7 +730,7 @@ class LanguageTransformer(nn.Module):
 
   def apply_encoder(self, inputs, train):
     x = inputs
-    
+
     x = self.encoder_layers['token_emb'](x)
 
     x = self.encoder_layers['pos_emb'](x)
@@ -664,7 +800,7 @@ class VisionTransformer(nn.Module):
       x: (N, L, patch_size**2 *3)
       """
       p, q = self.patches.size
-      h, w = imgs.shape[1] // p, imgs.shape[2] // q 
+      h, w = imgs.shape[1] // p, imgs.shape[2] // q
 
       x = jnp.reshape(imgs, (imgs.shape[0], h, p, w, q, 3))
       x = jnp.einsum('nhpwqc->nhwpqc', x)
@@ -688,7 +824,7 @@ class VisionTransformer(nn.Module):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
+    mask: [N, L], 0 is keep, 1 is remove,
     """
     target = self.patchify(imgs)
     if self.norm_pix_loss:
@@ -707,7 +843,7 @@ class VisionTransformer(nn.Module):
     """
     imgs: [N, H, W, 3]
     pred: [N, L, p*p*3]
-    mask: [N, L], 0 is keep, 1 is remove, 
+    mask: [N, L], 0 is keep, 1 is remove,
     """
     imgs_pred = self.unpatchify(pred)
 
@@ -723,7 +859,12 @@ class VisionTransformer(nn.Module):
     axis=1)
     return imgs_vis
 
-  def apply_encoder(self, inputs, train):
+  def apply_encoder(self, inputs, train, apply_mask=False):
+    if apply_mask:
+        mask_ratio = self.mask_ratio
+    else:
+        mask_ratio = 0.0
+
     use_cls_token = (self.classifier == 'token')
     assert use_cls_token  # kaiming: TODO: support both?
 
@@ -735,7 +876,7 @@ class VisionTransformer(nn.Module):
     x = self.encoder_layers['pos_emb'](x)
 
     # masking: length -> length * mask_ratio
-    x, mask, ids_restore = random_mask(self.make_rng('dropout'), x, self.mask_ratio)
+    x, mask, ids_restore, ids_keep, id_unkeep = random_mask(self.make_rng('dropout'), x, mask_ratio)
     ids_restore = jnp.reshape(ids_restore, [n, h, w])  # carries the shape info
 
     if use_cls_token:
@@ -746,7 +887,7 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder_layers['blocks'](x, train=train)
 
-    return x, mask, ids_restore
+    return x, mask, ids_restore, ids_keep, id_unkeep
 
   def apply_unshuffle(self, x, ids_restore):
     """bottleneck projection, unshuffle, add pos emb"""
@@ -780,10 +921,26 @@ class VisionTransformer(nn.Module):
     x = self.decoder_layers['blocks'](x, train=train)
 
     # apply the predictor
-    x = self.decoder_layers['pred'](x)
+    # x = self.decoder_layers['pred'](x)
 
     # remove cls token
-    pred = x[:, num_clstokens:, :]
+    # pred = x[:, num_clstokens:, :]
+
+    return x
+
+  def apply_decoder_prompt(self, x, fix_encoding_tokens, train, ids_restore, pred_masked_only=False):
+    use_cls_token = (self.classifier == 'token')
+    num_clstokens = 1 if use_cls_token else 0
+
+    # apply the decoder
+    x = self.decoder_layers['blocks'](
+      x, fix_encoding_tokens, train=train, use_cls_token=use_cls_token, ids_restore=ids_restore, pred_masked_only=pred_masked_only,
+    )
+
+    # apply the predictor
+    # x = self.decoder_layers['pred'](x)
+
+    pred = x
 
     return pred
 
@@ -827,6 +984,10 @@ class VisionTransformer(nn.Module):
       'mask_token', masktoken_init, (1, 1, self.decoder.hidden_size),
       jnp.float32, axes=('_null0', '_null1', 'embed'))
     decoder_layers['pos_emb'] = Add2DPositionEmbs(sincos=self.sincos, use_cls_token=use_cls_token, name='posembed_decoder')
+    if self.decoder.prompt_attention:
+      decoder_layers['blocks'] = EncoderPrompt(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
+    else:
+      decoder_layers['blocks'] = Encoder(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
     if self.decoder.on_use:
       if self.decoder.cross_attention:
         decoder_layers['blocks'] = EncoderCross(name='TransformerDecoder', **self.decoder.transformer, prefix='decoder')
@@ -840,7 +1001,7 @@ class VisionTransformer(nn.Module):
         name='pred')
     self.decoder_layers = decoder_layers
 
-  
+
 class ImageTextLearner(nn.Module):
   """ContrastiveLearner with Vision Transformer
   """
@@ -880,8 +1041,8 @@ class ImageTextLearner(nn.Module):
       kernel_axes=('_null0', '_null1'),
       name='{}_mlp{}'.format(prefix, clr.proj_layers))(z)
     return z
-  
-  def compute_contrastive_loss(self, z0, z1):
+
+  def compute_contrastive_loss(self, z0, z1, postfix="ori"):
     clr = self.config.clr
 
     logits = jnp.einsum('nc,mc->nm', z0, z1)
@@ -889,7 +1050,7 @@ class ImageTextLearner(nn.Module):
 
     if clr.tau_learnable:
       logit_scale = t5x.layers.param_with_axes(
-          'logit_scale', initializers_util.constant(value=math.log(1 / 0.07)),
+          f'logit_scale_{postfix}', initializers_util.constant(value=math.log(1 / 0.07)),
           (1,), jnp.float32, axes=('_null0',))
       logit_scale = jnp.clip(logit_scale, 0, math.log(100))
       logits *= jnp.exp(logit_scale)
@@ -910,14 +1071,42 @@ class ImageTextLearner(nn.Module):
   def __call__(self, inputs, *, train, encode_img=True, encode_txt=True):
     if encode_img:
       img = inputs['image']
-    
+
     if encode_txt:
       txt = inputs['txt']
       is_valid = inputs['txt_is_valid']
 
     # apply both encoders
     if encode_img:
-      x_img, mask_img, ids_restore_img = self.img_encoder.apply_encoder(img, train=train)
+      x_img, mask_img, ids_restore_img, _, _ = self.img_encoder.apply_encoder(img, train=train)
+
+      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder.apply_encoder(img, train=train, apply_mask=True)
+      x_img_full_m, x_img_part_m = self.img_encoder.apply_unshuffle(x_img_m, ids_restore_img)
+
+      if self.img_encoder.decoder.no_attention:
+        pred_img_m = x_img_m
+      elif self.img_encoder.decoder.prompt_attention:
+        use_cls_token = (self.img_encoder.classifier == 'token')
+        num_clstokens = 1 if use_cls_token else 0
+
+        fix_encoding_tokens = gather_by_einsum(x_img_full_m[:, num_clstokens:, :], ids_keep_m)
+        mask_tokens = gather_by_einsum(x_img_full_m[:, num_clstokens:, :], ids_unkeep_m)
+        fix_encoding_tokens = jnp.concatenate([x_img_full_m[:, :num_clstokens, :], fix_encoding_tokens], axis=1)
+
+        print(f"fix_encoding_tokens {fix_encoding_tokens.shape}")
+        print(f"mask_tokens {mask_tokens.shape}")
+
+        pred_img_m = self.img_encoder.apply_decoder_prompt(
+          mask_tokens, fix_encoding_tokens, train=train, ids_restore=ids_restore_img_m, pred_masked_only=self.config.clr.contrast_with_mask_only,
+        )
+      else:
+        pred_img_m = self.img_encoder.apply_decoder(x_img_full_m, train=train)
+
+      if self.config.clr.contrast_with_mask_only:
+        ids_unkeep_m = jnp.concatenate([jax.numpy.zeros((ids_unkeep_m.shape[0], 1)), ids_unkeep_m + 1], axis=1)
+        pred_img_m = gather_by_einsum(pred_img_m, ids_unkeep_m)
+        pred_img_m = t5x.layers.with_sharding_constraint(pred_img_m, ('batch', 'length', 'embed'))
+
     if encode_txt:
       x_txt, mask_txt, ids_restore_txt = self.txt_encoder.apply_encoder(txt, train=train)
 
@@ -927,6 +1116,10 @@ class ImageTextLearner(nn.Module):
         z_img = x_img.mean(axis=1)  # avearge pool anyway
         z_img = self.apply_projection_head(z_img, prefix='img')
         z_img /= jnp.linalg.norm(z_img, axis=-1, keepdims=True) + 1e-8
+
+        z_img_m = pred_img_m.mean(axis=1)  # avearge pool anyway
+        z_img_m = self.apply_projection_head(z_img_m, prefix='img_m')
+        z_img_m /= jnp.linalg.norm(z_img_m, axis=-1, keepdims=True) + 1e-8
       if encode_txt:
         if self.txt_encoder.use_attention_mask:
           ids_eos = jnp.argmax(jnp.cumsum(is_valid - 1e-6, axis=-1), axis=-1)  # find the last one
@@ -937,10 +1130,17 @@ class ImageTextLearner(nn.Module):
         z_txt = self.apply_projection_head(z_txt, prefix='txt')
         z_txt /= jnp.linalg.norm(z_txt, axis=-1, keepdims=True) + 1e-8
       if encode_img and encode_txt:
-        loss_clr, tau = self.compute_contrastive_loss(z_img, z_txt)
+        loss_clr_ori, tau = self.compute_contrastive_loss(z_img, z_txt)
+        if not self.config.clr.bp2txt:
+          z_txt = jax.lax.stop_gradient(z_txt)
+        loss_clr_m, tau_m = self.compute_contrastive_loss(z_img_m, z_txt, postfix="m")
+        loss_clr = (loss_clr_ori + loss_clr_m) / 2
       else:
         loss_clr = 0
+        loss_clr_ori = 0
+        loss_clr_m = 0
         tau = 0
+        tau_m = 0
     else:
       raise NotImplementedError
       loss_clr = 0
@@ -981,10 +1181,14 @@ class ImageTextLearner(nn.Module):
     artifacts = {
       'loss': loss_img,  # always plot loss_img in the 'loss' metric
       'loss_clr': loss_clr,
+      'loss_clr_ori': loss_clr_ori,
+      'loss_clr_m': loss_clr_m,
       'loss_img': loss_img,
       'loss_txt': loss_txt,
-      'tau': tau}
-    
+      'tau': tau,
+      'tau_m': tau_m,
+    }
+
     if not train and encode_img:
       artifacts['z_img'] = z_img
     if not train and encode_txt:

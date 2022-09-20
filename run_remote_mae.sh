@@ -1,7 +1,7 @@
 echo 'code dir: '$STAGEDIR
 
 # seed=0
-batch=16384  # 4096, 8192, 16384, 32768
+batch=32768  # 4096, 8192, 16384, 32768
 lr=4e-6  # MAE base lr: 1e-4; CLIP base lr: 5e-4/32768*256=3.90625e-06
 ep=10000  # 10000  # 400M * 30 / 1.28M = 9375; 400M * 32 / 1.28M = 9375
 
@@ -11,30 +11,56 @@ mask_txt=0.0
 txtw=0
 
 tau=0.01
+seed=42
 
 partitions=1
 
+######################
+# batch=64
+# VM_NAME=hf-mamut-v3-8
+######################
+
+mask=0.75
+ep=2000
+batch=24576  # 16384 + 8192
+d_depth=4
+
+
+
+REMOTE_ROOT_FOLDER="checkpoint"
 rescale=1.0
 
-vitsize=large
+HASH=$(echo $RANDOM | md5sum | head -c 8; echo;)
+vitsize=base
 CONFIG=cfg_mae_${vitsize}
 
 # _normpix_exwd_NOsplit_fastsave
-JOBNAME=flax/$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}txtNO_s${seed}_p${partitions}st_re${rescale}_laion_a0.5_clrtau_ev1_512d1mlp_evonly # _hfclip77b_autoreg_wd0.2_b0.98
-# RESUME=''
-RESUME='gs://kmh-gcp/checkpoints/flax/20220910_212550_maet5x_kmh-tpuvm-v3-512-1_cfg_mae_large_10000ep_b16384_lr4e-6_mk0.0txt0.0_s100_p1st_re1.0_laion_a0.5_clrtau_eval_512d1mlp'
+JOBNAME=flax/${HASH}_$(date +%Y%m%d_%H%M%S)_maet5x_${VM_NAME}_${CONFIG}_${ep}ep_b${batch}_lr${lr}_mk${mask}txt${mask_txt}_s${seed}_p${partitions}st_re${rescale}_laion_a0.5_sanity_twoMAE_twoCross
+RESUME=''
+# RESUME='gs://kmh-gcp/checkpoints/flax/20220910_212550_maet5x_kmh-tpuvm-v3-512-1_cfg_mae_large_10000ep_b16384_lr4e-6_mk0.0txt0.0_s100_p1st_re1.0_laion_a0.5_clrtau_eval_512d1mlp'
 
-WORKDIR=gs://kmh-gcp/checkpoints/${JOBNAME}
-LOGDIR=/kmh_data/logs/${JOBNAME}
+WORKDIR=gs://hf-gcp/checkpoints/${JOBNAME}
+LOGDIR=/checkpoint/haoqifan/log/${JOBNAME}
+REMOTE_LOGDIR=/${REMOTE_ROOT_FOLDER}/haoqifan/log/${JOBNAME}
 mkdir -p ${LOGDIR}
 chmod 777 ${LOGDIR}
 
+PYTHONPATH_ORG=/checkpoint/haoqifan/workspace/mclip
+PYTHONPATH_TAR=/checkpoint/haoqifan/jobs/${HASH}
+
+REMOTE_PYTHONPATH_TAR=/${REMOTE_ROOT_FOLDER}/haoqifan/jobs/${HASH}
+cp -R $PYTHONPATH_ORG $PYTHONPATH_TAR
+
+echo $HASH
+echo $PYTHONPATH_TAR
+
+
 # source run_init_remote.sh
 
-gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
+cd ${HOME} && gcloud alpha compute tpus tpu-vm ssh ${VM_NAME} --zone europe-west4-a \
     --worker=all --command "
-cd $STAGEDIR
-git config --global --add safe.directory $STAGEDIR
+# cd $STAGEDIR
+# git config --global --add safe.directory $STAGEDIR
 
 echo Current commit: $(git show -s --format=%h)
 echo Current dir: $(pwd)
@@ -43,8 +69,10 @@ export GOOGLE_APPLICATION_CREDENTIALS=~/gcp_credential.json
 export TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=8589934592
 export TFDS_DATA_DIR=gs://kmh-gcp/tensorflow_datasets
 
+echo REMOTE_PYTHONPATH_TAR $REMOTE_PYTHONPATH_TAR
+cd ${REMOTE_PYTHONPATH_TAR}
+echo Current dir: $(pwd)
 source run_get_ssh_id.sh
-
 python3 main.py \
     --workdir=${WORKDIR} \
     --config=configs/$CONFIG.py \
@@ -79,9 +107,16 @@ python3 main.py \
     --config.model.clr.proj_layers=1 \
     --config.model.clr.proj_dim_out=512 \
     --config.model.clr.tau_learnable=True \
-    --config.eval_only=True \
+    --config.opt.b2=0.98 \
+    --config.opt.weight_decay=0.2 \
+    --config.eval_only=False \
     --config.aug.eval_pad=0 \
-2>&1 | tee -a $LOGDIR/finetune_\$SSH_ID.log
+    --config.model.model_img.decoder.transformer.num_layers=${d_depth} \
+    --config.model.clr.contrast_with_mask_only=False \
+    --config.model.model_img.decoder.prompt_attention=False \
+    --config.model.model_img.decoder.no_attention=False \
+    --config.model.clr.bp2txt=True \
+2>&1 | tee -a $REMOTE_LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
     # --config.aug.txt.tokenizer=hf_clip \
@@ -91,6 +126,7 @@ python3 main.py \
 
     # --config.opt.b2=0.98 \
     # --config.opt.weight_decay=0.2 \
+
     # --config.aug.txt.tokenizer=hf_clip \
     # --config.aug.txt.max_len=77 \
     # --config.model.model_txt.vocab_size=49408 \

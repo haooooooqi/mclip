@@ -76,6 +76,8 @@ def get_config_img():
   config.decoder.transformer.droppath_rate = 0.0
 
   config.decoder.cross_attention = True
+  config.decoder.prompt_attention = False
+  config.decoder.no_attention = False
 
   config.decoder.on_use = True  # whehter img has decoders?
 
@@ -119,5 +121,6 @@ def get_config_txt():
   config.decoder.on_use = True  # whehter txt has decoders?
 
   config.decoder.loss_weight = 1.0
+
 
   return config

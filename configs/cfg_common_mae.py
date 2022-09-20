@@ -66,7 +66,7 @@ def get_config():
   config.opt.b1 = 0.9
   config.opt.b2 = 0.95
   config.opt.weight_decay = 0.05
-  
+
   config.opt_mu_dtype = 'float32'
 
   config.exclude_wd = True  # exclude some weight decays (bias, norm, cls, posembed)
@@ -144,5 +144,9 @@ def get_config():
 
   # eval
   config.eval_only = False
+
+
+  config.model.clr.contrast_with_mask_only = False
+  config.model.clr.bp2txt = True
 
   return config
