@@ -29,7 +29,8 @@ from utils import posembed_util
 from utils import initializers_util
 from utils import onlineknn_util
 
-from models_mclr import AddPositionEmbs, gather_by_einsum, Encoder
+from models_mclr import AddPositionEmbs, gather_by_einsum, Encoder, Decoder
+
 
 # init hacks
 INIT_VER = 'mae_jax_v2'
@@ -55,16 +56,14 @@ else:
   raise NotImplementedError
 
 
-class VisionTransformer(nn.Module):
-  """VisionTransformer."""
+class EncoderTransformer(nn.Module):
+  """EncoderTransformer."""
   sincos: bool
   patches: Any
   transformer: Any
   image_size: int
   hidden_size: int
-  proj_layers: int
-  proj_dim_hidden: int
-  proj_dim_out: int
+  proj_size: int
   classifier: str = 'token' # not used
   dtype: Any = jnp.float32
 
@@ -94,44 +93,13 @@ class VisionTransformer(nn.Module):
                           **self.transformer,
                           prefix='encoder')
 
-    flip = False
-    projector = []
-    for i in range(self.proj_layers):
-      kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
-      if i < self.proj_layers - 1:
-        dim = self.proj_dim_hidden
-        post_act = True
-      else:
-        dim = self.proj_dim_out
-        post_act = False
-
-      projector.append(t5x.layers.Dense(
-          features=dim,
-          dtype=self.dtype,
-          kernel_init=mlp_kernel_init,
-          kernel_axes=kernel_axes,
-          use_bias=False,
-          name='proj{}'.format(i),
-      ))
-      if post_act:
-        projector.append(t5x.layers.TrainOnlyBatchNorm(
-          dtype=self.dtype,
-          axes=(kernel_axes[-1],),
-          name='proj_norm{}'.format(i),
-        ))
-        projector.append(nn.relu)
-      else:
-        projector.append(t5x.layers.TrainOnlyBatchNorm(
-          use_bias=False,
-          use_scale=False,
-          dtype=self.dtype,
-          axes=(kernel_axes[-1],),
-          name='proj_norm{}'.format(i),
-        ))
-
-      flip = not flip
-
-    self.projector = nn.Sequential(projector)
+    self.proj = t5x.layers.Dense(
+      features=self.proj_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('embed', 'mlp'),  # 'mlp' is split first
+      name='bottleneck',
+    )
 
   def __call__(self, inputs, train):
     x = self.conv_0(inputs)
@@ -145,24 +113,77 @@ class VisionTransformer(nn.Module):
     # apply the encoder
     x = self.encoder(x, train=train)
 
-    # just do global average pooling
-    p = jnp.mean(x, axis=1)
-
-    # apply projector
-    p = self.projector(p)
+    # apply the bottleneck
+    p = self.proj(x)
 
     return x, p
+
+
+class DecoderTransformer(nn.Module):
+  """DecoderTransformer."""
+  sincos: bool
+  patches: Any
+  transformer: Any
+  image_size: int
+  hidden_size: int
+  classifier: str = 'token' # not used
+  dtype: Any = jnp.float32
+
+  def setup(self):
+    h = self.image_size // self.patches.size[0]
+    w = self.image_size // self.patches.size[1]
+    pos_emb_shape = (1, h * w, self.hidden_size)
+
+    if not self.sincos:
+      init_fn = posemb_init
+    else:
+      pe_array = posembed_util.get_2d_sincos_pos_embed(self.hidden_size, (h, w), cls_token=False)  # in numpy array
+      init_fn = initializers_util.constant(value=pe_array, dtype=self.dtype)
+
+    self.pos_embed = t5x.layers.param_with_axes(
+        'pos_embedding',
+        init_fn,
+        pos_emb_shape,
+        jnp.float32,
+        axes=('_null0', 'length', 'embed')
+    )
+
+    self.decoder = Decoder(name='DecoderTransformer',
+                          decoder_type='cross',
+                          hidden_size=self.hidden_size,
+                          mlp_dim=self.transformer.mlp_dim,
+                          num_heads=self.transformer.num_heads,
+                          num_layers=self.transformer.num_layers,
+                          prefix='decoder')
+
+    self.proj = t5x.layers.Dense(
+      features=self.hidden_size,
+      kernel_init=mlp_kernel_init,
+      bias_init=mlp_bias_init,
+      kernel_axes=('embed', 'mlp'),  # 'mlp' is split first
+      name='predictor',
+    )
+
+  def __call__(self, inputs, train):
+    # apply the decoder
+    pos_embed = jnp.tile(self.pos_embed, [inputs.shape[0], 1, 1])
+    q = self.decoder(inputs, pos_embed, train=train)
+
+    # apply the predictor
+    q = self.proj(q)
+
+    return q
 
 
 class SiameseLearner(nn.Module):
   """SiameseLearner."""
 
   encoder: Any
+  decoder: Any
   image_size: int
   temp: float
-  pred_layers: int
-  pred_dim_hidden: int
-  loss_type: str = 'info-nce'
+  loss_type: str = 'cos'
+  intra_weight: float = 1.0
   visualize: bool = False
   knn: Any = None
   dtype: Any = jnp.float32
@@ -170,11 +191,15 @@ class SiameseLearner(nn.Module):
   def setup(self):
     # source
     self.encoder.name = 'Source' # hack to change name
-    self.source_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+    self.source_encoder = EncoderTransformer(image_size=self.image_size,
+                                            proj_size=self.decoder.hidden_size,
+                                            **self.encoder)
 
     # target
     self.encoder.name = 'Target'
-    self.target_encoder = VisionTransformer(image_size=self.image_size, **self.encoder)
+    self.target_encoder = EncoderTransformer(image_size=self.image_size,
+                                            proj_size=self.decoder.hidden_size,
+                                            **self.encoder)
 
     # knn
     if self.knn.on:
@@ -188,44 +213,9 @@ class SiameseLearner(nn.Module):
       elif self.knn.postnorm != 'None':
         raise NotImplementedError
 
-    # predictor
-    flip = False if self.encoder.proj_layers % 2 == 0 else True
-    predictor = []
-    for i in range(self.pred_layers):
-      kernel_axes = ('mlp', 'embed') if flip else ('embed', 'mlp')
-      if i < self.pred_layers - 1:
-        dim = self.pred_dim_hidden
-        post_act = True
-      else:
-        dim = self.encoder.proj_dim_out
-        post_act = False
-
-      predictor.append(t5x.layers.Dense(
-          features=dim,
-          dtype=self.dtype,
-          kernel_init=mlp_kernel_init,
-          kernel_axes=kernel_axes,
-          use_bias=False,
-          name='pred{}'.format(i),
-      ))
-      if post_act:
-        predictor.append(t5x.layers.TrainOnlyBatchNorm(
-          dtype=self.dtype,
-          axes=(kernel_axes[-1],),
-          name='pred_norm{}'.format(i),
-        ))
-        predictor.append(nn.relu)
-      else:
-        predictor.append(t5x.layers.TrainOnlyBatchNorm(
-          use_bias=False,
-          use_scale=False,
-          dtype=self.dtype,
-          axes=(kernel_axes[-1],),
-          name='pred_norm{}'.format(i),
-        ))
-
-      flip = not flip
-    self.predictor = nn.Sequential(predictor)
+    # decoder
+    self.decoder.name = 'Decoder'
+    self.source_decoder = DecoderTransformer(image_size=self.image_size, **self.decoder)
 
   def apply_knn(self, x, labels, train):
     if not self.knn.on:
@@ -249,27 +239,51 @@ class SiameseLearner(nn.Module):
     return knn_accuracy
 
   def compute_loss(self, source, target):
-    # l2 normalization
-    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
-    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
-
     if self.loss_type == 'cos':
       return self.cosine(source, target)
+    elif self.loss_type == 'norm_l2':
+      return self.norm_l2(source, target)
     elif self.loss_type == 'info-nce':
       return self.info_nce(source, target)
     else:
       raise NotImplementedError
 
   def cosine(self, source, target):
-    logits = jnp.einsum('nc,nc->n', source, target)
+    # l2 normalization
+    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
+    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
+
+    logits = jnp.einsum('nqc,nqc->nq', source, target)
     return -logits.mean()
 
+  def norm_l2(self, source, target):
+    mean = jnp.mean(target, axis=-1, keepdims=True)
+    var = jnp.var(target, axis=-1, keepdims=True)
+    target = (target - mean) / (var + 1.e-6)**.5
+    return jnp.square(source - target).mean()
+
   def info_nce(self, source, target):
-    # inter-image contrast
-    logits = jnp.einsum('nc,mc->nm', source, target) / self.temp
-    labels = jnp.arange(source.shape[0], dtype=jnp.int32)
-    xent = optax.softmax_cross_entropy_with_integer_labels(logits=logits, labels=labels)
-    return xent.mean() * self.temp
+    # batch size
+    N, L, _ = source.shape
+    # l2 normalization
+    source /= jnp.sqrt(jnp.sum(source**2, axis=-1, keepdims=True) + 1.e-12)
+    target /= jnp.sqrt(jnp.sum(target**2, axis=-1, keepdims=True) + 1.e-12)
+    # inter-image contrast -- with position embedding it is probably not need?
+    logits_inter = jnp.einsum('nqc,mqc->nqm', source, target) / self.temp
+    labels_inter = jnp.tile(jnp.arange(N, dtype=jnp.int32)[:, None], (1, L))
+    xent_inter = optax.softmax_cross_entropy_with_integer_labels(logits=logits_inter, labels=labels_inter)
+
+    loss = xent_inter.mean()
+
+    if self.intra_weight != 0:
+      # intra-image contrast
+      logits_intra = jnp.einsum('nqc,npc->nqp', source, target) / self.temp
+      labels_intra = jnp.tile(jnp.arange(L, dtype=jnp.int32)[None, :], (N, 1))
+      xent_intra = optax.softmax_cross_entropy_with_integer_labels(logits=logits_intra, labels=labels_intra)
+
+      loss += xent_intra.mean() * self.intra_weight
+
+    return loss * self.temp
 
   def __call__(self, inputs, *, train, update=True):
     imgs = inputs['image']
@@ -287,8 +301,8 @@ class SiameseLearner(nn.Module):
     # optionally apply knn
     knn_accuracy = self.apply_knn(x1, labels, train=(train and update))
 
-    # predictor
-    p0 = self.predictor(p0)
+    # decoder
+    p0 = self.source_decoder(p0, train)
 
     # compute loss
     loss = self.compute_loss(p0, p1)

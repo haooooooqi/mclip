@@ -10,6 +10,12 @@ set -x
 # after --: options for both training and fine-tuning
 # before --: options only for training
 
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.aug.train_type=byol-sym" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.aug.train_type=byol-sym --config.model.pred_vis=True" >> $queue_file
+
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 128 large imagenet-1k --config.aug.train_type=byol-sym" >> $queue_file
+# echo "~/mae_jax/infra/wrapper.sh maco $salt 128 large imagenet-1k --config.aug.train_type=byol-sym --config.model.pred_vis=True" >> $queue_file
+
 # for mr in .75 .9; do
 #     echo "~/mae_jax/infra/wrapper.sh maco $salt 128 base imagenet-1k --config.model.mask_ratio=$mr" >> $queue_file
 #     echo "~/mae_jax/infra/wrapper.sh maco $salt 256 large imagenet-1k --config.model.mask_ratio=$mr" >> $queue_file
