@@ -106,6 +106,10 @@ python3 main.py \
     --config.model.model_txt.decoder.loss_weight=${txtw} \
     --config.model.clr.proj_layers=1 \
     --config.model.clr.proj_dim_out=512 \
+    --config.model.model_proj.proj_layers=1 \
+    --config.model.model_proj.proj_dim_out=512 \
+    --config.model.model_img.decoder.hidden_size=768 \
+    --config.model.model_img.decoder.transformer.num_heads=12 \
     --config.model.clr.tau_learnable=True \
     --config.opt.b2=0.98 \
     --config.opt.weight_decay=0.2 \

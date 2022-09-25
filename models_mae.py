@@ -205,6 +205,41 @@ class MlpBlock(nn.Module):
     return output
 
 
+class Projection(nn.Module):
+  """Transformer MLP / feed-forward block."""
+
+  proj_dim_hidden: int
+  proj_layers: int
+  proj_dim_out: int
+  prefix: str
+  dtype: Dtype = jnp.float32
+  kernel_init: Callable[[PRNGKey, Shape, Dtype],
+                        Array] = nn.initializers.xavier_uniform()
+  bias_init: Callable[[PRNGKey, Shape, Dtype],
+                      Array] = nn.initializers.zeros
+
+  @nn.compact
+  def __call__(self, z):
+    """Applies Transformer MlpBlock module."""
+    for i in range(self.proj_layers - 1):
+      z = t5x.layers.Dense(
+        features=self.proj_dim_hidden,
+        dtype=self.dtype,
+        kernel_init=self.kernel_init,
+        bias_init=self.bias_init,
+        kernel_axes=('_null0', '_null1'),
+        name='{}_mlp{}'.format(self.prefix, i))(z)
+      z = nn.gelu(z)
+    z = t5x.layers.Dense(
+      features=self.proj_dim_out,
+      dtype=self.dtype,
+      kernel_init=self.kernel_init,
+      bias_init=self.bias_init,
+      kernel_axes=('_null0', '_null1'),
+      name='{}_mlp{}'.format(self.prefix, self.proj_layers))(z)
+    return z
+
+
 class Encoder1DBlock(nn.Module):
   """Transformer encoder layer.
 
@@ -1018,9 +1053,23 @@ class ImageTextLearner(nn.Module):
     cfg.name = 'txt_encoder'  # force name
     return cfg
 
+  def get_config_txt_proj(self):
+    cfg = self.config.model_proj.copy_and_resolve_references()  # copy
+    cfg.name = 'txt_proj'  # force name
+    cfg.prefix = 'txt'
+    return cfg
+
+  def get_config_img_proj(self):
+    cfg = self.config.model_proj.copy_and_resolve_references()  # copy
+    cfg.name = 'img_proj'  # force name
+    cfg.prefix = 'img'
+    return cfg
+
   def setup(self):
     self.img_encoder = VisionTransformer(**self.get_config_img())
     self.txt_encoder = LanguageTransformer(**self.get_config_txt())
+    self.img_proj = Projection(**self.get_config_img_proj())
+    self.txt_proj = Projection(**self.get_config_txt_proj())
 
   def apply_projection_head(self, z, prefix):
     clr = self.config.clr
@@ -1114,11 +1163,13 @@ class ImageTextLearner(nn.Module):
     if self.config.clr.clr_loss:
       if encode_img:
         z_img = x_img.mean(axis=1)  # avearge pool anyway
-        z_img = self.apply_projection_head(z_img, prefix='img')
+        # z_img = self.apply_projection_head(z_img, prefix='img')
+        z_img = self.img_proj(z_img)
         z_img /= jnp.linalg.norm(z_img, axis=-1, keepdims=True) + 1e-8
 
         z_img_m = pred_img_m.mean(axis=1)  # avearge pool anyway
-        z_img_m = self.apply_projection_head(z_img_m, prefix='img_m')
+        # z_img_m = self.apply_projection_head(z_img_m, prefix='img_m')
+        z_img_m = self.img_proj(z_img_m)
         z_img_m /= jnp.linalg.norm(z_img_m, axis=-1, keepdims=True) + 1e-8
       if encode_txt:
         if self.txt_encoder.use_attention_mask:
@@ -1127,7 +1178,8 @@ class ImageTextLearner(nn.Module):
           z_txt = gather_by_einsum(x_txt, ids_eos).squeeze(axis=1)
         else:
           z_txt = x_txt[:, 0, :]  # cls token anyway
-        z_txt = self.apply_projection_head(z_txt, prefix='txt')
+        # z_txt = self.apply_projection_head(z_txt, prefix='txt')
+        z_txt = self.txt_proj(z_txt)
         z_txt /= jnp.linalg.norm(z_txt, axis=-1, keepdims=True) + 1e-8
       if encode_img and encode_txt:
         loss_clr_ori, tau = self.compute_contrastive_loss(z_img, z_txt)
