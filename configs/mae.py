@@ -37,6 +37,7 @@ def get_config():
   config = ml_collections.ConfigDict()
   config.model_img = get_config_img()
   config.model_txt = get_config_txt()
+  config.model_proj = get_config_proj()
 
   config.visualize = True
 
@@ -123,4 +124,14 @@ def get_config_txt():
   config.decoder.loss_weight = 1.0
 
 
+  return config
+
+
+def get_config_proj():
+  config = ml_collections.ConfigDict()
+  config.name = 'img_proj'
+  config.prefix = ''
+  config.proj_layers = 2
+  config.proj_dim_hidden = 1024
+  config.proj_dim_out = 256
   return config
