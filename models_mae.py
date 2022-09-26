@@ -1043,6 +1043,11 @@ class ImageTextLearner(nn.Module):
   config: Any = None  # model config
   dtype: Any = jnp.float32
 
+  def get_config_img_t(self):
+    cfg = self.config.model_img.copy_and_resolve_references()  # copy
+    cfg.name = 'img_encoder_t'  # force name
+    return cfg
+
   def get_config_img(self):
     cfg = self.config.model_img.copy_and_resolve_references()  # copy
     cfg.name = 'img_encoder'  # force name
@@ -1066,6 +1071,7 @@ class ImageTextLearner(nn.Module):
     return cfg
 
   def setup(self):
+    self.img_encoder_t = VisionTransformer(**self.get_config_img_t())
     self.img_encoder = VisionTransformer(**self.get_config_img())
     self.txt_encoder = LanguageTransformer(**self.get_config_txt())
     self.img_proj = Projection(**self.get_config_img_proj())
@@ -1127,10 +1133,10 @@ class ImageTextLearner(nn.Module):
 
     # apply both encoders
     if encode_img:
-      x_img, mask_img, ids_restore_img, _, _ = self.img_encoder.apply_encoder(img, train=train)
+      x_img, mask_img, ids_restore_img, _, _ = self.img_encoder_t.apply_encoder(img, train=train)
 
-      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder.apply_encoder(img, train=train, apply_mask=True)
-      x_img_full_m, x_img_part_m = self.img_encoder.apply_unshuffle(x_img_m, ids_restore_img)
+      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder_t.apply_encoder(img, train=train, apply_mask=train)
+      x_img_full_m, x_img_part_m = self.img_encoder_t.apply_unshuffle(x_img_m, ids_restore_img)
 
       if self.img_encoder.decoder.no_attention:
         pred_img_m = x_img_m
@@ -1186,7 +1192,8 @@ class ImageTextLearner(nn.Module):
         if not self.config.clr.bp2txt:
           z_txt = jax.lax.stop_gradient(z_txt)
         loss_clr_m, tau_m = self.compute_contrastive_loss(z_img_m, z_txt, postfix="m")
-        loss_clr = (loss_clr_ori + loss_clr_m) / 2
+        if self.config.clr.mean_loss:
+          loss_clr = (loss_clr_ori + loss_clr_m) / 2
       else:
         loss_clr = 0
         loss_clr_ori = 0
@@ -1242,7 +1249,7 @@ class ImageTextLearner(nn.Module):
     }
 
     if not train and encode_img:
-      artifacts['z_img'] = z_img
+      artifacts['z_img'] = z_img_m
     if not train and encode_txt:
       artifacts['z_txt'] = z_txt
 

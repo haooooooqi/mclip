@@ -21,6 +21,7 @@ partitions=1
 ######################
 
 mask=0.75
+mask=0.5
 ep=2000
 batch=24576  # 16384 + 8192
 d_depth=4
@@ -118,8 +119,9 @@ python3 main.py \
     --config.model.model_img.decoder.transformer.num_layers=${d_depth} \
     --config.model.clr.contrast_with_mask_only=False \
     --config.model.model_img.decoder.prompt_attention=False \
-    --config.model.model_img.decoder.no_attention=False \
+    --config.model.model_img.decoder.no_attention=True \
     --config.model.clr.bp2txt=True \
+    --config.model.clr.mean_loss=False \
 2>&1 | tee -a $REMOTE_LOGDIR/finetune_\$SSH_ID.log
 " 2>&1 | tee -a $LOGDIR/finetune.log
 
