@@ -211,7 +211,6 @@ class Projection(nn.Module):
   proj_dim_hidden: int
   proj_layers: int
   proj_dim_out: int
-  prefix: str
   dtype: Dtype = jnp.float32
   kernel_init: Callable[[PRNGKey, Shape, Dtype],
                         Array] = nn.initializers.xavier_uniform()
@@ -228,7 +227,7 @@ class Projection(nn.Module):
         kernel_init=self.kernel_init,
         bias_init=self.bias_init,
         kernel_axes=('_null0', '_null1'),
-        name='{}_mlp{}'.format(self.prefix, i))(z)
+        name='mlp{}'.format(i))(z)
       z = nn.gelu(z)
     z = t5x.layers.Dense(
       features=self.proj_dim_out,
@@ -236,7 +235,7 @@ class Projection(nn.Module):
       kernel_init=self.kernel_init,
       bias_init=self.bias_init,
       kernel_axes=('_null0', '_null1'),
-      name='{}_mlp{}'.format(self.prefix, self.proj_layers))(z)
+      name='mlp{}'.format(self.proj_layers))(z)
     return z
 
 
@@ -1058,24 +1057,42 @@ class ImageTextLearner(nn.Module):
     cfg.name = 'txt_encoder'  # force name
     return cfg
 
+  def get_config_txt_mmt(self):
+    cfg = self.config.model_txt.copy_and_resolve_references()  # copy
+    cfg.name = 'txt_encoder_mmt'  # force name
+    return cfg
+
   def get_config_txt_proj(self):
     cfg = self.config.model_proj.copy_and_resolve_references()  # copy
     cfg.name = 'txt_proj'  # force name
-    cfg.prefix = 'txt'
+    return cfg
+
+  def get_config_txt_proj_mmt(self):
+    cfg = self.config.model_proj.copy_and_resolve_references()  # copy
+    cfg.name = 'txt_proj_mmt'  # force name
     return cfg
 
   def get_config_img_proj(self):
     cfg = self.config.model_proj.copy_and_resolve_references()  # copy
     cfg.name = 'img_proj'  # force name
-    cfg.prefix = 'img'
+    return cfg
+
+  def get_config_img_proj_t(self):
+    cfg = self.config.model_proj.copy_and_resolve_references()  # copy
+    cfg.name = 'img_proj_t'  # force name
     return cfg
 
   def setup(self):
     self.img_encoder_t = VisionTransformer(**self.get_config_img_t())
     self.img_encoder = VisionTransformer(**self.get_config_img())
     self.txt_encoder = LanguageTransformer(**self.get_config_txt())
+    self.txt_encoder_mmt = LanguageTransformer(**self.get_config_txt_mmt())
+    self.img_proj_t = Projection(**self.get_config_img_proj_t())
     self.img_proj = Projection(**self.get_config_img_proj())
     self.txt_proj = Projection(**self.get_config_txt_proj())
+    self.txt_proj_mmt = Projection(**self.get_config_txt_proj_mmt())
+
+    # self.txt_encoder_mmt.replace(self.txt_encoder.params)
 
   def apply_projection_head(self, z, prefix):
     clr = self.config.clr
@@ -1135,8 +1152,8 @@ class ImageTextLearner(nn.Module):
     if encode_img:
       x_img, mask_img, ids_restore_img, _, _ = self.img_encoder_t.apply_encoder(img, train=train)
 
-      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder_t.apply_encoder(img, train=train, apply_mask=train)
-      x_img_full_m, x_img_part_m = self.img_encoder_t.apply_unshuffle(x_img_m, ids_restore_img)
+      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder.apply_encoder(img, train=train, apply_mask=train)
+      x_img_full_m, x_img_part_m = self.img_encoder.apply_unshuffle(x_img_m, ids_restore_img)
 
       if self.img_encoder.decoder.no_attention:
         pred_img_m = x_img_m
@@ -1164,13 +1181,14 @@ class ImageTextLearner(nn.Module):
 
     if encode_txt:
       x_txt, mask_txt, ids_restore_txt = self.txt_encoder.apply_encoder(txt, train=train)
+      x_txt_mmt, mask_txt_mmt, ids_restore_txt_mmt = self.txt_encoder_mmt.apply_encoder(txt, train=train)
 
     # apply contrastive learning (clip-like)
     if self.config.clr.clr_loss:
       if encode_img:
         z_img = x_img.mean(axis=1)  # avearge pool anyway
         # z_img = self.apply_projection_head(z_img, prefix='img')
-        z_img = self.img_proj(z_img)
+        z_img = self.img_proj_t(z_img)
         z_img /= jnp.linalg.norm(z_img, axis=-1, keepdims=True) + 1e-8
 
         z_img_m = pred_img_m.mean(axis=1)  # avearge pool anyway
@@ -1182,18 +1200,28 @@ class ImageTextLearner(nn.Module):
           ids_eos = jnp.argmax(jnp.cumsum(is_valid - 1e-6, axis=-1), axis=-1)  # find the last one
           ids_eos = ids_eos[:, None]
           z_txt = gather_by_einsum(x_txt, ids_eos).squeeze(axis=1)
+          # mmt
+          z_txt_mmt = gather_by_einsum(x_txt_mmt, ids_eos).squeeze(axis=1)
         else:
           z_txt = x_txt[:, 0, :]  # cls token anyway
+          # mmt
+          z_txt_mmt = x_txt_mmt[:, 0, :]  # cls token anyway
         # z_txt = self.apply_projection_head(z_txt, prefix='txt')
         z_txt = self.txt_proj(z_txt)
         z_txt /= jnp.linalg.norm(z_txt, axis=-1, keepdims=True) + 1e-8
+        # mmt
+        z_txt_mmt = self.txt_proj_mmt(z_txt_mmt)
+        z_txt_mmt /= jnp.linalg.norm(z_txt_mmt, axis=-1, keepdims=True) + 1e-8
       if encode_img and encode_txt:
         loss_clr_ori, tau = self.compute_contrastive_loss(z_img, z_txt)
         if not self.config.clr.bp2txt:
           z_txt = jax.lax.stop_gradient(z_txt)
-        loss_clr_m, tau_m = self.compute_contrastive_loss(z_img_m, z_txt, postfix="m")
+        z_txt_mmt = jax.lax.stop_gradient(z_txt_mmt)
+        loss_clr_m, tau_m = self.compute_contrastive_loss(z_img_m, z_txt_mmt, postfix="m")
         if self.config.clr.mean_loss:
           loss_clr = (loss_clr_ori + loss_clr_m) / 2
+        else:
+          loss_clr = (loss_clr_ori + loss_clr_m)
       else:
         loss_clr = 0
         loss_clr_ori = 0
@@ -1203,6 +1231,8 @@ class ImageTextLearner(nn.Module):
     else:
       raise NotImplementedError
       loss_clr = 0
+
+    # self.config.clr.ema
 
     # apply both decoders
     # x_img_full, x_img_part = self.img_encoder.apply_unshuffle(x_img, ids_restore_img)

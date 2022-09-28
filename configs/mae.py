@@ -130,7 +130,6 @@ def get_config_txt():
 def get_config_proj():
   config = ml_collections.ConfigDict()
   config.name = 'img_proj'
-  config.prefix = ''
   config.proj_layers = 2
   config.proj_dim_hidden = 1024
   config.proj_dim_out = 256

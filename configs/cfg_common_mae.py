@@ -149,5 +149,6 @@ def get_config():
   config.model.clr.contrast_with_mask_only = False
   config.model.clr.bp2txt = True
   config.model.clr.mean_loss = True
+  config.model.clr.ema = 0.999
 
   return config

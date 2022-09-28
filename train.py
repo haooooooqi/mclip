@@ -20,8 +20,8 @@ The data is loaded using tensorflow_datasets.
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
-warnings.filterwarnings("ignore", category=FutureWarning) 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 import functools
 import time, datetime
@@ -131,7 +131,7 @@ def build_dataloaders(config, partitioner):
       image_size,
       input_dtype,
       train=False,
-      cache=False, # config.cache, 
+      cache=False, # config.cache,
       seed=config.seed_tf,
       cfg=config,
       from_tags=tags)
@@ -142,7 +142,7 @@ def build_dataloaders(config, partitioner):
       image_size,
       input_dtype,
       train=True,
-      cache=False, # config.cache, 
+      cache=False, # config.cache,
       seed=config.seed_tf,
       cfg=config)
 
@@ -153,7 +153,7 @@ def build_dataloaders(config, partitioner):
       image_size,
       input_dtype,
       train=False,
-      cache=config.cache, 
+      cache=config.cache,
       seed=config.seed_tf,
       aug=config.aug)
   # data_loader_val = None
@@ -209,7 +209,19 @@ def train_step(state, batch, model, rng):
   new_state = state.apply_gradient(
     grads,
     learning_rate=None,  # TODO: not used in adamw
-    flax_mutables=new_mutables)
+    flax_mutables=new_mutables,
+  )
+
+  print(dir(model))
+
+  params = new_state.params
+  params = flax.core.frozen_dict.unfreeze(params)
+  params["txt_encoder_mmt"] = jax.tree_map(
+      lambda x, y: x * 0.999 + y * 0.001, params["txt_encoder_mmt"], params["txt_encoder"])
+  params["txt_proj_mmt"] = jax.tree_map(
+      lambda x, y: x * 0.999 + y * 0.001, params["txt_proj_mmt"], params["txt_proj"])
+  params = flax.core.frozen_dict.freeze(params)
+  new_state = new_state.replace_params(params)
   return new_state, metrics
 
 
@@ -342,12 +354,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
   batched_tags = [d for d in data_loader_tags]  # 1000x80 or 1000x7
 
   steps_per_epoch = config.samples_per_epoch // config.batch_size  # for lr schedule
-  
+
   # ------------------------------------
   # Create model
   # ------------------------------------
   model = models_mae.ImageTextLearner(config=config.model)
-  
+
   p_init_fn, state_axes, state_shape = create_train_state(
     config, model, steps_per_epoch, partitioner, init_batch=next(data_loader_train))
   rng_init, rng = jax.random.split(rng)
@@ -363,7 +375,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     checkpoints_dir=workdir,
     keep=None,  # TODO: move to config
   )
-  
+
   if config.resume_dir != '':
     state = ckp.restore_checkpoint(checkpointer, path=config.resume_dir)
   elif config.pretrain_dir != '':
@@ -376,6 +388,40 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
     # logging.info('std: {}'.format(stds))
 
   t5x.model_info.log_state_info(state)
+
+  # init MAE mmt model
+  if config.resume_dir == '' and config.pretrain_dir == '':
+      # params = state.params
+
+      # new_param = {k: params[k] for k in params.keys()}
+      # # new_param["txt_proj_mmt"] = {
+      # #     k.replace("txt_", "txt_mmt_"): params["txt_proj"][k] for k in params["txt_proj"].keys()
+      # # }
+      # # new_param["txt_encoder_mmt"] = params["txt_encoder"]
+      # # new_param["txt_encoder_mmt"] = {
+      # #     k.replace("txt_encoder_", "txt_encoder_mmt_"): params["txt_encoder"][k] for k in params["txt_encoder"].keys()
+      # # }
+      # # new_param["txt_encoder_mmt"] = {k: params["txt_encoder"][k] for k in params["txt_encoder"]}
+      # new_param["txt_proj_mmt"] = flax.core.frozen_dict.unfreeze(params["txt_proj"])
+      # new_param["txt_encoder_mmt"] = flax.core.frozen_dict.unfreeze(params["txt_encoder"])
+
+      # params_new = flax.core.frozen_dict.freeze(new_param)
+      # # params_new = partitioner.move_params_to_devices(params_new, state_axes.params)
+
+      # state = state.replace_params(params_new)
+
+      params = state.params
+      params = flax.core.frozen_dict.unfreeze(params)
+      params["txt_encoder_mmt"] = jax.tree_map(lambda x: x.copy(), params["txt_encoder"])
+      params = flax.core.frozen_dict.freeze(params)
+      state = state.replace_params(params)
+
+      # print("========= weights after init txt_proj =============")
+      # print(params["txt_proj"]["mlp1"]["kernel"].sum())
+      # print("========= weights after init txt_proj_mmt =============")
+      # print(params["txt_proj_mmt"]["mlp1"]["kernel"].sum())
+      # print("========= weights after init txt_encoder.keys() =============")
+      # print(params["txt_encoder"].keys())
 
   # ------------------------------------------
   # for debugging with real tensors
@@ -476,7 +522,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
 
   for epoch in range(epoch_offset, int(config.num_epochs)):
     # data_loader_train.sampler.set_epoch(epoch)  # reset random seed
-    
+
     # ------------------------------------------------------------
     # train one epoch (one "virtual" epoch)
     # ------------------------------------------------------------
@@ -520,7 +566,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict,
           train_metrics = []
           train_metrics_last_t = time.time()
 
-      step += 1  
+      step += 1
 
     # ------------------------------------------------------------
     # finished one epoch: eval
