@@ -1127,9 +1127,9 @@ class ImageTextLearner(nn.Module):
 
     # apply both encoders
     if encode_img:
-      x_img, mask_img, ids_restore_img, _, _ = self.img_encoder.apply_encoder(img, train=train)
+      # x_img, mask_img, ids_restore_img, _, _ = self.img_encoder.apply_encoder(img, train=train)
 
-      x_img_m, mask_img_m, ids_restore_img_m, ids_keep_m, ids_unkeep_m = self.img_encoder.apply_encoder(img, train=train, apply_mask=True)
+      x_img_m, mask_img_m, ids_restore_img, ids_keep_m, ids_unkeep_m = self.img_encoder.apply_encoder(img, train=train, apply_mask=train)
       x_img_full_m, x_img_part_m = self.img_encoder.apply_unshuffle(x_img_m, ids_restore_img)
 
       if self.img_encoder.decoder.no_attention:
@@ -1146,7 +1146,7 @@ class ImageTextLearner(nn.Module):
         print(f"mask_tokens {mask_tokens.shape}")
 
         pred_img_m = self.img_encoder.apply_decoder_prompt(
-          mask_tokens, fix_encoding_tokens, train=train, ids_restore=ids_restore_img_m, pred_masked_only=self.config.clr.contrast_with_mask_only,
+          mask_tokens, fix_encoding_tokens, train=train, ids_restore=ids_restore_img, pred_masked_only=self.config.clr.contrast_with_mask_only,
         )
       else:
         pred_img_m = self.img_encoder.apply_decoder(x_img_full_m, train=train)
@@ -1162,10 +1162,10 @@ class ImageTextLearner(nn.Module):
     # apply contrastive learning (clip-like)
     if self.config.clr.clr_loss:
       if encode_img:
-        z_img = x_img.mean(axis=1)  # avearge pool anyway
+        # z_img = x_img.mean(axis=1)  # avearge pool anyway
         # z_img = self.apply_projection_head(z_img, prefix='img')
-        z_img = self.img_proj(z_img)
-        z_img /= jnp.linalg.norm(z_img, axis=-1, keepdims=True) + 1e-8
+        # z_img = self.img_proj(z_img)
+        # z_img /= jnp.linalg.norm(z_img, axis=-1, keepdims=True) + 1e-8
 
         z_img_m = pred_img_m.mean(axis=1)  # avearge pool anyway
         # z_img_m = self.apply_projection_head(z_img_m, prefix='img_m')
@@ -1182,17 +1182,17 @@ class ImageTextLearner(nn.Module):
         z_txt = self.txt_proj(z_txt)
         z_txt /= jnp.linalg.norm(z_txt, axis=-1, keepdims=True) + 1e-8
       if encode_img and encode_txt:
-        loss_clr_ori, tau = self.compute_contrastive_loss(z_img, z_txt)
+        # loss_clr_ori, tau = self.compute_contrastive_loss(z_img, z_txt)
         if not self.config.clr.bp2txt:
           z_txt = jax.lax.stop_gradient(z_txt)
-        loss_clr_m, tau_m = self.compute_contrastive_loss(z_img_m, z_txt, postfix="m")
-        loss_clr = (loss_clr_ori + loss_clr_m) / 2
+        loss_clr, tau = self.compute_contrastive_loss(z_img_m, z_txt, postfix="m")
+        # loss_clr = (loss_clr_ori + loss_clr_m) / 2
       else:
         loss_clr = 0
-        loss_clr_ori = 0
-        loss_clr_m = 0
+        # loss_clr_ori = 0
+        # loss_clr_m = 0
         tau = 0
-        tau_m = 0
+        # tau_m = 0
     else:
       raise NotImplementedError
       loss_clr = 0
@@ -1233,16 +1233,16 @@ class ImageTextLearner(nn.Module):
     artifacts = {
       'loss': loss_img,  # always plot loss_img in the 'loss' metric
       'loss_clr': loss_clr,
-      'loss_clr_ori': loss_clr_ori,
-      'loss_clr_m': loss_clr_m,
+      # 'loss_clr_ori': loss_clr_ori,
+      # 'loss_clr_m': loss_clr_m,
       'loss_img': loss_img,
       'loss_txt': loss_txt,
       'tau': tau,
-      'tau_m': tau_m,
+      # 'tau_m': tau_m,
     }
 
     if not train and encode_img:
-      artifacts['z_img'] = z_img
+      artifacts['z_img'] = z_img_m
     if not train and encode_txt:
       artifacts['z_txt'] = z_txt
 
